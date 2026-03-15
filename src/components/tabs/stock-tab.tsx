@@ -1,0 +1,216 @@
+
+'use client';
+
+import * as React from 'react';
+import { useSearchParams } from "next/navigation";
+import { Search, Plus, Minus, Package, RefreshCcw, DollarSign, AlertCircle, RotateCcw, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { StockFormDialog } from "@/components/stock/stock-form-dialog";
+import { toast } from "@/hooks/use-toast";
+import { useAppStore } from '@/store/app-store';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { USER_ID } from '@/lib/constants';
+import { cn, formatPrecio } from '@/lib/utils';
+
+export function StockTab() {
+  const searchParams = useSearchParams();
+  const db = useFirestore();
+  const { ingredientes, ingredientesCargadas } = useAppStore();
+  const [search, setSearch] = React.useState("");
+  const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
+  const [isResetting, setIsResetting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (searchParams.get("filtro") === "stockBajo") setShowLowStockOnly(true);
+  }, [searchParams]);
+
+  const syncGlobalState = async () => {
+    if (!db) return;
+    const batch = writeBatch(db);
+    const shoppingSnap = await getDocs(collection(db, "users", USER_ID, "shopping_list_items"));
+    shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
+    await batch.commit();
+  };
+
+  const handleResetAllMinStock = async () => {
+    if (!db) return;
+    setIsResetting(true);
+    try {
+      const batch = writeBatch(db);
+      const snap = await getDocs(collection(db, "users", USER_ID, "ingredients"));
+      snap.docs.forEach(d => {
+        batch.update(d.ref, { stockMinimo: 0, updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+      toast({ title: "¡Listo!", description: "Todos los stock mínimos se pusieron en 0." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al resetear" });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const updateStockDirect = async (id: string, val: number) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, "users", USER_ID, "ingredients", id), { stockActual: Math.max(0, val), updatedAt: serverTimestamp() });
+    } catch (e) { console.error(e); }
+  };
+
+  const filteredIngredients = React.useMemo(() => {
+    return ingredientes.filter(item => {
+      const matchesSearch = (item.nombre || "").toLowerCase().includes(search.toLowerCase());
+      const isLow = item.stockActual <= (item.stockMinimo || 0);
+      return matchesSearch && (!showLowStockOnly || isLow);
+    });
+  }, [ingredientes, search, showLowStockOnly]);
+
+  const grouped = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    filteredIngredients.forEach(item => {
+      const cat = item.categoria || "Otros";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [filteredIngredients]);
+
+  if (!ingredientesCargadas && ingredientes.length === 0) {
+    return (
+      <div className="p-4 space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col gap-4 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-black tracking-tight text-primary">Despensa</h1>
+          <div className="flex gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <AlertDialog>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-accent bg-accent/10">
+                        <RotateCcw className={cn("h-5 w-5", isResetting && "animate-spin")} />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <AlertDialogContent className="rounded-[2rem]">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-black text-primary">¿Poner todos los mínimos en 0?</AlertDialogTitle>
+                      <AlertDialogDescription>Esto hará que nada aparezca en la lista de compras automáticamente a menos que lo planees o te quedes sin nada.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2">
+                      <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction className="bg-accent text-white rounded-xl font-black" onClick={handleResetAllMinStock}>Sí, poner en 0</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <TooltipContent>Resetear stock mínimo a 0</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <AlertDialog>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-destructive bg-destructive/5">
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <AlertDialogContent className="rounded-[2rem]">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-black text-primary">¿Vaciar stock actual?</AlertDialogTitle>
+                      <AlertDialogDescription>Se pondrá el "Stock Actual" de todos los ingredientes en 0. Esta acción no se puede deshacer.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2">
+                      <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction className="bg-destructive text-white rounded-xl font-black" onClick={async () => {
+                        const batch = writeBatch(db!);
+                        ingredientes.forEach(i => batch.update(doc(db!, "users", USER_ID, "ingredients", i.id), { stockActual: 0 }));
+                        await batch.commit();
+                        syncGlobalState();
+                      }}>Sí, vaciar stock</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <TooltipContent>Vaciar todo el stock actual</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <StockFormDialog />
+          </div>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre..." className="pl-10 h-12 bg-white rounded-2xl border-2 border-primary/5 font-bold" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-4 py-2 rounded-full cursor-pointer font-black text-[10px] uppercase w-fit", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
+          {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
+        </Badge>
+      </header>
+
+      {Object.keys(grouped).length > 0 ? (
+        <Accordion type="multiple" defaultValue={Object.keys(grouped)} className="space-y-3">
+          {Object.keys(grouped).sort().map(category => (
+            <AccordionItem key={category} value={category} className="border-none">
+              <AccordionTrigger className="flex hover:no-underline bg-white px-5 py-3 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+                <div className="flex items-center gap-3"><Package className="h-4 w-4 text-primary" /><span className="text-xs font-black uppercase text-primary">{category}</span></div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-1 space-y-1 px-1">
+                {grouped[category].map((item) => (
+                  <div key={item.id} className="bg-white p-4 rounded-xl border border-border/50 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-bold text-sm truncate">{item.nombre}</p>
+                        <StockFormDialog ingredientToEdit={item} />
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        {item.precioUnitario > 0 ? (
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatPrecio(item.precioUnitario)} / {item.unidad}</span>
+                        ) : (
+                          <div className="flex items-center gap-1 text-destructive/60">
+                            <AlertCircle className="h-3 w-3" />
+                            <span className="text-[10px] font-bold uppercase">Sin precio definido</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-[8px] font-black uppercase text-muted-foreground">
+                          <span>Actual: {item.stockActual}</span>
+                          <span>Mínimo: {item.stockMinimo || 0}</span>
+                        </div>
+                        <Progress value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} className="h-1" indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "bg-destructive" : "bg-primary"} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 bg-background p-1 rounded-xl shrink-0">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
+                      <div className="w-6 text-center font-black text-xs text-primary">{item.stockActual}</div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
+                    </div>
+                  </div>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      ) : (
+        <div className="py-20 text-center opacity-40"><Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><p className="text-xs font-black uppercase">Sin resultados en la despensa</p></div>
+      )}
+    </div>
+  );
+}

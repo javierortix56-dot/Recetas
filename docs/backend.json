@@ -1,0 +1,719 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile and application settings, linked to an external authentication system. This entity stores personal preferences and daily macro goals.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "externalAuthId": {
+          "type": "string",
+          "description": "Identifier from the external authentication system (e.g., Firebase Auth UID) to link this profile."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, primarily from the external authentication system.",
+          "format": "email"
+        },
+        "profileImageUrl": {
+          "type": "string",
+          "description": "URL to the user's profile picture.",
+          "format": "uri"
+        },
+        "preferredUnitSystem": {
+          "type": "string",
+          "description": "The user's preferred system for units (e.g., 'metric' or 'imperial')."
+        },
+        "dailyCalorieGoal": {
+          "type": "number",
+          "description": "The user's daily target for calorie intake."
+        },
+        "dailyProteinGoal": {
+          "type": "number",
+          "description": "The user's daily target for protein intake in grams."
+        },
+        "dailyCarbGoal": {
+          "type": "number",
+          "description": "The user's daily target for carbohydrate intake in grams."
+        },
+        "dailyFatGoal": {
+          "type": "number",
+          "description": "The user's daily target for fat intake in grams."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "externalAuthId",
+        "displayName",
+        "email",
+        "preferredUnitSystem",
+        "dailyCalorieGoal",
+        "dailyProteinGoal",
+        "dailyCarbGoal",
+        "dailyFatGoal",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Defines categories for organizing recipes and ingredients.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the category (e.g., 'Main Dish', 'Vegetables')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the category."
+        },
+        "usageType": {
+          "type": "string",
+          "description": "Specifies the primary use of the category (e.g., 'recipe', 'ingredient', 'general')."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Category). Optional, for user-defined categories."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the category was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the category was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "usageType",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Ingredient": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Ingredient",
+      "type": "object",
+      "description": "Represents a single ingredient with its nutritional information and default properties.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Ingredient entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The common name of the ingredient (e.g., 'Chicken Breast', 'Olive Oil')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the ingredient."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category for this ingredient. (Relationship: Category 1:N Ingredient)"
+        },
+        "macrosPer100g": {
+          "type": "array",
+          "description": "Nutritional macros per 100 grams or milliliters of the ingredient.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaultUnit": {
+          "type": "string",
+          "description": "The default unit for measuring this ingredient (e.g., 'g', 'ml', 'unit', 'cup')."
+        },
+        "isSystemDefined": {
+          "type": "boolean",
+          "description": "Indicates if this is a pre-seeded system ingredient or a user-created one."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Ingredient). Optional, for user-added custom ingredients."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the ingredient was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the ingredient was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "categoryId",
+        "macrosPer100g",
+        "defaultUnit",
+        "isSystemDefined",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StockItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StockItem",
+      "type": "object",
+      "description": "Represents a user's current inventory of a specific ingredient, including quantity and location.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the StockItem entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N StockItem)"
+        },
+        "ingredientId": {
+          "type": "string",
+          "description": "Reference to Ingredient. (Relationship: Ingredient 1:N StockItem)"
+        },
+        "currentQuantity": {
+          "type": "number",
+          "description": "The current quantity of the ingredient in stock."
+        },
+        "minimumQuantity": {
+          "type": "number",
+          "description": "The minimum desired quantity of the ingredient to keep in stock."
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit of measurement for the current and minimum quantities (e.g., 'g', 'ml', 'can', 'bag')."
+        },
+        "location": {
+          "type": "string",
+          "description": "The physical location where the ingredient is stored (e.g., 'Pantry', 'Fridge', 'Freezer')."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Timestamp when this stock item was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "ingredientId",
+        "currentQuantity",
+        "minimumQuantity",
+        "unit",
+        "location",
+        "lastUpdated"
+      ]
+    },
+    "Recipe": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Recipe",
+      "type": "object",
+      "description": "Details of a family recipe, including ingredients, steps, and nutritional information.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Recipe entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile, indicating the owner/creator of the recipe. (Relationship: UserProfile 1:N Recipe)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the recipe."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description or introduction to the recipe."
+        },
+        "history": {
+          "type": "string",
+          "description": "Historical notes or anecdotes about the recipe (e.g., 'Abuela's secret recipe')."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to Category for this recipe. (Relationship: Category 1:N Recipe)"
+        },
+        "portions": {
+          "type": "number",
+          "description": "The number of servings/portions the recipe yields."
+        },
+        "prepTimeMinutes": {
+          "type": "number",
+          "description": "Estimated preparation time in minutes."
+        },
+        "cookTimeMinutes": {
+          "type": "number",
+          "description": "Estimated cooking time in minutes."
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "The difficulty level of the recipe (e.g., 'Facil', 'Normal', 'Dificil')."
+        },
+        "chefTip": {
+          "type": "string",
+          "description": "A special tip or recommendation from the chef."
+        },
+        "utensils": {
+          "type": "array",
+          "description": "A list of utensils required for the recipe.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL to the hero image of the prepared recipe.",
+          "format": "uri"
+        },
+        "ingredients": {
+          "type": "array",
+          "description": "A list of ingredients required for the recipe, including quantity and unit.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "description": "A detailed, ordered list of preparation steps for the recipe.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the recipe was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the recipe was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "description",
+        "categoryId",
+        "portions",
+        "prepTimeMinutes",
+        "cookTimeMinutes",
+        "difficulty",
+        "ingredients",
+        "steps",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MealPlan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MealPlan",
+      "type": "object",
+      "description": "Records a recipe planned for a specific meal time and date by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the MealPlan entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N MealPlan)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the meal is planned (YYYY-MM-DD).",
+          "format": "date"
+        },
+        "mealType": {
+          "type": "string",
+          "description": "The type of meal (e.g., 'Desayuno', 'Almuerzo', 'Cena', 'Snack')."
+        },
+        "recipeId": {
+          "type": "string",
+          "description": "Reference to Recipe. (Relationship: Recipe 1:N MealPlan)"
+        },
+        "plannedPortions": {
+          "type": "number",
+          "description": "The number of portions of the recipe planned for this meal."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the meal plan was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the meal plan was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "date",
+        "mealType",
+        "recipeId",
+        "plannedPortions",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ShoppingListItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ShoppingListItem",
+      "type": "object",
+      "description": "Represents an item on a user's shopping list, potentially generated from meal plans and stock levels.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ShoppingListItem entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N ShoppingListItem)"
+        },
+        "ingredientId": {
+          "type": "string",
+          "description": "Reference to Ingredient. (Relationship: Ingredient 1:N ShoppingListItem)"
+        },
+        "quantityNeeded": {
+          "type": "number",
+          "description": "The quantity of the ingredient needed."
+        },
+        "unit": {
+          "type": "string",
+          "description": "The unit of measurement for the needed quantity (e.g., 'g', 'ml', 'pack')."
+        },
+        "isPurchased": {
+          "type": "boolean",
+          "description": "Indicates if the item has been purchased."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes for the shopping item (e.g., 'organic', 'brand X')."
+        },
+        "generatedFromMealPlanIds": {
+          "type": "array",
+          "description": "References to MealPlan entities from which this shopping item was generated. (Relationship: MealPlan N:N ShoppingListItem)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the shopping list item was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the shopping list item was last updated.",
+          "format": "date-time"
+        },
+        "purchasedAt": {
+          "type": "string",
+          "description": "Timestamp when the item was marked as purchased.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "ingredientId",
+        "quantityNeeded",
+        "unit",
+        "isPurchased",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DailyMacroSummary": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyMacroSummary",
+      "type": "object",
+      "description": "Aggregates and tracks a user's daily macronutrient consumption against their goals.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyMacroSummary entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N DailyMacroSummary)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the macro summary is recorded (YYYY-MM-DD).",
+          "format": "date"
+        },
+        "totalCaloriesConsumed": {
+          "type": "number",
+          "description": "Total calories consumed for the day."
+        },
+        "totalProteinConsumed": {
+          "type": "number",
+          "description": "Total protein consumed in grams for the day."
+        },
+        "totalCarbsConsumed": {
+          "type": "number",
+          "description": "Total carbohydrates consumed in grams for the day."
+        },
+        "totalFatConsumed": {
+          "type": "number",
+          "description": "Total fat consumed in grams for the day."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the daily macro summary was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the daily macro summary was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "date",
+        "totalCaloriesConsumed",
+        "totalProteinConsumed",
+        "totalCarbsConsumed",
+        "totalFatConsumed",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores the profile and application settings for a specific user, where the document ID matches the user's externalAuthId (Firebase Auth UID). Includes denormalized 'externalAuthId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, which is also the document ID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/system_categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Globally accessible, system-defined categories for organizing recipes and ingredients. These are read-only for all authenticated users.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for a system-defined category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "User-defined categories for organizing recipes and ingredients, privately owned by the specified user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this category."
+            },
+            {
+              "name": "categoryId",
+              "description": "Unique identifier for a user-defined category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/system_ingredients/{ingredientId}",
+        "definition": {
+          "entityName": "Ingredient",
+          "schema": {
+            "$ref": "#/backend/entities/Ingredient"
+          },
+          "description": "Globally accessible, system-defined ingredients with nutritional information. These are read-only for all authenticated users.",
+          "params": [
+            {
+              "name": "ingredientId",
+              "description": "Unique identifier for a system-defined ingredient."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/ingredients/{ingredientId}",
+        "definition": {
+          "entityName": "Ingredient",
+          "schema": {
+            "$ref": "#/backend/entities/Ingredient"
+          },
+          "description": "User-created custom ingredients with nutritional information, privately owned by the specified user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this ingredient."
+            },
+            {
+              "name": "ingredientId",
+              "description": "Unique identifier for a user-created ingredient."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/stock_items/{stockItemId}",
+        "definition": {
+          "entityName": "StockItem",
+          "schema": {
+            "$ref": "#/backend/entities/StockItem"
+          },
+          "description": "Inventory items privately owned by the specified user, tracking their ingredient stock levels. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this stock item."
+            },
+            {
+              "name": "stockItemId",
+              "description": "Unique identifier for a stock item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/recipes/{recipeId}",
+        "definition": {
+          "entityName": "Recipe",
+          "schema": {
+            "$ref": "#/backend/entities/Recipe"
+          },
+          "description": "User-created recipes privately owned by the specified user, including details, ingredients, and steps. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this recipe."
+            },
+            {
+              "name": "recipeId",
+              "description": "Unique identifier for a recipe."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/meal_plans/{mealPlanId}",
+        "definition": {
+          "entityName": "MealPlan",
+          "schema": {
+            "$ref": "#/backend/entities/MealPlan"
+          },
+          "description": "Meal plan entries privately owned by the specified user, recording planned recipes for specific dates and meal types. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this meal plan entry."
+            },
+            {
+              "name": "mealPlanId",
+              "description": "Unique identifier for a meal plan entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/shopping_list_items/{shoppingListItemId}",
+        "definition": {
+          "entityName": "ShoppingListItem",
+          "schema": {
+            "$ref": "#/backend/entities/ShoppingListItem"
+          },
+          "description": "Shopping list items privately owned by the specified user, potentially generated from meal plans. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this shopping list item."
+            },
+            {
+              "name": "shoppingListItemId",
+              "description": "Unique identifier for a shopping list item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/daily_macro_summaries/{dailyMacroSummaryId}",
+        "definition": {
+          "entityName": "DailyMacroSummary",
+          "schema": {
+            "$ref": "#/backend/entities/DailyMacroSummary"
+          },
+          "description": "Daily macronutrient summaries privately owned by the specified user, tracking consumption against goals. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The authenticated user's Firebase Auth UID, owner of this daily macro summary."
+            },
+            {
+              "name": "dailyMacroSummaryId",
+              "description": "Unique identifier for a daily macro summary."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure for 'Cocina Familiar' is designed with a strong emphasis on Authorization Independence, Structural Segregation, and Path-Based Ownership to ensure security, scalability, and debuggability.\n\n**Authorization Independence:** All user-specific data is structured under `/users/{userId}/` subcollections. For every document within these user-owned subcollections (e.g., UserProfile, user-defined Categories, Ingredients, StockItems, Recipes, MealPlans, ShoppingListItems, DailyMacroSummaries), the `userId` field (or `externalAuthId` for UserProfile) is explicitly stored within the document itself. This 'denormalization' of the owner's ID into each document means that Firestore security rules can directly compare `request.auth.uid` with the document's `userId` field. This eliminates the need for expensive and complex `get()` calls in rules to check parent document ownership, thereby supporting atomic operations (transactions/batches) and making rule debugging straightforward. For instance, a rule for `/users/{userId}/recipes/{recipeId}` can simply check `request.auth.uid == resource.data.userId` without needing to retrieve any parent document.\n\n**Structural Segregation for Homogeneous Security Posture & QAPs:** To simplify security rules and support Query-As-Permissions (QAPs), entities like `Category` and `Ingredient` are segregated based on their security requirements:\n*   `/system_categories` and `/system_ingredients`: These collections store pre-seeded, globally accessible data. All authenticated users have read-only access. This ensures that `list` queries on these collections are naturally secure, returning only data that is publicly available to all users, without any client-side filtering needed.\n*   `/users/{userId}/categories` and `/users/{userId}/ingredients`: These subcollections store categories and ingredients created and owned by individual users. Access is restricted to the owning user. `list` operations on these paths will automatically be scoped to the authenticated user's ID, fulfilling QAPs by only returning the user's private data.\n\n**Path-Based Ownership & Clarity:** All private user data leverages a clear hierarchical path structure, `/users/{userId}/{collectionName}/{documentId}`. This makes the ownership explicit in the path itself and allows security rules to leverage the `{userId}` wildcard, ensuring that `request.auth.uid` matches the path's `userId` parameter. This is consistent across `UserProfile`, `StockItem`, `Recipe`, `MealPlan`, `ShoppingListItem`, and `DailyMacroSummary` entities. The consistent use of descriptive wildcards (e.g., `{userId}`, `{recipeId}`) further enhances clarity and debuggability.\n\nThis design avoids `get()` calls in rules, ensures all documents in a collection share the same security posture, provides robust authorization for both global and user-specific data, and supports efficient and secure list operations."
+  }
+}

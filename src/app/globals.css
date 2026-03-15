@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Basado en las especificaciones de Cocina Familiar */
+    --background: 140 20% 98%; /* #F7FAF8 */
+    --foreground: 149 28% 14%; /* #1A2E24 */
+    --card: 0 0% 100%;
+    --card-foreground: 149 28% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 149 28% 14%;
+    --primary: 153 55% 39%; /* #2D9A6B */
+    --primary-foreground: 147 43% 94%;
+    --primary-suave: 147 43% 94%; /* #E8F5EF */
+    --secondary: 147 43% 94%;
+    --secondary-foreground: 153 55% 39%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%; /* #6B7280 */
+    --accent: 38 92% 50%; /* #F59E0B */
+    --accent-foreground: 149 28% 14%;
+    --destructive: 350 89% 60%; /* #F43F5E */
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%; /* #E5E7EB */
+    --input: 214 32% 91%;
+    --ring: 153 55% 39%;
+    --radius: 1rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.recipe-card-shadow {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Optimización de scrollbars para chips horizontales */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Transiciones de tab suaves */
+.tab-panel {
+  transition: opacity 150ms ease;
+  opacity: 0;
+  display: none;
+}
+
+.tab-panel.visible {
+  display: block;
+  opacity: 1;
+}
+
+.tab-panel.hidden {
+  display: none;
+  opacity: 0;
+}

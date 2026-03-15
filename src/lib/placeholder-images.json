@@ -1,0 +1,28 @@
+{
+  "placeholderImages": [
+    {
+      "id": "recipe-pasta",
+      "description": "Delicious pasta with tomato sauce",
+      "imageUrl": "https://picsum.photos/seed/pasta/600/400",
+      "imageHint": "pasta tomato"
+    },
+    {
+      "id": "recipe-salad",
+      "description": "Fresh greek salad",
+      "imageUrl": "https://picsum.photos/seed/salad/600/400",
+      "imageHint": "greek salad"
+    },
+    {
+      "id": "recipe-chicken",
+      "description": "Roasted chicken with vegetables",
+      "imageUrl": "https://picsum.photos/seed/chicken/600/400",
+      "imageHint": "roasted chicken"
+    },
+    {
+      "id": "ingredient-tomato",
+      "description": "Fresh tomatoes",
+      "imageUrl": "https://picsum.photos/seed/tomato/200/200",
+      "imageHint": "tomato vegetable"
+    }
+  ]
+}
