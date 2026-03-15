@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,36 @@ export function ComprasTab() {
   const { listaCompras, listaComprasCargada, optimisticToggleCompra } = useAppStore();
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
+  
+  // Estado para controlar expansión del acordeón
+  const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+
+  const groupedItems = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    listaCompras.forEach(item => {
+      const cat = (item.categoria || "Otros").toUpperCase();
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [listaCompras]);
+
+  const categories = React.useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
+
+  // Expandir todo por defecto al cargar si hay items
+  React.useEffect(() => {
+    if (listaComprasCargada && categories.length > 0 && expandedItems.length === 0) {
+      setExpandedItems(categories);
+    }
+  }, [listaComprasCargada, categories]);
+
+  const toggleExpandAll = () => {
+    if (expandedItems.length === categories.length) {
+      setExpandedItems([]);
+    } else {
+      setExpandedItems(categories);
+    }
+  };
 
   const totalEstimado = React.useMemo(() => {
     return listaCompras
@@ -143,15 +173,6 @@ export function ComprasTab() {
     );
   }
 
-  const groupedItems: Record<string, any[]> = {};
-  listaCompras.forEach(item => {
-    const cat = (item.categoria || "Otros").toUpperCase();
-    if (!groupedItems[cat]) groupedItems[cat] = [];
-    groupedItems[cat].push(item);
-  });
-  
-  const categories = Object.keys(groupedItems).sort();
-
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
@@ -162,6 +183,15 @@ export function ComprasTab() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleExpandAll} 
+            className="h-10 w-10 rounded-full bg-primary-suave text-primary"
+          >
+            {expandedItems.length === categories.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </Button>
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -206,7 +236,12 @@ export function ComprasTab() {
       )}
 
       {listaCompras.length > 0 ? (
-        <Accordion type="multiple" defaultValue={categories} className="space-y-2">
+        <Accordion 
+          type="multiple" 
+          value={expandedItems} 
+          onValueChange={setExpandedItems}
+          className="space-y-2"
+        >
           {categories.map((category) => (
             <AccordionItem key={category} value={category} className="border-none">
               <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2.5 rounded-2xl border border-border shadow-sm mb-1 transition-all">
@@ -240,7 +275,7 @@ export function ComprasTab() {
                                 }}
                                 trigger={
                                   <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Tag className="h-3 w-3" />
+                                    <Tag className="h-3.5 w-3.5" />
                                   </button>
                                 }
                               />
