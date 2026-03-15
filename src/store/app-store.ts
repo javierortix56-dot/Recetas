@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { format } from 'date-fns';
 
@@ -26,6 +27,7 @@ export type UserProfileName = 'javi' | 'mary';
 interface AppState {
   // Perfil activo
   activeProfile: UserProfileName;
+  isProfileConfirmed: boolean; // No persistido para forzar pregunta por sesión
   
   // Datos
   recetas: any[];
@@ -50,6 +52,7 @@ interface AppState {
 
   // Setters
   setActiveProfile: (profile: UserProfileName) => void;
+  confirmProfile: () => void;
   setRecetas: (data: any[]) => void;
   setIngredientes: (data: any[]) => void;
   setPlanificacion: (data: any[]) => void;
@@ -68,6 +71,7 @@ const cached = getCachedData();
 
 const initialState = {
   activeProfile: (cached?.activeProfile as UserProfileName) ?? 'javi',
+  isProfileConfirmed: false, // Siempre empieza en false al abrir la app
   
   recetas: cached?.recetas ?? [],
   ingredientes: cached?.ingredientes ?? [],
@@ -93,8 +97,18 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveProfile: (profile) => {
     updateCache('activeProfile', profile);
-    set({ activeProfile: profile, macrosCargados: false, macrosHoy: null, macrosSemana: [], planificacion: [], planificacionCargada: false });
+    set({ 
+      activeProfile: profile, 
+      isProfileConfirmed: true, // Al cambiar activamente, confirmamos la sesión
+      macrosCargados: false, 
+      macrosHoy: null, 
+      macrosSemana: [], 
+      planificacion: [], 
+      planificacionCargada: false 
+    });
   },
+
+  confirmProfile: () => set({ isProfileConfirmed: true }),
 
   setRecetas: (data) => {
     updateCache('recetas', data);

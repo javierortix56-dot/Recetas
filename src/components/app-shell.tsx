@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -10,6 +11,7 @@ import { PlanificacionTab } from './tabs/planificacion-tab';
 import { ComprasTab } from './tabs/compras-tab';
 import { MacrosTab } from './tabs/macros-tab';
 import { ProfileSwitcher } from './profile-switcher';
+import { ProfileSelectionOverlay } from './profile-selection-overlay';
 import { cn } from '@/lib/utils';
 
 /**
@@ -18,7 +20,7 @@ import { cn } from '@/lib/utils';
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activeTab, setActiveTab } = useAppStore();
+  const { activeTab, setActiveTab, isProfileConfirmed } = useAppStore();
   
   // Normalización para soportar rutas con o sin barra final, y la raíz
   const normalizedPath = React.useMemo(() => {
@@ -42,6 +44,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [normalizedPath, setActiveTab]);
 
   const isCoreTab = ['/inicio', '/planificacion', '/recetas', '/stock', '/compras', '/macros'].includes(normalizedPath);
+
+  // Si no se ha confirmado el perfil en esta sesión, mostramos el overlay bloqueante
+  if (!isProfileConfirmed) {
+    return <ProfileSelectionOverlay />;
+  }
 
   return (
     <div className="relative w-full h-full min-h-screen overflow-hidden">
