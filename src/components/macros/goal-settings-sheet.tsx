@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Settings, Wrench, Database, Activity, Target } from "lucide-react"
+import { Settings, Wrench, Database, Activity, Target, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { useFirestore } from "@/firebase"
 import { doc, serverTimestamp, setDoc } from "firebase/firestore"
 import { USER_ID } from "@/lib/constants"
 import { useAppStore } from "@/store/app-store"
+import { IngredientMergerDialog } from "./ingredient-merger-dialog"
 
 export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
   const db = useFirestore()
@@ -144,6 +145,14 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
           </section>
 
           <Separator className="bg-primary/5" />
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <Wrench className="h-4 w-4 text-primary" />
+              <h3 className="text-xs font-black uppercase text-primary tracking-widest">Mantenimiento</h3>
+            </div>
+            <IngredientMergerDialog />
+          </section>
 
           <section className="space-y-4 pb-8">
             <h3 className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
