@@ -42,13 +42,13 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from '@/store/app-store';
 import { AddMealPlanDialog } from '@/components/plan/add-meal-plan-dialog';
 import { USER_ID } from '@/lib/constants';
-import { cn, convertirCantidad, sugerirUnidadLogica } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { GradientPlaceholder } from '@/components/gradient-placeholder';
 import { motion, AnimatePresence } from 'framer-motion';
 import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
 import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
-import { categorizeIngredient, isSubPreparation } from '@/lib/categorizeIngredient';
 import Image from "next/image";
+import { syncShoppingList } from '@/lib/sync-logic';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 
@@ -89,101 +89,6 @@ export function PlanificacionTab() {
     }
   }, [planificacionCargada, expandedDay]);
 
-  const syncGlobalState = async () => {
-    if (!db) return;
-    const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
-      getDocs(collection(db, "users", USER_ID, "meal_plans")),
-      getDocs(collection(db, "users", USER_ID, "ingredients")),
-      getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
-    ]);
-
-    const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing]));
-    const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-    
-    allPlans.forEach(plan => {
-      const planPortions = Number(plan.plannedPortions) || 1;
-      const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-      const scale = planPortions / originalPortions;
-
-      (plan.ingredientes || []).forEach((ing: any) => {
-        const nombreIng = (ing.nombre || "").toLowerCase().trim();
-        if (!nombreIng || isSubPreparation(nombreIng)) return;
-        
-        const rawQty = (Number(ing.cantidad) || 0) * scale;
-        const stockItem = stockMap.get(nombreIng);
-        
-        const convertedQty = stockItem 
-          ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
-          : rawQty;
-
-        const existing = neededMap.get(nombreIng);
-        if (existing) {
-          existing.cantidad += convertedQty;
-        } else {
-          neededMap.set(nombreIng, { 
-            nombre: ing.nombre, 
-            cantidad: convertedQty, 
-            unidad: stockItem?.unidad || ing.unidad || "unid", 
-            categoria: ing.categoria || categorizeIngredient(ing.nombre) 
-          });
-        }
-      });
-    });
-
-    const batch = writeBatch(db);
-    shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
-    
-    const finalShoppingMap = new Map();
-
-    allIngredients.forEach((ing: any) => {
-      const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-      const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
-      const minNeed = Number(ing.stockMinimo ?? 0);
-      const enStock = Number(ing.stockActual || 0);
-      const totalRequerido = Math.max(planNeed, minNeed);
-      const faltante = totalRequerido - enStock;
-
-      if (faltante > 0) {
-        const precio = ing.precioUnitario || 0;
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-        
-        finalShoppingMap.set(nombreNorm, {
-          nombre: ing.nombre,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          categoria: ing.categoria || categorizeIngredient(ing.nombre),
-          ingredienteId: ing.id,
-          precioUnitario: precio,
-          subtotal: precio * faltante
-        });
-      }
-    });
-
-    neededMap.forEach((data, nombreNorm) => {
-      if (!finalShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
-        finalShoppingMap.set(nombreNorm, {
-          ...data,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          ingredienteId: "",
-          precioUnitario: 0,
-          subtotal: 0
-        });
-      }
-    });
-
-    finalShoppingMap.forEach((data) => {
-      const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-      batch.set(ref, { userId: USER_ID, ...data, isPurchased: false, createdAt: serverTimestamp() });
-    });
-
-    await batch.commit();
-  };
-
   const updateSummariesAfterAutoPlan = async (affectedDates: string[]) => {
     if (!db) return;
     for (const date of affectedDates) {
@@ -214,11 +119,7 @@ export function PlanificacionTab() {
   };
 
   const handleAutoPlan = async () => {
-    if (!db || recetas.length === 0) {
-      toast({ variant: "destructive", title: "Sin recetas", description: "Carga algunas recetas primero." });
-      return;
-    }
-
+    if (!db || recetas.length === 0) return;
     setIsAutoPlanning(true);
     try {
       const result = await autoPlanWeek({
@@ -296,12 +197,11 @@ export function PlanificacionTab() {
 
       await batch.commit();
       await updateSummariesAfterAutoPlan(weekStr);
-      await syncGlobalState();
+      await syncShoppingList(db);
       
-      toast({ title: `¡Plan de ${activeProfile} listo! ✨`, description: result.summary });
+      toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
     } catch (e) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el plan automático." });
+      toast({ variant: "destructive", title: "Error al generar plan semanal" });
     } finally {
       setIsAutoPlanning(false);
     }
@@ -387,13 +287,12 @@ export function PlanificacionTab() {
 
       await batch.commit();
       await updateSummariesAfterAutoPlan([dateStr]);
-      await syncGlobalState();
+      await syncShoppingList(db);
       
       toast({ title: `Día de ${activeProfile} planeado ✓` });
       setExpandedDay(dateStr);
     } catch (e) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Error" });
+      toast({ variant: "destructive", title: "Error al planear el día" });
     } finally {
       setIsAutoPlanningDay(null);
     }
@@ -406,7 +305,6 @@ export function PlanificacionTab() {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
       
-      // SOLO borra planes del perfil activo
       const currentPlansSnap = await getDocs(query(
         collection(db, "users", USER_ID, "meal_plans"), 
         where("date", "in", weekStr),
@@ -431,10 +329,10 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncGlobalState();
-      toast({ title: `Semana de ${activeProfile} desplanificada` });
+      await syncShoppingList(db);
+      toast({ title: `Semana desplanificada` });
     } catch (e) {
-      toast({ variant: "destructive", title: "Error" });
+      toast({ variant: "destructive", title: "Error al limpiar plan" });
     } finally {
       setIsClearing(false);
     }
@@ -448,7 +346,7 @@ export function PlanificacionTab() {
         plannedPortions: newPortions, 
         updatedAt: serverTimestamp() 
       });
-      await syncGlobalState();
+      await syncShoppingList(db);
     } catch (e) {}
   };
 
@@ -468,11 +366,11 @@ export function PlanificacionTab() {
 
       await batch.commit();
       await updateSummariesAfterAutoPlan([selectedPlan.date]);
-      await syncGlobalState();
+      await syncShoppingList(db);
       
       toast({ title: "Comida eliminada" });
       setSelectedPlan(null);
-    } catch (e) { toast({ variant: "destructive", title: "Error" }); }
+    } catch (e) { toast({ variant: "destructive", title: "Error al borrar" }); }
     finally { setIsDeleting(false); }
   };
 
@@ -623,7 +521,7 @@ export function PlanificacionTab() {
                                 <Button variant="ghost" size="icon" className="h-8 w-8 absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSelectedPlan(plan)}><MoreVertical className="h-4 w-4" /></Button>
                               </div>
                             ) : (
-                              <AddMealPlanDialog date={day} momento={m} onSave={() => syncGlobalState()}>
+                              <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
                                 <button className="flex-1 h-14 border-2 border-dashed border-border rounded-2xl flex items-center justify-center gap-2 text-muted-foreground hover:bg-primary/5 transition-colors">
                                   <Plus className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Planificar</span>
                                 </button>

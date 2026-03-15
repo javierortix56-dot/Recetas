@@ -7,16 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, addDoc, serverTimestamp, query, orderBy, doc, getDoc, setDoc, updateDoc, writeBatch, getDocs } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, query, orderBy, doc, getDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { GradientPlaceholder } from "@/components/gradient-placeholder"
 import { Card, CardContent } from "@/components/ui/card"
 import { USER_ID } from "@/lib/constants"
-import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
-import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
+import { syncShoppingList } from "@/lib/sync-logic"
 
 interface AddMealPlanDialogProps {
   date: Date
@@ -48,101 +47,6 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
     if (!recipes) return []
     return recipes.filter(r => (r.nombre || "").toLowerCase().includes(search.toLowerCase()))
   }, [recipes, search])
-
-  const syncGlobalState = async () => {
-    if (!db) return;
-    const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
-      getDocs(collection(db, "users", USER_ID, "meal_plans")),
-      getDocs(collection(db, "users", USER_ID, "ingredients")),
-      getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
-    ]);
-
-    const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing]));
-    const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-    
-    allPlans.forEach(plan => {
-      const planPortions = Number(plan.plannedPortions) || 1;
-      const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-      const scale = planPortions / originalPortions;
-
-      (plan.ingredientes || []).forEach((ing: any) => {
-        const nombreIng = (ing.nombre || "").toLowerCase().trim();
-        if (!nombreIng || isSubPreparation(nombreIng)) return;
-        
-        const rawQty = (Number(ing.cantidad) || 0) * scale;
-        const stockItem = stockMap.get(nombreIng);
-        
-        const convertedQty = stockItem 
-          ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
-          : rawQty;
-
-        const existing = neededMap.get(nombreIng);
-        if (existing) {
-          existing.cantidad += convertedQty;
-        } else {
-          neededMap.set(nombreIng, { 
-            nombre: ing.nombre, 
-            cantidad: convertedQty, 
-            unidad: stockItem?.unidad || ing.unidad || "unid", 
-            categoria: ing.categoria || categorizeIngredient(ing.nombre) 
-          });
-        }
-      });
-    });
-
-    const batch = writeBatch(db);
-    shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
-    
-    const finalShoppingMap = new Map();
-
-    allIngredients.forEach((ing: any) => {
-      const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-      const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
-      const minNeed = Number(ing.stockMinimo ?? 0);
-      const enStock = Number(ing.stockActual || 0);
-      const totalRequerido = Math.max(planNeed, minNeed);
-      const faltante = totalRequerido - enStock;
-
-      if (faltante > 0) {
-        const precio = ing.precioUnitario || 0;
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-        
-        finalShoppingMap.set(nombreNorm, {
-          nombre: ing.nombre,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          categoria: ing.categoria || categorizeIngredient(ing.nombre),
-          ingredienteId: ing.id,
-          precioUnitario: precio,
-          subtotal: precio * faltante
-        });
-      }
-    });
-
-    neededMap.forEach((data, nombreNorm) => {
-      if (!finalShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
-        finalShoppingMap.set(nombreNorm, {
-          ...data,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          ingredienteId: "",
-          precioUnitario: 0,
-          subtotal: 0
-        });
-      }
-    });
-
-    finalShoppingMap.forEach((data) => {
-      const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-      batch.set(ref, { userId: USER_ID, ...data, isPurchased: false, createdAt: serverTimestamp() });
-    });
-
-    await batch.commit();
-  };
 
   const handleSelectRecipe = async (recipe: any) => {
     if (!db) return
@@ -180,7 +84,6 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
       batch.set(planRef, planData);
 
-      // El log de macros también es individual
       batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
         userId: USER_ID,
         perfil: activeProfile,
@@ -223,7 +126,8 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         });
       }
 
-      await syncGlobalState();
+      // Sincronización optimizada
+      await syncShoppingList(db);
       
       toast({ title: "Planificado ✓", description: `Agregado a ${momento} de ${activeProfile}` })
       setOpen(false)

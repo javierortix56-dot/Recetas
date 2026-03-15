@@ -1,17 +1,18 @@
 "use client"
 
 import * as React from "react"
-import { Plus, DollarSign, Calculator, Info, Tag } from "lucide-react"
+import { Plus, Calculator, Tag } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore } from "@/firebase"
-import { collection, addDoc, serverTimestamp, getDocs, writeBatch, doc, updateDoc, query, where } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, query, where } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
-import { categorizeIngredient, isSubPreparation, normalizeIngredientName, IngredientCategory } from "@/lib/categorizeIngredient"
-import { convertirCantidad, normalizarUnidad, sugerirUnidadLogica, formatPrecio, calcularPrecioUnitarioBase } from "@/lib/utils"
+import { categorizeIngredient, normalizeIngredientName, IngredientCategory } from "@/lib/categorizeIngredient"
+import { formatPrecio, calcularPrecioUnitarioBase } from "@/lib/utils"
+import { syncShoppingList } from "@/lib/sync-logic"
 
 const CATEGORIES: IngredientCategory[] = [
   "Lácteos y Huevos",
@@ -31,7 +32,6 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
   const db = useFirestore()
   const [isSaving, setIsSaving] = React.useState(false)
 
-  // Estados para la calculadora de precios
   const [calcPrecio, setCalcPrecio] = React.useState<number>(0)
   const [calcCantidad, setCalcCantidad] = React.useState<number>(1)
   const [calcUnidad, setCalcUnidad] = React.useState<string>("kg")
@@ -62,19 +62,6 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
         setCalcCantidad(1)
         setCalcUnidad(ingredientToEdit.unidad || "unidad")
       }
-    } else {
-      setFormData({
-        nombre: "",
-        categoria: "Almacén",
-        unidad: "unidad",
-        stockActual: 0,
-        stockMinimo: 0, 
-        precioUnitario: 0,
-        macrosPer100g: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 }
-      })
-      setCalcPrecio(0)
-      setCalcCantidad(1)
-      setCalcUnidad("kg")
     }
   }, [ingredientToEdit, open])
 
@@ -82,101 +69,6 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
     const unitario = calcularPrecioUnitarioBase(calcPrecio, calcCantidad, calcUnidad, formData.unidad)
     setFormData(prev => ({ ...prev, precioUnitario: unitario }))
   }, [calcPrecio, calcCantidad, calcUnidad, formData.unidad])
-
-  const syncGlobalState = async () => {
-    if (!db) return;
-    const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
-      getDocs(collection(db, "users", USER_ID, "meal_plans")),
-      getDocs(collection(db, "users", USER_ID, "ingredients")),
-      getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
-    ]);
-
-    const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing]));
-    const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-    
-    allPlans.forEach(plan => {
-      const planPortions = Number(plan.plannedPortions) || 1;
-      const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-      const scale = planPortions / originalPortions;
-
-      (plan.ingredientes || []).forEach((ing: any) => {
-        const nombreIng = (ing.nombre || "").toLowerCase().trim();
-        if (!nombreIng || isSubPreparation(nombreIng)) return;
-        
-        const rawQty = (Number(ing.cantidad) || 0) * scale;
-        const stockItem = stockMap.get(nombreIng);
-        
-        const convertedQty = stockItem 
-          ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
-          : rawQty;
-
-        const existing = neededMap.get(nombreIng);
-        if (existing) {
-          existing.cantidad += convertedQty;
-        } else {
-          neededMap.set(nombreIng, { 
-            nombre: ing.nombre, 
-            cantidad: convertedQty, 
-            unidad: stockItem?.unidad || ing.unidad || "unid", 
-            categoria: ing.categoria || categorizeIngredient(ing.nombre) 
-          });
-        }
-      });
-    });
-
-    const batch = writeBatch(db);
-    shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
-    
-    const finalShoppingMap = new Map();
-
-    allIngredients.forEach((ing: any) => {
-      const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-      const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
-      const minNeed = Number(ing.stockMinimo ?? 0);
-      const enStock = Number(ing.stockActual || 0);
-      const totalRequerido = Math.max(planNeed, minNeed);
-      const faltante = totalRequerido - enStock;
-
-      if (faltante > 0) {
-        const precio = ing.precioUnitario || 0;
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-        
-        finalShoppingMap.set(nombreNorm, {
-          nombre: ing.nombre,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          categoria: ing.categoria || categorizeIngredient(ing.nombre),
-          ingredienteId: ing.id,
-          precioUnitario: precio,
-          subtotal: precio * faltante
-        });
-      }
-    });
-
-    neededMap.forEach((data, nombreNorm) => {
-      if (!finalShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
-        finalShoppingMap.set(nombreNorm, {
-          ...data,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          ingredienteId: "",
-          precioUnitario: 0,
-          subtotal: 0
-        });
-      }
-    });
-
-    finalShoppingMap.forEach((data) => {
-      const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-      batch.set(ref, { userId: USER_ID, ...data, isPurchased: false, createdAt: serverTimestamp() });
-    });
-
-    await batch.commit();
-  };
 
   const handleSave = async () => {
     if (!formData.nombre || !db) return
@@ -186,7 +78,6 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
     const finalData = {
       ...formData,
       nombre: normalizedName,
-      // La categoría ahora viene del estado local (seleccionada por el usuario)
       categoria: formData.categoria
     };
 
@@ -198,7 +89,6 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
           updatedAt: serverTimestamp()
         })
       } else {
-        // Buscar si ya existe por nombre para no duplicar si vino de la lista de compras
         const q = query(collection(db, "users", USER_ID, "ingredients"), where("nombre", "==", normalizedName));
         const snap = await getDocs(q);
         
@@ -218,12 +108,13 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
         }
       }
       
-      await syncGlobalState();
+      // Sync optimizado
+      await syncShoppingList(db);
       
-      toast({ title: "Cambios guardados ✓", description: "Se recordará para futuros usos." })
+      toast({ title: "Cambios guardados ✓" })
       setOpen(false)
     } catch (e) {
-      toast({ variant: "destructive", title: "Error" })
+      toast({ variant: "destructive", title: "Error al guardar" })
     } finally {
       setIsSaving(false)
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Package, ArrowUpCircle, DollarSign, Info, AlertTriangle, RefreshCcw, Tag, Pencil } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,17 +11,17 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, getDocs, setDoc, query, where } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc } from "firebase/firestore";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
-import { categorizeIngredient, isSubPreparation } from '@/lib/categorizeIngredient';
-import { cn, formatPrecio, convertirCantidad, sugerirUnidadLogica, normalizarUnidad } from '@/lib/utils';
+import { cn, formatPrecio, convertirCantidad } from '@/lib/utils';
 import { StockFormDialog } from '@/components/stock/stock-form-dialog';
+import { syncShoppingList } from '@/lib/sync-logic';
 
 export function ComprasTab() {
   const db = useFirestore();
-  const { listaCompras, listaComprasCargada, optimisticToggleCompra, planificacion, ingredientes } = useAppStore();
+  const { listaCompras, listaComprasCargada, optimisticToggleCompra } = useAppStore();
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
 
@@ -35,103 +35,13 @@ export function ComprasTab() {
     return listaCompras.filter(i => !i.isPurchased && (!i.precioUnitario || i.precioUnitario === 0)).length;
   }, [listaCompras]);
 
-  const syncGlobalState = async () => {
+  const handleSync = async () => {
     if (!db) return;
     setIsSyncing(true);
     try {
-      const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
-        getDocs(collection(db, "users", USER_ID, "meal_plans")),
-        getDocs(collection(db, "users", USER_ID, "ingredients")),
-        getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
-      ]);
-
-      const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing]));
-      const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-      
-      allPlans.forEach(plan => {
-        const planPortions = Number(plan.plannedPortions) || 1;
-        const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-        const scale = planPortions / originalPortions;
-
-        (plan.ingredientes || []).forEach((ing: any) => {
-          const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-          if (!nombreNorm || isSubPreparation(nombreNorm)) return;
-          
-          const rawQty = (Number(ing.cantidad) || 0) * scale;
-          const stockItem = stockMap.get(nombreNorm);
-          
-          const convertedQty = stockItem 
-            ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
-            : rawQty;
-
-          const existing = neededMap.get(nombreNorm);
-          if (existing) {
-            existing.cantidad += convertedQty;
-          } else {
-            neededMap.set(nombreNorm, { 
-              nombre: ing.nombre, 
-              cantidad: convertedQty, 
-              unidad: stockItem?.unidad || ing.unidad || "unid", 
-              categoria: ing.categoria || categorizeIngredient(ing.nombre) 
-            });
-          }
-        });
-      });
-
-      const batch = writeBatch(db);
-      shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
-      
-      const finalShoppingMap = new Map();
-
-      allIngredients.forEach((ing: any) => {
-        const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-        const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
-        const minNeed = Number(ing.stockMinimo ?? 0);
-        const enStock = Number(ing.stockActual || 0);
-        const totalRequerido = Math.max(planNeed, minNeed);
-        const faltante = totalRequerido - enStock;
-
-        if (faltante > 0) {
-          const precio = ing.precioUnitario || 0;
-          const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-          
-          finalShoppingMap.set(nombreNorm, {
-            nombre: ing.nombre,
-            cantidad: Number(finalQty.toFixed(2)),
-            unidad: finalUnit,
-            categoria: ing.categoria || categorizeIngredient(ing.nombre),
-            ingredienteId: ing.id,
-            precioUnitario: precio,
-            subtotal: precio * faltante
-          });
-        }
-      });
-
-      neededMap.forEach((data, nombreNorm) => {
-        if (!finalShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
-          const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
-          finalShoppingMap.set(nombreNorm, {
-            ...data,
-            cantidad: Number(finalQty.toFixed(2)),
-            unidad: finalUnit,
-            ingredienteId: "",
-            precioUnitario: 0,
-            subtotal: 0
-          });
-        }
-      });
-
-      finalShoppingMap.forEach((data) => {
-        const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-        batch.set(ref, { userId: USER_ID, ...data, isPurchased: false, createdAt: serverTimestamp() });
-      });
-
-      await batch.commit();
+      await syncShoppingList(db);
       toast({ title: "Sincronizado con el plan ✓" });
     } catch (e) {
-      console.error(e);
       toast({ variant: "destructive", title: "Error al sincronizar" });
     } finally {
       setIsSyncing(false);
@@ -195,10 +105,10 @@ export function ComprasTab() {
       }
 
       await batch.commit();
-      await syncGlobalState();
-      toast({ title: "Stock actualizado ✓", description: `Se sumaron los productos a tu despensa.` });
+      await syncShoppingList(db);
+      toast({ title: "Stock actualizado ✓" });
     } catch (e) { 
-      toast({ variant: "destructive", title: "Error" }); 
+      toast({ variant: "destructive", title: "Error al actualizar stock" }); 
     } finally { 
       setIsUpdatingStock(false); 
     }
@@ -255,7 +165,7 @@ export function ComprasTab() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={syncGlobalState} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
+                <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
                   <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
                 </Button>
               </TooltipTrigger>
@@ -356,7 +266,7 @@ export function ComprasTab() {
       ) : (
         <div className="py-24 text-center space-y-4">
           <div className="bg-primary-suave w-24 h-24 rounded-full flex items-center justify-center mx-auto">
-            <Check className="h-12 w-12 text-primary" />
+            <Package className="h-12 w-12 text-primary" />
           </div>
           <h2 className="text-2xl font-black text-primary">¡Lista vacía!</h2>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Planificá una receta para ver qué ingredientes te faltan.</p>
