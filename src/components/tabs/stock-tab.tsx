@@ -40,7 +40,7 @@ export function StockTab() {
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   
-  // Estado para controlar expansión del acordeón
+  // Estado para controlar expansión del acordeón - Contraído por defecto []
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
   const categoriesInView = React.useMemo(() => {
@@ -50,9 +50,7 @@ export function StockTab() {
 
   React.useEffect(() => {
     if (searchParams.get("filtro") === "stockBajo") setShowLowStockOnly(true);
-    // Por defecto, expandir todas las categorías al cargar
-    setExpandedItems(categoriesInView);
-  }, [searchParams, categoriesInView]);
+  }, [searchParams]);
 
   const toggleExpandAll = () => {
     if (expandedItems.length === categoriesInView.length) {

@@ -26,6 +26,7 @@ export function ComprasTab() {
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   
+  // Estado para controlar expansión del acordeón - Contraído por defecto []
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
   const groupedItems = React.useMemo(() => {
@@ -39,12 +40,6 @@ export function ComprasTab() {
   }, [listaCompras]);
 
   const categories = React.useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
-
-  React.useEffect(() => {
-    if (listaComprasCargada && categories.length > 0 && expandedItems.length === 0) {
-      setExpandedItems(categories);
-    }
-  }, [listaComprasCargada, categories]);
 
   const toggleExpandAll = () => {
     if (expandedItems.length === categories.length) {
@@ -249,7 +244,7 @@ export function ComprasTab() {
         >
           {categories.map((category) => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2.5 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-1 transition-all">
                 <div className="flex items-center gap-3">
                   <Package className="h-4 w-4 text-primary" />
                   <div className="flex flex-col items-start">
