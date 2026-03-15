@@ -243,11 +243,11 @@ export function ComprasTab() {
   const categories = Object.keys(groupedItems).sort();
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
+    <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-primary">Compras</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">
+          <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
             {listaCompras.filter(i => i.isPurchased).length} de {listaCompras.length} en el carrito
           </p>
         </div>
@@ -269,18 +269,18 @@ export function ComprasTab() {
             className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-6 gap-2"
           >
             <ArrowUpCircle className="h-4 w-4" />
-            {isUpdatingStock ? "..." : "Terminar Compra"}
+            {isUpdatingStock ? "..." : "Terminar"}
           </Button>
         </div>
       </header>
 
       {listaCompras.length > 0 && (
         <Card className="border-none shadow-sm bg-primary-suave/50 rounded-3xl overflow-hidden border-2 border-primary/5">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-2xl font-black text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-xs font-bold opacity-60">estimado</span></p>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-2xl font-black text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-[10px] font-bold opacity-60 uppercase">Estimado</span></p>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">{listaCompras.filter(i => !i.isPurchased).length} ítems pendientes</span>
+                <span className="text-[9px] font-black text-muted-foreground uppercase">{listaCompras.filter(i => !i.isPurchased).length} ítems pendientes</span>
                 {itemsSinPrecio > 0 && (
                   <div className="flex items-center gap-1 text-accent font-black text-[9px] uppercase">
                     <AlertTriangle className="h-3 w-3" /> {itemsSinPrecio} sin precio
@@ -288,43 +288,43 @@ export function ComprasTab() {
                 )}
               </div>
             </div>
-            <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-              <DollarSign className="h-6 w-6 text-primary" />
+            <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+              <DollarSign className="h-5 w-5 text-primary" />
             </div>
           </CardContent>
         </Card>
       )}
 
       {listaCompras.length > 0 ? (
-        <Accordion type="multiple" defaultValue={categories} className="space-y-4">
+        <Accordion type="multiple" defaultValue={categories} className="space-y-2">
           {categories.map((category) => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-5 py-4 rounded-3xl border border-border shadow-sm mb-2 transition-all">
-                <div className="flex items-center gap-4">
-                  <Package className="h-5 w-5 text-primary" />
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2.5 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+                <div className="flex items-center gap-3">
+                  <Package className="h-4 w-4 text-primary" />
                   <div className="flex flex-col items-start">
-                    <span className="text-sm font-black uppercase text-primary">{category}</span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase">{groupedItems[category].length} productos</span>
+                    <span className="text-xs font-black uppercase text-primary tracking-tight">{category}</span>
+                    <span className="text-[8px] font-black text-muted-foreground uppercase">{groupedItems[category].length} productos</span>
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-3xl overflow-hidden border-x border-b">
+              <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
                 {groupedItems[category].map((item) => (
                   <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
-                    <div className="p-5 flex items-center gap-4 bg-white border-b border-border/50">
-                      <Checkbox checked={item.isPurchased} onCheckedChange={() => toggleItem(item.id, item.isPurchased)} className="h-7 w-7 rounded-xl border-2" />
+                    <div className="p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50">
+                      <Checkbox checked={item.isPurchased} onCheckedChange={() => toggleItem(item.id, item.isPurchased)} className="h-6 w-6 rounded-lg border-2" />
                       <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
                         <div className="flex flex-col min-w-0">
-                          <span className={`font-bold text-base truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                          <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
                             {item.nombre}
                           </span>
-                          <span className="text-[10px] font-black text-muted-foreground uppercase">{item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}</span>
+                          <span className="text-[9px] font-black text-muted-foreground uppercase">{item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}</span>
                         </div>
                         <div className="text-right shrink-0">
                           {item.precioUnitario > 0 ? (
-                            <p className="text-sm font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                            <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
                           ) : (
-                            <p className="text-xs font-bold text-muted-foreground opacity-40">$ —</p>
+                            <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
                           )}
                         </div>
                       </div>

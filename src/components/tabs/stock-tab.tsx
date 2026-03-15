@@ -94,8 +94,8 @@ export function StockTab() {
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col gap-4 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4">
+    <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col gap-3 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-3">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-black tracking-tight text-primary">Despensa</h1>
           <div className="flex gap-2">
@@ -156,36 +156,39 @@ export function StockTab() {
           </div>
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input placeholder="Buscar por nombre..." className="pl-10 h-12 bg-white rounded-2xl border-2 border-primary/5 font-bold" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border-2 border-primary/5 font-bold text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-4 py-2 rounded-full cursor-pointer font-black text-[10px] uppercase w-fit", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
+        <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
           {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
         </Badge>
       </header>
 
       {Object.keys(grouped).length > 0 ? (
-        <Accordion type="multiple" defaultValue={Object.keys(grouped)} className="space-y-3">
+        <Accordion type="multiple" defaultValue={Object.keys(grouped)} className="space-y-2">
           {Object.keys(grouped).sort().map(category => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-5 py-3 rounded-2xl border border-border shadow-sm mb-1 transition-all">
-                <div className="flex items-center gap-3"><Package className="h-4 w-4 text-primary" /><span className="text-xs font-black uppercase text-primary">{category}</span></div>
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+                <div className="flex items-center gap-3">
+                  <Package className="h-4 w-4 text-primary" />
+                  <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
+                </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-1 space-y-1 px-1">
+              <AccordionContent className="pt-0.5 space-y-1 px-1">
                 {grouped[category].map((item) => (
-                  <div key={item.id} className="bg-white p-4 rounded-xl border border-border/50 flex items-center justify-between gap-4">
+                  <div key={item.id} className="bg-white p-3 px-4 rounded-xl border border-border/50 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-bold text-sm truncate">{item.nombre}</p>
+                      <div className="flex justify-between items-start">
+                        <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
                         <StockFormDialog ingredientToEdit={item} />
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1.5">
                         {item.precioUnitario > 0 ? (
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatPrecio(item.precioUnitario)} / {item.unidad}</span>
+                          <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">{formatPrecio(item.precioUnitario)} / {item.unidad}</span>
                         ) : (
-                          <div className="flex items-center gap-1 text-destructive/60">
-                            <AlertCircle className="h-3 w-3" />
-                            <span className="text-[10px] font-bold uppercase">Sin precio definido</span>
+                          <div className="flex items-center gap-1 text-destructive/40">
+                            <AlertCircle className="h-2.5 w-2.5" />
+                            <span className="text-[8px] font-black uppercase">Sin precio</span>
                           </div>
                         )}
                       </div>
@@ -197,10 +200,10 @@ export function StockTab() {
                         <Progress value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} className="h-1" indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "bg-destructive" : "bg-primary"} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 bg-background p-1 rounded-xl shrink-0">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
-                      <div className="w-6 text-center font-black text-xs text-primary">{item.stockActual}</div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
+                    <div className="flex items-center gap-1 bg-background p-1 rounded-xl shrink-0 border">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
+                      <div className="w-5 text-center font-black text-xs text-primary">{item.stockActual}</div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
