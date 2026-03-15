@@ -35,7 +35,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, subWeeks, addWeeks } from "date-fns";
 import { es } from "date-fns/locale";
-import { collection, writeBatch, doc, serverTimestamp, getDocs, updateDoc, query, where, setDoc } from "firebase/firestore";
+import { collection, writeBatch, doc, serverTimestamp, getDocs, query, where, increment } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -89,35 +89,6 @@ export function PlanificacionTab() {
     }
   }, [planificacionCargada, expandedDay]);
 
-  const updateSummariesAfterAutoPlan = async (affectedDates: string[]) => {
-    if (!db) return;
-    for (const date of affectedDates) {
-      const logsSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("date", "==", date),
-        where("perfil", "==", activeProfile)
-      ));
-      const totales = logsSnap.docs.reduce((acc, d) => {
-        const m = d.data().macros || {};
-        return {
-          calorias: acc.calorias + (Number(m.calorias) || 0),
-          proteinas: acc.proteinas + (Number(m.proteinas) || 0),
-          carbohidratos: acc.carbohidratos + (Number(m.carbohidratos) || 0),
-          grasas: acc.grasas + (Number(m.grasas) || 0),
-        };
-      }, { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 });
-
-      const summaryId = `${date}_${activeProfile}`
-      await setDoc(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
-        date, 
-        userId: USER_ID, 
-        perfil: activeProfile,
-        totalesDia: totales, 
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    }
-  };
-
   const handleAutoPlan = async () => {
     if (!db || recetas.length === 0) return;
     setIsAutoPlanning(true);
@@ -136,6 +107,7 @@ export function PlanificacionTab() {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
       
+      // 1. Limpiar planes y logs actuales de la semana
       const currentPlansSnap = await getDocs(query(
         collection(db, "users", USER_ID, "meal_plans"), 
         where("date", "in", weekStr),
@@ -150,6 +122,16 @@ export function PlanificacionTab() {
       ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
+      // 2. Resetear resúmenes
+      for (const date of weekStr) {
+        const summaryId = `${date}_${activeProfile}`
+        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
+          totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+
+      // 3. Crear nuevos planes, logs y actualizar resúmenes con increment()
       for (const p of result.plans) {
         const fullRecipe = recetas.find(r => r.id === p.recipeId);
         if (!fullRecipe) continue;
@@ -193,14 +175,24 @@ export function PlanificacionTab() {
           planId: planRef.id,
           createdAt: serverTimestamp()
         });
+
+        const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${p.date}_${activeProfile}`);
+        batch.set(summaryRef, {
+          totalesDia: {
+            calorias: increment(macrosCalculados.calorias),
+            proteinas: increment(macrosCalculados.proteinas),
+            carbohidratos: increment(macrosCalculados.carbohidratos),
+            grasas: increment(macrosCalculados.grasas)
+          },
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       }
 
       await batch.commit();
-      await updateSummariesAfterAutoPlan(weekStr);
       await syncShoppingList(db);
-      
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
     } catch (e) {
+      console.error(e);
       toast({ variant: "destructive", title: "Error al generar plan semanal" });
     } finally {
       setIsAutoPlanning(false);
@@ -240,6 +232,12 @@ export function PlanificacionTab() {
       ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${dateStr}_${activeProfile}`);
+      batch.set(summaryRef, {
+        totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
       for (const p of result.plans) {
         const fullRecipe = recetas.find(r => r.id === p.recipeId);
         if (!fullRecipe) continue;
@@ -283,10 +281,19 @@ export function PlanificacionTab() {
           planId: planRef.id,
           createdAt: serverTimestamp()
         });
+
+        batch.set(summaryRef, {
+          totalesDia: {
+            calorias: increment(macrosCalculados.calorias),
+            proteinas: increment(macrosCalculados.proteinas),
+            carbohidratos: increment(macrosCalculados.carbohidratos),
+            grasas: increment(macrosCalculados.grasas)
+          },
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       }
 
       await batch.commit();
-      await updateSummariesAfterAutoPlan([dateStr]);
       await syncShoppingList(db);
       
       toast({ title: `Día de ${activeProfile} planeado ✓` });
@@ -342,10 +349,10 @@ export function PlanificacionTab() {
     if (!db) return;
     const newPortions = Math.max(1, currentPortions + delta);
     try {
-      await updateDoc(doc(db, "users", USER_ID, "meal_plans", planId), { 
-        plannedPortions: newPortions, 
-        updatedAt: serverTimestamp() 
-      });
+      const planRef = doc(db, "users", USER_ID, "meal_plans", planId);
+      await writeBatch(db)
+        .update(planRef, { plannedPortions: newPortions, updatedAt: serverTimestamp() })
+        .commit();
       await syncShoppingList(db);
     } catch (e) {}
   };
@@ -364,13 +371,27 @@ export function PlanificacionTab() {
       ));
       logSnap.docs.forEach(d => batch.delete(d.ref));
 
+      // Actualizar resumen restando macros
+      const macros = selectedPlan.macros || {};
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${selectedPlan.date}_${activeProfile}`);
+      batch.set(summaryRef, {
+        totalesDia: {
+          calorias: increment(-Math.round(macros.calorias || 0)),
+          proteinas: increment(-Math.round(macros.proteinas || 0)),
+          carbohidratos: increment(-Math.round(macros.carbohidratos || 0)),
+          grasas: increment(-Math.round(macros.grasas || 0))
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
       await batch.commit();
-      await updateSummariesAfterAutoPlan([selectedPlan.date]);
       await syncShoppingList(db);
       
       toast({ title: "Comida eliminada" });
       setSelectedPlan(null);
-    } catch (e) { toast({ variant: "destructive", title: "Error al borrar" }); }
+    } catch (e) { 
+      toast({ variant: "destructive", title: "Error al borrar" }); 
+    }
     finally { setIsDeleting(false); }
   };
 

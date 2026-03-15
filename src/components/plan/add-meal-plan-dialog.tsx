@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, addDoc, serverTimestamp, query, orderBy, doc, getDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore"
+import { collection, serverTimestamp, query, orderBy, doc, writeBatch, increment } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -63,7 +63,11 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         fibra: Math.round(Number(m.fibra || 0)),
       };
 
-      const planData = {
+      const batch = writeBatch(db);
+      const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
+      
+      // 1. Guardar Plan
+      batch.set(planRef, {
         userId: USER_ID,
         perfil: activeProfile,
         date: dateStr,
@@ -78,12 +82,9 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         ingredientes: recipe.ingredientes || [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      }
+      });
 
-      const batch = writeBatch(db);
-      const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
-      batch.set(planRef, planData);
-
+      // 2. Crear Log Diario
       batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
         userId: USER_ID,
         perfil: activeProfile,
@@ -98,38 +99,29 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         createdAt: serverTimestamp()
       });
 
+      // 3. Actualizar Resumen usando increment() para ahorrar ancho de banda y evitar getDocs
+      const summaryId = `${dateStr}_${activeProfile}`
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId)
+      
+      batch.set(summaryRef, {
+        date: dateStr,
+        userId: USER_ID,
+        perfil: activeProfile,
+        totalesDia: {
+          calorias: increment(macrosIndividuales.calorias),
+          proteinas: increment(macrosIndividuales.proteinas),
+          carbohidratos: increment(macrosIndividuales.carbohidratos),
+          grasas: increment(macrosIndividuales.grasas)
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
       await batch.commit();
 
-      const summaryId = `${dateStr}_${activeProfile}`
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId);
-      const summarySnap = await getDoc(summaryRef);
-      
-      if (summarySnap.exists()) {
-        const d = summarySnap.data();
-        const currentTotales = d.totalesDia || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 };
-        
-        await updateDoc(summaryRef, {
-          "totalesDia.calorias": Number(currentTotales.calorias || 0) + macrosIndividuales.calorias,
-          "totalesDia.proteinas": Number(currentTotales.proteinas || 0) + macrosIndividuales.proteinas,
-          "totalesDia.carbohidratos": Number(currentTotales.carbohidratos || 0) + macrosIndividuales.carbohidratos,
-          "totalesDia.grasas": Number(currentTotales.grasas || 0) + macrosIndividuales.grasas,
-          updatedAt: serverTimestamp()
-        });
-      } else {
-        await setDoc(summaryRef, {
-          date: dateStr,
-          userId: USER_ID,
-          perfil: activeProfile,
-          totalesDia: macrosIndividuales,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      // Sincronización optimizada
+      // Sincronización diferencial
       await syncShoppingList(db);
       
-      toast({ title: "Planificado ✓", description: `Agregado a ${momento} de ${activeProfile}` })
+      toast({ title: "Planificado ✓" })
       setOpen(false)
       if (onSave) onSave()
     } catch (e) {

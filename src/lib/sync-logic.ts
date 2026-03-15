@@ -1,6 +1,6 @@
 /**
  * @fileOverview Lógica centralizada y optimizada para la sincronización de la lista de compras.
- * Minimiza las escrituras en Firestore mediante comparaciones diferenciales.
+ * Minimiza las escrituras en Firestore mediante comparaciones diferenciales y bloqueo de concurrencia.
  */
 
 import { 
@@ -9,20 +9,24 @@ import {
   getDocs, 
   writeBatch, 
   doc, 
-  serverTimestamp, 
-  query, 
-  where 
+  serverTimestamp 
 } from "firebase/firestore";
 import { USER_ID } from "@/lib/constants";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
 
+// Bloqueo de concurrencia para evitar múltiples ejecuciones simultáneas
+let isSyncing = false;
+
 /**
  * Sincroniza la lista de compras basándose en los planes de comida y el stock actual.
- * Utiliza una estrategia diferencial para minimizar las escrituras (evita el error resource-exhausted).
+ * Utiliza una estrategia diferencial para minimizar las escrituras.
  */
 export const syncShoppingList = async (db: Firestore) => {
-  if (!db) return;
+  if (!db || isSyncing) return;
+  
+  isSyncing = true;
+  console.log("Iniciando sincronización diferencial de lista de compras...");
 
   try {
     // 1. Cargar datos necesarios en paralelo
@@ -121,9 +125,9 @@ export const syncShoppingList = async (db: Firestore) => {
     const batch = writeBatch(db);
     let writeCount = 0;
 
-    // A. Identificar qué borrar (están en Firestore pero no en el mapa deseado y NO han sido comprados)
+    // A. Identificar qué borrar
     for (const current of currentShoppingItems) {
-      if (current.isPurchased) continue; // No tocamos lo ya comprado
+      if (current.isPurchased) continue; 
       
       const nombreNorm = (current.nombre || "").toLowerCase().trim();
       if (!desiredShoppingMap.has(nombreNorm)) {
@@ -139,7 +143,6 @@ export const syncShoppingList = async (db: Firestore) => {
       );
 
       if (existing) {
-        // Solo actualizar si hay cambios significativos
         const hasChanges = 
           Math.abs(existing.cantidad - desiredData.cantidad) > 0.01 ||
           existing.unidad !== desiredData.unidad ||
@@ -154,7 +157,6 @@ export const syncShoppingList = async (db: Firestore) => {
           writeCount++;
         }
       } else {
-        // Crear nuevo
         const newRef = doc(collection(db, "users", USER_ID, "shopping_list_items"));
         batch.set(newRef, {
           userId: USER_ID,
@@ -165,7 +167,6 @@ export const syncShoppingList = async (db: Firestore) => {
       }
     });
 
-    // 5. Ejecutar batch solo si hay cambios
     if (writeCount > 0) {
       await batch.commit();
       console.log(`Sync completado: ${writeCount} operaciones realizadas.`);
@@ -173,6 +174,7 @@ export const syncShoppingList = async (db: Firestore) => {
 
   } catch (error) {
     console.error("Error en syncShoppingList:", error);
-    throw error;
+  } finally {
+    isSyncing = false;
   }
 };

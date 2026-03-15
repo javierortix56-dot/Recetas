@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, orderBy, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
+import { collection, query, orderBy, addDoc, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { GradientPlaceholder } from "@/components/gradient-placeholder"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,7 +22,7 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
   const activeProfile = useAppStore(s => s.activeProfile)
   const [search, setSearch] = React.useState("")
   const [momento, setMomento] = React.useState("Almuerzo")
-  const [portions, setPortions] = React.useState(1) // Default 1 porción consumida
+  const [portions, setPortions] = React.useState(1)
   const [isSaving, setIsSaving] = React.useState(false)
 
   const recipesQuery = useMemoFirebase(() => {
@@ -42,16 +42,18 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
     setIsSaving(true)
     try {
       const m = recipe.macros || {};
-      const calculatedMacros = {
+      const macrosCalculados = {
         calorias: Math.round(Number(m.calorias || 0)),
         proteinas: Math.round(Number(m.proteinas || 0)),
         carbohidratos: Math.round(Number(m.carbohidratos || 0)),
         grasas: Math.round(Number(m.grasas || 0)),
-        fibra: Math.round(Number(m.fibra || 0)),
       }
 
-      // El log individual guarda quién comió
-      const logData = {
+      const batch = writeBatch(db);
+      
+      // 1. Registro individual
+      const logRef = doc(collection(db, "users", USER_ID, "daily_logs"));
+      batch.set(logRef, {
         userId: USER_ID,
         perfil: activeProfile,
         date,
@@ -59,45 +61,34 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
         recetaId: recipe.id,
         recetaNombre: recipe.nombre,
         recetaCategoria: recipe.categoria || "Almuerzo",
-        porciones: 1, 
-        macros: calculatedMacros,
+        porciones: portions, 
+        macros: macrosCalculados,
         createdAt: serverTimestamp()
-      }
+      });
 
-      await addDoc(collection(db, "users", USER_ID, "daily_logs"), logData)
-      
-      // El resumen diario ahora es por perfil (ID único: fecha_perfil)
+      // 2. Resumen diario atómico con increment()
       const summaryId = `${date}_${activeProfile}`
       const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId)
-      const summarySnap = await getDoc(summaryRef)
       
-      if (summarySnap.exists()) {
-        const d = summarySnap.data()
-        const currentTotales = d.totalesDia || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 };
-        
-        await updateDoc(summaryRef, {
-          "totalesDia.calorias": Number(currentTotales.calorias || 0) + calculatedMacros.calorias,
-          "totalesDia.proteinas": Number(currentTotales.proteinas || 0) + calculatedMacros.proteinas,
-          "totalesDia.carbohidratos": Number(currentTotales.carbohidratos || 0) + calculatedMacros.carbohidratos,
-          "totalesDia.grasas": Number(currentTotales.grasas || 0) + calculatedMacros.grasas,
-          updatedAt: serverTimestamp()
-        })
-      } else {
-        await setDoc(summaryRef, {
-          date,
-          userId: USER_ID,
-          perfil: activeProfile,
-          totalesDia: calculatedMacros,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
-      }
+      batch.set(summaryRef, {
+        date,
+        userId: USER_ID,
+        perfil: activeProfile,
+        totalesDia: {
+          calorias: increment(macrosCalculados.calorias * portions),
+          proteinas: increment(macrosCalculados.proteinas * portions),
+          carbohidratos: increment(macrosCalculados.carbohidratos * portions),
+          grasas: increment(macrosCalculados.grasas * portions)
+        },
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
+      await batch.commit();
       toast({ title: `Comida registrada para ${activeProfile} ✓` })
       setOpen(false)
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo registrar la comida." })
+      toast({ variant: "destructive", title: "Error" })
     } finally {
       setIsSaving(false)
     }
@@ -157,31 +148,6 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
                   </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-3xl border-2 border-primary/5 space-y-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Activity className="h-4 w-4 text-primary" />
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest">Tus Macros (Consumidos)</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-background p-3 rounded-2xl">
-                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Calorías</p>
-                      <p className="text-lg font-black text-primary leading-none">{Math.round(Number(recipeToLog.macros?.calorias || 0))} <span className="text-[8px]">kcal</span></p>
-                    </div>
-                    <div className="bg-background p-3 rounded-2xl">
-                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Proteínas</p>
-                      <p className="text-lg font-black text-primary leading-none">{Math.round(Number(recipeToLog.macros?.proteinas || 0))}g</p>
-                    </div>
-                    <div className="bg-background p-3 rounded-2xl">
-                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Carbos</p>
-                      <p className="text-lg font-black text-primary leading-none">{Math.round(Number(recipeToLog.macros?.carbohidratos || 0))}g</p>
-                    </div>
-                    <div className="bg-background p-3 rounded-2xl">
-                      <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Grasas</p>
-                      <p className="text-lg font-black text-primary leading-none">{Math.round(Number(recipeToLog.macros?.grasas || 0))}g</p>
-                    </div>
-                  </div>
-                </div>
-
                 <Button 
                   className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
                   onClick={() => handleSelectRecipe(recipeToLog)}
@@ -200,15 +166,6 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
-                </div>
-
-                <div className="flex items-center justify-between bg-primary-suave p-3 rounded-2xl border border-primary/10">
-                  <span className="text-[10px] font-black text-primary uppercase tracking-widest">Tus Porciones</span>
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-white rounded-lg text-primary shadow-sm" onClick={() => setPortions(Math.max(1, portions - 1))}>-</Button>
-                    <span className="font-black text-primary tabular-nums">{portions}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 bg-white rounded-lg text-primary shadow-sm" onClick={() => setPortions(portions + 1)}>+</Button>
-                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
