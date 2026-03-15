@@ -10,7 +10,7 @@ export function ProfileSwitcher() {
 
   const profiles: { id: UserProfileName; label: string; emoji: string; color: string }[] = [
     { id: 'javi', label: 'Javi', emoji: '🧔‍♂️', color: 'bg-primary' },
-    { id: 'elena', label: 'Elena', emoji: '👩🏻‍🦰', color: 'bg-accent' }
+    { id: 'mary', label: 'Mary', emoji: '👩🏻‍🦰', color: 'bg-accent' }
   ]
 
   return (

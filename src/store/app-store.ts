@@ -21,7 +21,7 @@ const updateCache = (key: string, data: any) => {
   } catch {}
 };
 
-export type UserProfileName = 'javi' | 'elena';
+export type UserProfileName = 'javi' | 'mary';
 
 interface AppState {
   // Perfil activo
@@ -93,7 +93,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveProfile: (profile) => {
     updateCache('activeProfile', profile);
-    set({ activeProfile: profile, macrosCargados: false, macrosHoy: null, macrosSemana: [] });
+    set({ activeProfile: profile, macrosCargados: false, macrosHoy: null, macrosSemana: [], planificacion: [], planificacionCargada: false });
   },
 
   setRecetas: (data) => {

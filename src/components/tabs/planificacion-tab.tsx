@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -36,7 +35,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, subWeeks, addWeeks } from "date-fns";
 import { es } from "date-fns/locale";
-import { collection, writeBatch, doc, serverTimestamp, getDocs, updateDoc, query, where } from "firebase/firestore";
+import { collection, writeBatch, doc, serverTimestamp, getDocs, updateDoc, query, where, setDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -56,7 +55,7 @@ const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 export function PlanificacionTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { planificacion, planificacionCargada, recetas } = useAppStore();
+  const { planificacion, planificacionCargada, recetas, activeProfile } = useAppStore();
   
   const [currentWeek, setCurrentWeek] = React.useState(new Date());
   const [expandedDay, setExpandedDay] = React.useState<string | null>(null);
@@ -188,7 +187,11 @@ export function PlanificacionTab() {
   const updateSummariesAfterAutoPlan = async (affectedDates: string[]) => {
     if (!db) return;
     for (const date of affectedDates) {
-      const logsSnap = await getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "==", date)));
+      const logsSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "daily_logs"), 
+        where("date", "==", date),
+        where("perfil", "==", activeProfile)
+      ));
       const totales = logsSnap.docs.reduce((acc, d) => {
         const m = d.data().macros || {};
         return {
@@ -199,20 +202,20 @@ export function PlanificacionTab() {
         };
       }, { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 });
 
-      await updateDoc(doc(db, "users", USER_ID, "daily_macro_summaries", date), {
-        totalesDia: totales,
+      const summaryId = `${date}_${activeProfile}`
+      await setDoc(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
+        date, 
+        userId: USER_ID, 
+        perfil: activeProfile,
+        totalesDia: totales, 
         updatedAt: serverTimestamp()
-      }).catch(async () => {
-        await updateDoc(doc(db, "users", USER_ID, "daily_macro_summaries", date), {
-          date, userId: USER_ID, totalesDia: totales, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        }, { merge: true });
-      });
+      }, { merge: true });
     }
   };
 
   const handleAutoPlan = async () => {
     if (!db || recetas.length === 0) {
-      toast({ variant: "destructive", title: "Sin recetas", description: "Carga algunas recetas primero para que la IA pueda planificar." });
+      toast({ variant: "destructive", title: "Sin recetas", description: "Carga algunas recetas primero." });
       return;
     }
 
@@ -232,10 +235,18 @@ export function PlanificacionTab() {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
       
-      const currentPlansSnap = await getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "in", weekStr)));
+      const currentPlansSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "meal_plans"), 
+        where("date", "in", weekStr),
+        where("perfil", "==", activeProfile)
+      ));
       currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
       
-      const currentLogsSnap = await getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "in", weekStr)));
+      const currentLogsSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "daily_logs"), 
+        where("date", "in", weekStr),
+        where("perfil", "==", activeProfile)
+      ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
       for (const p of result.plans) {
@@ -253,6 +264,7 @@ export function PlanificacionTab() {
         const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
         batch.set(planRef, {
           userId: USER_ID,
+          perfil: activeProfile,
           date: p.date,
           mealType: p.mealType,
           recipeId: p.recipeId,
@@ -269,6 +281,7 @@ export function PlanificacionTab() {
 
         batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
           userId: USER_ID,
+          perfil: activeProfile,
           date: p.date,
           momento: p.mealType,
           recetaId: p.recipeId,
@@ -285,7 +298,7 @@ export function PlanificacionTab() {
       await updateSummariesAfterAutoPlan(weekStr);
       await syncGlobalState();
       
-      toast({ title: "¡Plan Semanal Generado! ✨", description: result.summary });
+      toast({ title: `¡Plan de ${activeProfile} listo! ✨`, description: result.summary });
     } catch (e) {
       console.error(e);
       toast({ variant: "destructive", title: "Error", description: "No se pudo generar el plan automático." });
@@ -295,10 +308,7 @@ export function PlanificacionTab() {
   };
 
   const handleAutoPlanDay = async (date: Date) => {
-    if (!db || recetas.length === 0) {
-      toast({ variant: "destructive", title: "Sin recetas", description: "Carga algunas recetas primero." });
-      return;
-    }
+    if (!db || recetas.length === 0) return;
 
     const dateStr = format(date, "yyyy-MM-dd");
     setIsAutoPlanningDay(dateStr);
@@ -316,10 +326,18 @@ export function PlanificacionTab() {
 
       const batch = writeBatch(db);
       
-      const currentPlansSnap = await getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "==", dateStr)));
+      const currentPlansSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "meal_plans"), 
+        where("date", "==", dateStr),
+        where("perfil", "==", activeProfile)
+      ));
       currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
       
-      const currentLogsSnap = await getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "==", dateStr)));
+      const currentLogsSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "daily_logs"), 
+        where("date", "==", dateStr),
+        where("perfil", "==", activeProfile)
+      ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
       for (const p of result.plans) {
@@ -337,6 +355,7 @@ export function PlanificacionTab() {
         const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
         batch.set(planRef, {
           userId: USER_ID,
+          perfil: activeProfile,
           date: dateStr,
           mealType: p.mealType,
           recipeId: p.recipeId,
@@ -353,6 +372,7 @@ export function PlanificacionTab() {
 
         batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
           userId: USER_ID,
+          perfil: activeProfile,
           date: dateStr,
           momento: p.mealType,
           recetaId: p.recipeId,
@@ -369,11 +389,11 @@ export function PlanificacionTab() {
       await updateSummariesAfterAutoPlan([dateStr]);
       await syncGlobalState();
       
-      toast({ title: `Plan del día listo ✓`, description: result.summary });
+      toast({ title: `Día de ${activeProfile} planeado ✓` });
       setExpandedDay(dateStr);
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el plan diario." });
+      toast({ variant: "destructive", title: "Error" });
     } finally {
       setIsAutoPlanningDay(null);
     }
@@ -385,20 +405,26 @@ export function PlanificacionTab() {
     try {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
-      const currentPlansSnap = await getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "in", weekStr)));
-      const currentLogsSnap = await getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "in", weekStr)));
       
-      if (currentPlansSnap.empty && currentLogsSnap.empty) {
-        toast({ title: "Semana vacía" });
-        setIsClearing(false);
-        return;
-      }
-
+      // SOLO borra planes del perfil activo
+      const currentPlansSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "meal_plans"), 
+        where("date", "in", weekStr),
+        where("perfil", "==", activeProfile)
+      ));
+      
+      const currentLogsSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "daily_logs"), 
+        where("date", "in", weekStr),
+        where("perfil", "==", activeProfile)
+      ));
+      
       currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
       
       for (const date of weekStr) {
-        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", date), {
+        const summaryId = `${date}_${activeProfile}`
+        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
           totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
           updatedAt: serverTimestamp()
         }, { merge: true });
@@ -406,7 +432,7 @@ export function PlanificacionTab() {
 
       await batch.commit();
       await syncGlobalState();
-      toast({ title: "Semana desplanificada" });
+      toast({ title: `Semana de ${activeProfile} desplanificada` });
     } catch (e) {
       toast({ variant: "destructive", title: "Error" });
     } finally {
@@ -433,7 +459,11 @@ export function PlanificacionTab() {
       const batch = writeBatch(db);
       batch.delete(doc(db, "users", USER_ID, "meal_plans", selectedPlan.id));
       
-      const logSnap = await getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("planId", "==", selectedPlan.id)));
+      const logSnap = await getDocs(query(
+        collection(db, "users", USER_ID, "daily_logs"), 
+        where("planId", "==", selectedPlan.id),
+        where("perfil", "==", activeProfile)
+      ));
       logSnap.docs.forEach(d => batch.delete(d.ref));
 
       await batch.commit();
@@ -459,7 +489,7 @@ export function PlanificacionTab() {
       <header className="flex items-center justify-between">
         <div className="flex flex-col">
           <h1 className="text-2xl font-black text-primary">Planificación</h1>
-          <p className="text-xs font-bold text-muted-foreground uppercase">Semana del {format(startDate, "d", { locale: es })}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase">Semana de {activeProfile}</p>
         </div>
         <div className="flex items-center gap-2">
           <TooltipProvider>
@@ -474,16 +504,16 @@ export function PlanificacionTab() {
                 </TooltipTrigger>
                 <AlertDialogContent className="rounded-[2rem]">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="font-black text-primary text-xl">¿Desplanificar semana?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm font-medium">Se quitarán todas las comidas y sus macros de esta semana.</AlertDialogDescription>
+                    <AlertDialogTitle className="font-black text-primary text-xl">¿Desplanificar tu semana?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm font-medium">Se quitarán tus comidas de esta semana. Los planes de los demás no se tocarán.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="gap-2">
                     <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleUnplanWeek} className="bg-destructive text-white rounded-xl font-black">Sí, quitar todo</AlertDialogAction>
+                    <AlertDialogAction onClick={handleUnplanWeek} className="bg-destructive text-white rounded-xl font-black">Sí, vaciar mi plan</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <TooltipContent>Vaciar plan semanal</TooltipContent>
+              <TooltipContent>Vaciar tu plan semanal</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -492,7 +522,7 @@ export function PlanificacionTab() {
                   {isAutoPlanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Plan semanal con IA</TooltipContent>
+              <TooltipContent>Planear tu semana con IA</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
@@ -507,7 +537,7 @@ export function PlanificacionTab() {
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-4 w-4 text-primary" />
-            <h3 className="text-[10px] font-black uppercase text-primary tracking-widest">Total Nutricional Semanal</h3>
+            <h3 className="text-[10px] font-black uppercase text-primary tracking-widest">Tus Macros Semanales</h3>
           </div>
           <div className="grid grid-cols-4 gap-2">
             <div className="flex flex-col items-center p-2 bg-primary-suave/50 rounded-2xl">
@@ -553,7 +583,7 @@ export function PlanificacionTab() {
                           {isLoadingThisDay ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Planear día con IA</TooltipContent>
+                      <TooltipContent>Planear tu día</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
@@ -616,7 +646,7 @@ export function PlanificacionTab() {
           <SheetHeader className="mb-6"><SheetTitle className="text-left font-black text-primary text-xl">Gestionar Comida</SheetTitle></SheetHeader>
           <div className="grid gap-2">
             <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4" onClick={() => { router.push(`/recetas/${selectedPlan.recipeId}`); setSelectedPlan(null); }}><Eye className="h-6 w-6 text-primary" /><span className="font-bold">Ver Receta completa</span></Button>
-            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4 text-destructive" onClick={handleDeleteFromPlan} disabled={isDeleting}><Trash2 className="h-6 w-6" /><span className="font-bold">Eliminar del plan semanal</span></Button>
+            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4 text-destructive" onClick={handleDeleteFromPlan} disabled={isDeleting}><Trash2 className="h-6 w-6" /><span className="font-bold">Eliminar de tu plan</span></Button>
           </div>
         </SheetContent>
       </Sheet>

@@ -27,7 +27,7 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
 
   const store = useAppStore.getState();
 
-  // Listeners de datos COMPARTIDOS (Globales)
+  // Listeners de datos COMPARTIDOS (Globales para la familia)
   unsubs.push(
     onSnapshot(collection(db, "users", USER_ID, "recipes"), (snap) => {
       store.setRecetas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -35,10 +35,6 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
     
     onSnapshot(collection(db, "users", USER_ID, "ingredients"), (snap) => {
       store.setIngredientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }),
-    
-    onSnapshot(collection(db, "users", USER_ID, "meal_plans"), (snap) => {
-      store.setPlanificacion(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }),
     
     onSnapshot(collection(db, "users", USER_ID, "shopping_list_items"), (snap) => {
@@ -51,7 +47,8 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   );
 
   // Listeners de datos INDIVIDUALES (Por Perfil)
-  // Perfil y Metas (Buscamos el documento del perfil dentro de la colección perfiles)
+  
+  // Perfil y Metas
   unsubs.push(
     onSnapshot(doc(db, "users", USER_ID, "profiles", activeProfile), (snap) => {
       store.setUserProfile(snap.exists() ? snap.data() : { 
@@ -61,7 +58,20 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
     })
   );
 
-  // Logs diarios de comida filtrados por perfil
+  // Planificación individual (Si Javi desplanifica, Mary no se ve afectada)
+  unsubs.push(
+    onSnapshot(
+      query(
+        collection(db, "users", USER_ID, "meal_plans"), 
+        where("perfil", "==", activeProfile)
+      ), 
+      (snap) => {
+        store.setPlanificacion(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+    )
+  );
+
+  // Resúmenes de macros por perfil
   unsubs.push(
     onSnapshot(
       query(

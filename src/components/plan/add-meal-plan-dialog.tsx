@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils"
+import { useAppStore } from "@/store/app-store"
 
 interface AddMealPlanDialogProps {
   date: Date
@@ -30,6 +31,7 @@ const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"]
 export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, children, onSave }: AddMealPlanDialogProps) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
+  const activeProfile = useAppStore(s => s.activeProfile)
   const [search, setSearch] = React.useState("")
   const [momento, setMomento] = React.useState(defaultMomento)
   const [portions, setPortions] = React.useState(3)
@@ -115,7 +117,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
           categoria: ing.categoria || categorizeIngredient(ing.nombre),
           ingredienteId: ing.id,
           precioUnitario: precio,
-          subtotal: precio * faltante // Usar faltante en la unidad original
+          subtotal: precio * faltante
         });
       }
     });
@@ -159,6 +161,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
 
       const planData = {
         userId: USER_ID,
+        perfil: activeProfile,
         date: dateStr,
         mealType: momento,
         recipeId: recipe.id,
@@ -177,8 +180,10 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
       batch.set(planRef, planData);
 
+      // El log de macros también es individual
       batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
         userId: USER_ID,
+        perfil: activeProfile,
         date: dateStr,
         momento: momento,
         recetaId: recipe.id,
@@ -192,8 +197,10 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
 
       await batch.commit();
 
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", dateStr);
+      const summaryId = `${dateStr}_${activeProfile}`
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId);
       const summarySnap = await getDoc(summaryRef);
+      
       if (summarySnap.exists()) {
         const d = summarySnap.data();
         const currentTotales = d.totalesDia || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 };
@@ -209,6 +216,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         await setDoc(summaryRef, {
           date: dateStr,
           userId: USER_ID,
+          perfil: activeProfile,
           totalesDia: macrosIndividuales,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -217,7 +225,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
 
       await syncGlobalState();
       
-      toast({ title: "Planificado ✓", description: `Agregado a ${momento}` })
+      toast({ title: "Planificado ✓", description: `Agregado a ${momento} de ${activeProfile}` })
       setOpen(false)
       if (onSave) onSave()
     } catch (e) {
@@ -234,7 +242,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       <DialogContent className="max-w-md rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary">Planificar {momento}</DialogTitle>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Para el {format(date, "d 'de' MMMM", { locale: es })}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Para el {format(date, "d 'de' MMMM", { locale: es })} · {activeProfile}</p>
         </DialogHeader>
         <div className="space-y-6 py-4 flex-1 flex flex-col overflow-hidden">
           <div className="space-y-2">
