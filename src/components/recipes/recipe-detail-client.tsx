@@ -5,7 +5,7 @@ import {
   ArrowLeft, Clock, Timer, ChefHat, Play, 
   Utensils, Calendar, ShoppingCart, Activity,
   Trash2, AlertTriangle, Pencil, Info,
-  ChefHat as ChefIcon, Box, Knife, Pan
+  Box, CookingPot
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -39,8 +39,8 @@ import { useAppStore } from "@/store/app-store"
 
 function UtensilIcon({ name }: { name: string }) {
   const n = name.toLowerCase();
-  if (n.includes('cuchillo')) return <Knife className="h-4 w-4" />;
-  if (n.includes('sartén') || n.includes('olla') || n.includes('cacerola')) return <Pan className="h-4 w-4" />;
+  if (n.includes('cuchillo')) return <Utensils className="h-4 w-4" />;
+  if (n.includes('sartén') || n.includes('olla') || n.includes('cacerola')) return <CookingPot className="h-4 w-4" />;
   if (n.includes('licuadora') || n.includes('procesadora') || n.includes('horno')) return <Activity className="h-4 w-4" />;
   return <Box className="h-4 w-4" />;
 }
