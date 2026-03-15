@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, Trash2, Activity, Zap, Beef, Wheat, Droplets, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Activity, Zap, Beef, Wheat, Droplets, Target, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { doc, query, collection, where, deleteDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GoalSettingsSheet } from "@/components/macros/goal-settings-sheet";
+import { AddMealLogDialog } from "@/components/macros/add-meal-log-dialog";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useAppStore } from '@/store/app-store';
@@ -83,7 +84,6 @@ export function MacrosTab() {
     });
   }, [rawDayLogs]);
 
-  // Objetivos específicos del perfil activo
   const goals = userProfile?.objetivosMacros || { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
   
   const todayStr = mounted ? format(new Date(), "yyyy-MM-dd") : "";
@@ -207,6 +207,11 @@ export function MacrosTab() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+           <AddMealLogDialog date={dateStr}>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+                <Plus className="h-6 w-6" />
+              </Button>
+           </AddMealLogDialog>
            <div className="text-right hidden sm:block">
               <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest leading-none">Editando perfil</p>
               <p className="text-[10px] font-black uppercase text-primary leading-none mt-1">{activeProfile}</p>

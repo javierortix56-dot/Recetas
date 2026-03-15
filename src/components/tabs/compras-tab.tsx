@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
 import { cn, formatPrecio, convertirCantidad } from '@/lib/utils';
 import { StockFormDialog } from '@/components/stock/stock-form-dialog';
+import { AddShoppingItemDialog } from '@/components/shopping/add-shopping-item-dialog';
 import { syncShoppingList } from '@/lib/sync-logic';
 
 export function ComprasTab() {
@@ -25,7 +26,6 @@ export function ComprasTab() {
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   
-  // Estado para controlar expansión del acordeón
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
   const groupedItems = React.useMemo(() => {
@@ -40,7 +40,6 @@ export function ComprasTab() {
 
   const categories = React.useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
 
-  // Expandir todo por defecto al cargar si hay items
   React.useEffect(() => {
     if (listaComprasCargada && categories.length > 0 && expandedItems.length === 0) {
       setExpandedItems(categories);
@@ -183,6 +182,12 @@ export function ComprasTab() {
           </p>
         </div>
         <div className="flex gap-2">
+          <AddShoppingItemDialog>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+              <Plus className="h-6 w-6" />
+            </Button>
+          </AddShoppingItemDialog>
+
           <Button 
             variant="ghost" 
             size="icon" 

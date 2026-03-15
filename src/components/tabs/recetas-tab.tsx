@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { 
   Search, Download, Clock, CheckSquare, 
-  Trash2, X, Check, Flame, Hash
+  Trash2, X, Check, Flame, Hash, Plus
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { GradientPlaceholder } from "@/components/gradient-placeholder";
 import { RecipeImportModal } from "@/components/recipe-import-modal";
 import { RecipePromptSheet } from "@/components/recipe-prompt-sheet";
@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"];
 
 export function RecetasTab() {
+  const router = useRouter();
   const db = useFirestore();
   const { recetas, recetasCargadas } = useAppStore();
   const [search, setSearch] = React.useState("");
@@ -127,6 +128,9 @@ export function RecetasTab() {
             </Button>
             {!isSelectionMode && (
               <>
+                <Button size="icon" variant="ghost" onClick={() => router.push("/recetas/nueva")} className="rounded-full bg-primary text-white shadow-md">
+                  <Plus className="h-6 w-6" />
+                </Button>
                 <RecipePromptSheet onOpenImport={() => setIsImportOpen(true)} />
                 <Button size="icon" variant="ghost" onClick={() => setIsImportOpen(true)} className="rounded-full bg-primary-suave text-primary">
                   <Download className="h-6 w-6" />
@@ -218,7 +222,6 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
   const diff = recipe.dificultad === "Fácil" ? "bg-[#2D9A6B]" : recipe.dificultad === "Difícil" ? "bg-[#F43F5E]" : "bg-[#F59E0B]";
   
-  // Unificación robusta: previene strings vacíos o nulos
   const imageSource = (recipe.fotoURL && recipe.fotoURL !== "") ? recipe.fotoURL : (recipe.imageUrl && recipe.imageUrl !== "") ? recipe.imageUrl : null;
 
   return (

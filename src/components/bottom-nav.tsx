@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Calendar, ChefHat, Package, ShoppingCart, Activity } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ContextualFabSheet } from "./contextual-fab-sheet"
 import { useAppStore } from "@/store/app-store"
 
 const navItems = [
@@ -24,8 +23,6 @@ export function BottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50">
-      <ContextualFabSheet />
-
       <nav className="bg-white border-t border-border h-[64px] safe-area-pb flex items-center">
         <div className="flex justify-around items-center w-full max-w-lg mx-auto px-1">
           {navItems.map(({ href, label, icon: Icon, key }) => {
