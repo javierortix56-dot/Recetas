@@ -52,10 +52,42 @@ import { syncShoppingList } from '@/lib/sync-logic';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 
+function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, icon: Icon }: { label: string, value: number, target: number, size?: number, strokeWidth?: number, icon?: any }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const rawPercentage = target > 0 ? (value / target) * 100 : 0;
+  const visualPercentage = Math.min(rawPercentage, 100);
+  const offset = circumference - (visualPercentage / 100) * circumference;
+
+  let ringColor = "text-primary";
+  if (rawPercentage > 110) ringColor = "text-destructive";
+  else if (rawPercentage > 100) ringColor = "text-accent";
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg className="w-full h-full transform -rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" strokeWidth={strokeWidth} className="text-primary-suave" />
+          <circle 
+            cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" 
+            strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} 
+            strokeLinecap="round" className={`${ringColor} transition-all duration-700 ease-out`} 
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {Icon && <Icon className={cn("h-3 w-3 mb-0.5", ringColor)} />}
+          <span className="text-[10px] font-black leading-none">{Math.round(rawPercentage)}%</span>
+        </div>
+      </div>
+      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">{label}</span>
+    </div>
+  );
+}
+
 export function PlanificacionTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { planificacion, planificacionCargada, recetas, activeProfile } = useAppStore();
+  const { planificacion, planificacionCargada, recetas, activeProfile, userProfile } = useAppStore();
   
   const [currentWeek, setCurrentWeek] = React.useState(new Date());
   const [expandedDay, setExpandedDay] = React.useState<string | null>(null);
@@ -67,6 +99,14 @@ export function PlanificacionTab() {
 
   const startDate = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
+
+  const goals = userProfile?.objetivosMacros || { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
+  const weeklyGoals = React.useMemo(() => ({
+    calorias: goals.calorias * 7,
+    proteinas: goals.proteinas * 7,
+    carbohidratos: goals.carbohidratos * 7,
+    grasas: goals.grasas * 7
+  }), [goals]);
 
   const weeklyTotals = React.useMemo(() => {
     const weekStrArray = weekDays.map(d => format(d, "yyyy-MM-dd"));
@@ -107,7 +147,6 @@ export function PlanificacionTab() {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
       
-      // 1. Limpiar planes y logs actuales de la semana
       const currentPlansSnap = await getDocs(query(
         collection(db, "users", USER_ID, "meal_plans"), 
         where("date", "in", weekStr),
@@ -122,7 +161,6 @@ export function PlanificacionTab() {
       ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
-      // 2. Resetear resúmenes
       for (const date of weekStr) {
         const summaryId = `${date}_${activeProfile}`
         batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
@@ -131,7 +169,6 @@ export function PlanificacionTab() {
         }, { merge: true });
       }
 
-      // 3. Crear nuevos planes, logs y actualizar resúmenes con increment()
       for (const p of result.plans) {
         const fullRecipe = recetas.find(r => r.id === p.recipeId);
         if (!fullRecipe) continue;
@@ -217,13 +254,6 @@ export function PlanificacionTab() {
       });
 
       const batch = writeBatch(db);
-      
-      const currentPlansSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "meal_plans"), 
-        where("date", "==", dateStr),
-        where("perfil", "==", activeProfile)
-      ));
-      currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
       
       const currentLogsSnap = await getDocs(query(
         collection(db, "users", USER_ID, "daily_logs"), 
@@ -371,7 +401,6 @@ export function PlanificacionTab() {
       ));
       logSnap.docs.forEach(d => batch.delete(d.ref));
 
-      // Actualizar resumen restando macros
       const macros = selectedPlan.macros || {};
       const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${selectedPlan.date}_${activeProfile}`);
       batch.set(summaryRef, {
@@ -408,7 +437,7 @@ export function PlanificacionTab() {
       <header className="flex items-center justify-between">
         <div className="flex flex-col">
           <h1 className="text-2xl font-black text-primary">Planificación</h1>
-          <p className="text-xs font-bold text-muted-foreground uppercase">Semana de {activeProfile}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Semana de {activeProfile}</p>
         </div>
         <div className="flex items-center gap-2">
           <TooltipProvider>
@@ -452,33 +481,27 @@ export function PlanificacionTab() {
         </div>
       </header>
 
-      <Card className="border-none shadow-recipe bg-white rounded-3xl overflow-hidden">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="h-4 w-4 text-primary" />
-            <h3 className="text-[10px] font-black uppercase text-primary tracking-widest">Tus Macros Semanales</h3>
+      <Card className="border-none shadow-recipe bg-white rounded-[2.5rem] overflow-hidden border-2 border-primary/5">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest">Cumplimiento del Plan Semanal</h3>
+            </div>
+            <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-[8px] px-2 font-black uppercase">En Tiempo Real</Badge>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            <div className="flex flex-col items-center p-2 bg-primary-suave/50 rounded-2xl">
-              <Flame className="h-4 w-4 text-primary mb-1 fill-current" />
-              <span className="text-sm font-black text-primary tabular-nums">{Math.round(weeklyTotals.calorias)}</span>
-              <span className="text-[8px] font-black text-muted-foreground uppercase">kcal</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-background rounded-2xl border">
-              <Beef className="h-4 w-4 text-red-500 mb-1" />
-              <span className="text-sm font-black tabular-nums">{Math.round(weeklyTotals.proteinas)}g</span>
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Prot</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-background rounded-2xl border">
-              <Wheat className="h-4 w-4 text-amber-500 mb-1" />
-              <span className="text-sm font-black tabular-nums">{Math.round(weeklyTotals.carbohidratos)}g</span>
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Carb</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-background rounded-2xl border">
-              <Droplets className="h-4 w-4 text-blue-500 mb-1" />
-              <span className="text-sm font-black tabular-nums">{Math.round(weeklyTotals.grasas)}g</span>
-              <span className="text-[8px] font-black text-muted-foreground uppercase">Grasa</span>
-            </div>
+          
+          <div className="flex justify-around items-center">
+            <WeeklyMacroRing label="Calorías" value={weeklyTotals.calorias} target={weeklyGoals.calorias} size={85} strokeWidth={7} icon={Flame} />
+            <WeeklyMacroRing label="Prots" value={weeklyTotals.proteinas} target={weeklyGoals.proteinas} icon={Beef} />
+            <WeeklyMacroRing label="Carbos" value={weeklyTotals.carbohidratos} target={weeklyGoals.carbohidratos} icon={Wheat} />
+            <WeeklyMacroRing label="Grasas" value={weeklyTotals.grasas} target={weeklyGoals.grasas} icon={Droplets} />
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-primary/5">
+            <p className="text-[8px] font-black text-muted-foreground uppercase text-center tracking-widest leading-relaxed">
+              Basado en {planificacion.length} comidas planeadas para esta semana.
+            </p>
           </div>
         </CardContent>
       </Card>

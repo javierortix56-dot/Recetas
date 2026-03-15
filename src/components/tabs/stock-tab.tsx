@@ -3,10 +3,9 @@
 import * as React from 'react';
 import { useSearchParams } from "next/navigation";
 import { 
-  Search, Plus, Minus, Package, RefreshCcw, 
-  DollarSign, AlertCircle, RotateCcw, Trash2,
-  CheckSquare, X, Tag, ChevronDown, ChevronUp,
-  Loader2, Check
+  Search, Plus, Minus, Package, 
+  AlertCircle, RotateCcw, X, Check,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Checkbox } from "@/components/ui/checkbox";
 import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { StockFormDialog } from "@/components/stock/stock-form-dialog";
@@ -36,11 +34,10 @@ export function StockTab() {
   const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
   
-  // Estados para selección múltiple
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   
-  // Estado para controlar expansión del acordeón - Contraído por defecto []
+  // Contraído por defecto: array vacío
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
   const categoriesInView = React.useMemo(() => {
@@ -48,8 +45,12 @@ export function StockTab() {
     return cats.sort();
   }, [ingredientes]);
 
+  // Manejo de filtro por URL - Solo se ejecuta al montar o cambiar el parámetro
   React.useEffect(() => {
-    if (searchParams.get("filtro") === "stockBajo") setShowLowStockOnly(true);
+    const filtro = searchParams?.get("filtro");
+    if (filtro === "stockBajo") {
+      setShowLowStockOnly(true);
+    }
   }, [searchParams]);
 
   const toggleExpandAll = () => {
@@ -58,14 +59,6 @@ export function StockTab() {
     } else {
       setExpandedItems(categoriesInView);
     }
-  };
-
-  const syncGlobalState = async () => {
-    if (!db) return;
-    const batch = writeBatch(db);
-    const shoppingSnap = await getDocs(collection(db, "users", USER_ID, "shopping_list_items"));
-    shoppingSnap.docs.forEach(d => { if (!d.data().isPurchased) batch.delete(d.ref); });
-    await batch.commit();
   };
 
   const handleResetAllMinStock = async () => {
@@ -144,7 +137,7 @@ export function StockTab() {
               onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
               className={cn("rounded-full h-10 w-10", isSelectionMode ? "bg-primary text-white" : "bg-primary-suave text-primary")}
             >
-              {isSelectionMode ? <X className="h-5 w-5" /> : <CheckSquare className="h-5 w-5" />}
+              {isSelectionMode ? <X className="h-5 w-5" /> : <Check className="h-5 w-5" />}
             </Button>
 
             {!isSelectionMode && (
@@ -245,7 +238,6 @@ export function StockTab() {
                       selectedIds.has(item.id) && "ring-2 ring-primary bg-primary/5 border-primary/20"
                     )}
                   >
-                    {/* Checkbox en modo selección */}
                     {isSelectionMode && (
                       <div className={cn(
                         "h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
@@ -255,13 +247,12 @@ export function StockTab() {
                       </div>
                     )}
 
-                    {/* Información Izquierda */}
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm truncate leading-tight mb-0.5">{item.nombre}</p>
                       <div className="flex items-center gap-2 mb-1.5">
                         {item.precioUnitario > 0 ? (
                           <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">
-                            {formatPrecio(item.precioUnitario)} / {item.unit || item.unidad}
+                            {formatPrecio(item.precioUnitario)} / {item.unidad}
                           </span>
                         ) : (
                           <div className="flex items-center gap-1 text-destructive/40">
@@ -277,14 +268,13 @@ export function StockTab() {
                           <span>Mínimo: {item.stockMinimo || 0}</span>
                         </div>
                         <Progress 
-                          value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} 
+                          value={item.stockMinimo > 0 ? Math.min((item.stockActual / item.stockMinimo) * 100, 100) : 100} 
                           className="h-1" 
                           indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && (item.stockMinimo || 0) > 0 ? "bg-destructive" : "bg-primary"} 
                         />
                       </div>
                     </div>
 
-                    {/* Acciones Derecha (Ocultas en modo selección) */}
                     {!isSelectionMode && (
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StockFormDialog ingredientToEdit={item} />
@@ -324,7 +314,6 @@ export function StockTab() {
         </div>
       )}
 
-      {/* Barra de acciones masivas */}
       <AnimatePresence>
         {isSelectionMode && selectedIds.size > 0 && (
           <motion.div 

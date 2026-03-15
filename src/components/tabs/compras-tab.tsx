@@ -26,7 +26,7 @@ export function ComprasTab() {
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   
-  // Estado para controlar expansión del acordeón - Contraído por defecto []
+  // Contraído por defecto: array vacío
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
   const groupedItems = React.useMemo(() => {
