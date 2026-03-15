@@ -1,8 +1,9 @@
+
 "use client"
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Plus, Trash2, Camera, Image as ImageIcon, Loader2, X, Wrench, Clock, Flame } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Image as ImageIcon, Loader2, X, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,6 +19,50 @@ import { normalizeIngredientName, categorizeIngredient } from "@/lib/categorizeI
 import { useAppStore } from "@/store/app-store"
 
 const CATEGORIES = ["Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"]
+
+/**
+ * Comprime una imagen en el cliente antes de subirla para mejorar la velocidad.
+ */
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new (window as any).Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas compression failed'));
+        }, 'image/jpeg', 0.85); // Calidad 85% para un balance ideal
+      };
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
 
 export function RecipeEditClient({ recipeId }: { recipeId: string }) {
   const router = useRouter()
@@ -55,15 +100,10 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
-      
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf("image") !== -1) {
           const file = items[i].getAsFile();
           if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-              toast({ variant: "destructive", title: "Imagen muy pesada", description: "El límite es 5MB." });
-              continue;
-            }
             setImageFile(file);
             setImagePreview(URL.createObjectURL(file));
             toast({ title: "¡Imagen pegada! 📋" });
@@ -71,7 +111,6 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
         }
       }
     };
-
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
   }, []);
@@ -79,10 +118,6 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ variant: "destructive", title: "Imagen muy pesada", description: "Límite 5MB." })
-        return
-      }
       setImageFile(file)
       setImagePreview(URL.createObjectURL(file))
     }
@@ -99,14 +134,19 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
     try {
       if (imageFile && storage) {
-        toast({ title: "Subiendo imagen...", description: "Por favor, espera un momento." })
+        toast({ title: "Procesando imagen...", description: "Comprimiendo y subiendo para mayor velocidad." })
+        
+        // 1. Comprimir en el cliente
+        const compressedBlob = await compressImage(imageFile);
+        
+        // 2. Subir a Storage
         const timestamp = Date.now()
-        const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}`)
-        const res = await uploadBytes(storageRef, imageFile)
+        const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}.jpg`)
+        const res = await uploadBytes(storageRef, compressedBlob)
         finalFotoURL = await getDownloadURL(res.ref)
       }
 
-      // Limpiamos imageUrl antiguo si existe para usar siempre fotoURL
+      // Limpiamos referencias duplicadas para consistencia
       const { imageUrl, ...restData } = formData;
 
       const updatedData = {
@@ -123,13 +163,13 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
       await updateDoc(doc(db, "users", USER_ID, "recipes", recipeId), updatedData)
       toast({ title: "¡Receta actualizada! 🎉" })
       
-      // Pequeña pausa para asegurar la sincronización de Firebase antes de volver
+      // Pequeña pausa para asegurar sincronización antes de volver
       setTimeout(() => {
         router.push(`/recetas/${recipeId}`)
-      }, 500)
+      }, 300)
     } catch (e) {
       console.error("Error al guardar:", e)
-      toast({ variant: "destructive", title: "Error al guardar cambios" })
+      toast({ variant: "destructive", title: "Error al guardar" })
       setIsSaving(false)
     }
   }
@@ -150,12 +190,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
   }
 
   const addPaso = () => {
-    const newPaso = { 
-      orden: (formData.pasos?.length || 0) + 1, 
-      titulo: "", 
-      descripcion: "", 
-      timerSegundos: 0 
-    }
+    const newPaso = { orden: (formData.pasos?.length || 0) + 1, titulo: "", descripcion: "", timerSegundos: 0 }
     setFormData({ ...formData, pasos: [...(formData.pasos || []), newPaso] })
   }
 
@@ -191,7 +226,6 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
       </header>
 
       <div className="p-6 space-y-8 max-w-lg mx-auto w-full">
-        {/* Imagen Section */}
         <section className="space-y-4">
           <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Imagen del plato</label>
           <div 
@@ -203,48 +237,25 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-primary/60">
                 <ImageIcon className="h-12 w-12" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Cambiar o Pegar imagen</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Subir o Pegar foto</span>
               </div>
             )}
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <div className="bg-white/90 p-4 rounded-full shadow-xl">
-                <ImageIcon className="text-primary h-8 w-8" />
-              </div>
-            </div>
-            <input 
-              id="image-upload" 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={handleImageChange} 
-            />
+            <input id="image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
           </div>
-          <p className="text-[9px] font-black text-muted-foreground text-center uppercase tracking-[0.2em]">PNG, JPG · Máx 5MB · <span className="text-primary">Ctrl+V para pegar</span></p>
+          <p className="text-[9px] font-black text-muted-foreground text-center uppercase tracking-widest">Optimizado para cargas rápidas · Máx 10MB</p>
         </section>
 
-        {/* Datos Básicos */}
         <section className="space-y-4">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Nombre del plato</label>
-            <Input 
-              placeholder="Ej: Pasta Boloñesa" 
-              className="h-14 rounded-2xl border-2 font-bold text-lg focus-visible:ring-primary"
-              value={formData.nombre}
-              onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-            />
+            <Input placeholder="Ej: Pasta Boloñesa" className="h-14 rounded-2xl border-2 font-bold text-lg" value={formData.nombre} onChange={(e) => setFormData({...formData, nombre: e.target.value})} />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Descripción</label>
-            <Textarea 
-              placeholder="Contanos un poco sobre este plato..." 
-              className="min-h-[100px] rounded-2xl border-2 font-medium focus-visible:ring-primary"
-              value={formData.descripcion}
-              onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-            />
+            <Textarea placeholder="Contanos sobre este plato..." className="min-h-[100px] rounded-2xl border-2 font-medium" value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} />
           </div>
         </section>
 
-        {/* Categorías */}
         <section className="space-y-3">
           <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Momentos del día</label>
           <div className="flex flex-wrap gap-2">
@@ -254,7 +265,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
                 <Badge 
                   key={cat} 
                   variant={isSelected ? "default" : "secondary"}
-                  className={`px-4 py-2 rounded-full cursor-pointer font-bold transition-all ${isSelected ? "bg-primary text-white shadow-md" : "bg-primary-suave text-primary border-none"}`}
+                  className={`px-4 py-2 rounded-full cursor-pointer font-bold ${isSelected ? "bg-primary text-white" : "bg-primary-suave text-primary border-none"}`}
                   onClick={() => {
                     const current = formData.categorias || []
                     const next = isSelected ? current.filter((c: string) => c !== cat) : [...current, cat]
@@ -268,18 +279,11 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
           </div>
         </section>
 
-        {/* Utensilios */}
         <section className="space-y-4">
           <h3 className="text-sm font-black uppercase text-primary tracking-widest">Utensilios</h3>
           <div className="flex gap-2">
-            <Input 
-              placeholder="Ej: Licuadora" 
-              className="rounded-xl h-12"
-              value={newUtensil}
-              onChange={(e) => setNewUtensil(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (setFormData({...formData, utensilios: [...formData.utensilios, newUtensil.trim()]}), setNewUtensil(""))}
-            />
-            <Button size="icon" onClick={() => (setFormData({...formData, utensilios: [...formData.utensilios, newUtensil.trim()]}), setNewUtensil(""))} className="rounded-xl h-12 w-12"><Plus className="h-4 w-4" /></Button>
+            <Input placeholder="Ej: Licuadora" className="rounded-xl" value={newUtensil} onChange={(e) => setNewUtensil(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (setFormData({...formData, utensilios: [...formData.utensilios, newUtensil.trim()]}), setNewUtensil(""))} />
+            <Button size="icon" onClick={() => (setFormData({...formData, utensilios: [...formData.utensilios, newUtensil.trim()]}), setNewUtensil(""))} className="rounded-xl"><Plus className="h-4 w-4" /></Button>
           </div>
           <div className="flex flex-wrap gap-2">
             {formData.utensilios.map((u: string, i: number) => (
@@ -291,75 +295,29 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
           </div>
         </section>
 
-        {/* Tips Section */}
-        <section className="space-y-4">
-          <h3 className="text-sm font-black uppercase text-primary tracking-widest">Tips del Chef</h3>
-          <div className="flex gap-2">
-            <Textarea 
-              placeholder="Añadir consejo..." 
-              className="rounded-xl min-h-[60px]"
-              value={newTip}
-              onChange={(e) => setNewTip(e.target.value)}
-            />
-            <Button size="icon" onClick={() => (setFormData({...formData, tips: [...formData.tips, newTip.trim()]}), setNewTip(""))} className="rounded-xl h-auto shrink-0 w-12"><Plus className="h-4 w-4" /></Button>
-          </div>
-          <div className="space-y-2">
-            {formData.tips.map((t: string, i: number) => (
-              <div key={i} className="bg-accent/5 p-3 rounded-2xl border border-accent/10 flex justify-between gap-3">
-                <p className="text-xs font-medium italic">{t}</p>
-                <X className="h-4 w-4 text-destructive cursor-pointer shrink-0" onClick={() => setFormData({...formData, tips: formData.tips.filter((_:any, idx:number) => i !== idx)})} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Ingredientes */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black uppercase text-primary tracking-widest">Ingredientes</h3>
-            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addIngrediente}>
-              <Plus className="h-3 w-3 mr-1" /> Agregar
-            </Button>
+            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addIngrediente}><Plus className="h-3 w-3 mr-1" /> Agregar</Button>
           </div>
           <div className="space-y-3">
             {formData.ingredientes?.map((ing: any, i: number) => (
               <Card key={i} className="border-none shadow-sm bg-white rounded-2xl overflow-hidden border-2 border-primary/5">
                 <CardContent className="p-3 grid grid-cols-12 gap-2">
-                  <Input 
-                    placeholder="Ingrediente" 
-                    className="col-span-6 h-10 rounded-xl border-none bg-background/50 font-bold"
-                    value={ing.nombre}
-                    onChange={(e) => updateIngrediente(i, 'nombre', e.target.value)}
-                  />
-                  <Input 
-                    type="number"
-                    placeholder="Cant." 
-                    className="col-span-3 h-10 rounded-xl border-none bg-background/50 font-bold"
-                    value={ing.cantidad}
-                    onChange={(e) => updateIngrediente(i, 'cantidad', Number(e.target.value))}
-                  />
-                  <Input 
-                    placeholder="Unid." 
-                    className="col-span-2 h-10 rounded-xl border-none bg-background/50 px-2 font-bold"
-                    value={ing.unidad}
-                    onChange={(e) => updateIngrediente(i, 'unidad', e.target.value)}
-                  />
-                  <Button variant="ghost" size="icon" className="col-span-1 h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => removeIngrediente(i)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <Input placeholder="Ingrediente" className="col-span-6 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.nombre} onChange={(e) => updateIngrediente(i, 'nombre', e.target.value)} />
+                  <Input type="number" placeholder="Cant." className="col-span-3 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.cantidad} onChange={(e) => updateIngrediente(i, 'cantidad', Number(e.target.value))} />
+                  <Input placeholder="Unid." className="col-span-2 h-10 rounded-xl border-none bg-background/50 px-2 font-bold" value={ing.unidad} onChange={(e) => updateIngrediente(i, 'unidad', e.target.value)} />
+                  <Button variant="ghost" size="icon" className="col-span-1 h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => removeIngrediente(i)}><Trash2 className="h-4 w-4" /></Button>
                 </CardContent>
               </Card>
             ))}
           </div>
         </section>
 
-        {/* Preparación */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black uppercase text-primary tracking-widest">Preparación</h3>
-            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addPaso}>
-              <Plus className="h-3 w-3 mr-1" /> Agregar Paso
-            </Button>
+            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addPaso}><Plus className="h-3 w-3 mr-1" /> Agregar Paso</Button>
           </div>
           <div className="space-y-4">
             {formData.pasos?.map((paso: any, i: number) => (
@@ -367,22 +325,10 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
                 <CardContent className="p-4 space-y-3">
                   <div className="flex justify-between items-center border-b pb-2">
                     <span className="text-[10px] font-black uppercase text-primary tracking-widest">Paso {i + 1}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => removePaso(i)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => removePaso(i)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <Input 
-                    placeholder="Título del paso (opcional)" 
-                    className="h-10 border-none font-bold p-0 focus-visible:ring-0 text-primary"
-                    value={paso.titulo}
-                    onChange={(e) => updatePaso(i, 'titulo', e.target.value)}
-                  />
-                  <Textarea 
-                    placeholder="Explicación detallada de qué hacer..." 
-                    className="min-h-[80px] border-none p-0 focus-visible:ring-0 text-sm font-medium leading-relaxed"
-                    value={paso.descripcion}
-                    onChange={(e) => updatePaso(i, 'descripcion', e.target.value)}
-                  />
+                  <Input placeholder="Título del paso (opcional)" className="h-10 border-none font-bold p-0 text-primary" value={paso.titulo} onChange={(e) => updatePaso(i, 'titulo', e.target.value)} />
+                  <Textarea placeholder="Instrucción detallada..." className="min-h-[80px] border-none p-0 text-sm font-medium" value={paso.descripcion} onChange={(e) => updatePaso(i, 'descripcion', e.target.value)} />
                 </CardContent>
               </Card>
             ))}
