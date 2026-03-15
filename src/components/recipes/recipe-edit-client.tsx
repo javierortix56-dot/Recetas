@@ -51,7 +51,6 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
     }
   }, [receta, formData])
 
-  // Soporte para pegar imagen
   React.useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -100,14 +99,18 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
     try {
       if (imageFile && storage) {
+        toast({ title: "Subiendo imagen...", description: "Por favor, espera un momento." })
         const timestamp = Date.now()
         const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}`)
         const res = await uploadBytes(storageRef, imageFile)
         finalFotoURL = await getDownloadURL(res.ref)
       }
 
+      // Limpiamos imageUrl antiguo si existe para usar siempre fotoURL
+      const { imageUrl, ...restData } = formData;
+
       const updatedData = {
-        ...formData,
+        ...restData,
         ingredientes: (formData.ingredientes || []).map((ing: any) => ({
           ...ing,
           nombre: normalizeIngredientName(ing.nombre),
@@ -119,10 +122,14 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
       await updateDoc(doc(db, "users", USER_ID, "recipes", recipeId), updatedData)
       toast({ title: "¡Receta actualizada! 🎉" })
-      router.push(`/recetas/${recipeId}`)
+      
+      // Pequeña pausa para asegurar la sincronización de Firebase antes de volver
+      setTimeout(() => {
+        router.push(`/recetas/${recipeId}`)
+      }, 500)
     } catch (e) {
-      console.error(e)
-      toast({ variant: "destructive", title: "Error al guardar" })
+      console.error("Error al guardar:", e)
+      toast({ variant: "destructive", title: "Error al guardar cambios" })
       setIsSaving(false)
     }
   }

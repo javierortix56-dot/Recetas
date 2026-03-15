@@ -222,6 +222,7 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
   const diff = recipe.dificultad === "Fácil" ? "bg-[#2D9A6B]" : recipe.dificultad === "Difícil" ? "bg-[#F43F5E]" : "bg-[#F59E0B]";
   
+  // Priorizar fotoURL sobre imageUrl
   const imageSource = (recipe.fotoURL && recipe.fotoURL !== "") ? recipe.fotoURL : (recipe.imageUrl && recipe.imageUrl !== "") ? recipe.imageUrl : null;
 
   return (
@@ -230,7 +231,7 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
       <div className="relative h-28 w-full pointer-events-none bg-primary-suave/30">
         {imageSource && !hasError ? (
           <Image 
-            key={imageSource} 
+            key={imageSource} // Key dinámica para forzar refresco
             src={imageSource} 
             alt={recipe.nombre} 
             fill 
