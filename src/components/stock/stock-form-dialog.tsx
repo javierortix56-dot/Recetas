@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Plus, DollarSign, Calculator, Info } from "lucide-react"
+import { Plus, DollarSign, Calculator, Info, Tag } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,13 +10,23 @@ import { useFirestore } from "@/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, writeBatch, doc, updateDoc, query, where } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
-import { categorizeIngredient, isSubPreparation, normalizeIngredientName } from "@/lib/categorizeIngredient"
+import { categorizeIngredient, isSubPreparation, normalizeIngredientName, IngredientCategory } from "@/lib/categorizeIngredient"
 import { convertirCantidad, normalizarUnidad, sugerirUnidadLogica, formatPrecio, calcularPrecioUnitarioBase } from "@/lib/utils"
 
-const CATEGORIES = ["Lácteos", "Carnes", "Verduras", "Frutas", "Almacén", "Bebidas", "Otros"]
+const CATEGORIES: IngredientCategory[] = [
+  "Lácteos y Huevos",
+  "Carnes y Aves",
+  "Pescados y Mariscos",
+  "Frutas y Verduras",
+  "Almacén",
+  "Especias y Condimentos",
+  "Bebidas",
+  "Otros"
+]
+
 const UNITS = ["kg", "g", "l", "ml", "unidad", "docena"]
 
-export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }) {
+export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdit?: any, trigger?: React.ReactNode }) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
   const [isSaving, setIsSaving] = React.useState(false)
@@ -28,7 +38,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
 
   const [formData, setFormData] = React.useState({
     nombre: "",
-    categoria: "Verduras",
+    categoria: "Almacén" as IngredientCategory,
     unidad: "unidad",
     stockActual: 0,
     stockMinimo: 0, 
@@ -40,14 +50,13 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
     if (ingredientToEdit) {
       setFormData({
         nombre: ingredientToEdit.nombre || "",
-        categoria: ingredientToEdit.categoria || "Verduras",
+        categoria: (ingredientToEdit.categoria || categorizeIngredient(ingredientToEdit.nombre)) as IngredientCategory,
         unidad: ingredientToEdit.unidad || "unidad",
         stockActual: Number(ingredientToEdit.stockActual || 0),
         stockMinimo: Number(ingredientToEdit.stockMinimo ?? 0),
         precioUnitario: Number(ingredientToEdit.precioUnitario || 0),
         macrosPer100g: ingredientToEdit.macrosPer100g || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 }
       })
-      // Inicializar calculadora con valores lógicos si ya tiene precio
       if (ingredientToEdit.precioUnitario > 0) {
         setCalcPrecio(ingredientToEdit.precioUnitario)
         setCalcCantidad(1)
@@ -56,7 +65,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
     } else {
       setFormData({
         nombre: "",
-        categoria: "Verduras",
+        categoria: "Almacén",
         unidad: "unidad",
         stockActual: 0,
         stockMinimo: 0, 
@@ -69,7 +78,6 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
     }
   }, [ingredientToEdit, open])
 
-  // Recalcular precio unitario base cuando cambian los valores de la calculadora
   React.useEffect(() => {
     const unitario = calcularPrecioUnitarioBase(calcPrecio, calcCantidad, calcUnidad, formData.unidad)
     setFormData(prev => ({ ...prev, precioUnitario: unitario }))
@@ -178,29 +186,41 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
     const finalData = {
       ...formData,
       nombre: normalizedName,
-      categoria: categorizeIngredient(normalizedName)
+      // La categoría ahora viene del estado local (seleccionada por el usuario)
+      categoria: formData.categoria
     };
 
     try {
-      if (ingredientToEdit) {
+      if (ingredientToEdit && ingredientToEdit.id) {
         await updateDoc(doc(db, "users", USER_ID, "ingredients", ingredientToEdit.id), {
           ...finalData,
           ultimaActualizacionPrecio: serverTimestamp(),
           updatedAt: serverTimestamp()
         })
       } else {
-        await addDoc(collection(db, "users", USER_ID, "ingredients"), {
-          ...finalData,
-          ultimaActualizacionPrecio: serverTimestamp(),
-          userId: USER_ID,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
+        // Buscar si ya existe por nombre para no duplicar si vino de la lista de compras
+        const q = query(collection(db, "users", USER_ID, "ingredients"), where("nombre", "==", normalizedName));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          await updateDoc(doc(db, "users", USER_ID, "ingredients", snap.docs[0].id), {
+            ...finalData,
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          await addDoc(collection(db, "users", USER_ID, "ingredients"), {
+            ...finalData,
+            ultimaActualizacionPrecio: serverTimestamp(),
+            userId: USER_ID,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          })
+        }
       }
       
       await syncGlobalState();
       
-      toast({ title: ingredientToEdit ? "Actualizado ✓" : "Guardado ✓" })
+      toast({ title: "Cambios guardados ✓", description: "Se recordará para futuros usos." })
       setOpen(false)
     } catch (e) {
       toast({ variant: "destructive", title: "Error" })
@@ -212,22 +232,24 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {ingredientToEdit ? (
-          <Button variant="ghost" size="sm" className="text-primary font-black uppercase text-[10px]">Editar</Button>
+        {trigger || (ingredientToEdit ? (
+          <Button variant="ghost" size="sm" className="text-primary font-black uppercase text-[10px] h-7 px-2">Editar</Button>
         ) : (
           <Button className="h-12 w-12 rounded-full p-0 bg-primary shadow-lg">
             <Plus className="h-6 w-6 text-white" />
           </Button>
-        )}
+        ))}
       </DialogTrigger>
       <DialogContent className="max-w-md rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-primary">{ingredientToEdit ? "Editar" : "Nuevo"} Alimento</DialogTitle>
+          <DialogTitle className="text-2xl font-black text-primary flex items-center gap-2">
+            <Tag className="h-6 w-6" /> {ingredientToEdit ? "Editar" : "Nuevo"} Alimento
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase text-muted-foreground tracking-widest px-1">Nombre</label>
+            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Nombre del producto</label>
             <Input 
               placeholder="Ej: Arroz Largo Fino" 
               className="h-12 rounded-xl border-2 font-bold"
@@ -236,8 +258,24 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
             />
           </div>
 
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Categoría (Ubicación en Súper)</label>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES.map(cat => (
+                <Badge 
+                  key={cat} 
+                  variant={formData.categoria === cat ? "default" : "outline"}
+                  className={`px-3 py-2 rounded-xl cursor-pointer font-bold justify-center transition-all ${formData.categoria === cat ? "bg-primary text-white" : "border-primary/10 text-primary/60 hover:bg-primary/5"}`}
+                  onClick={() => setFormData({...formData, categoria: cat})}
+                >
+                  <span className="text-[9px] uppercase tracking-tight">{cat}</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase text-muted-foreground tracking-widest px-1">Unidad base en Despensa</label>
+            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Unidad base en Despensa</label>
             <div className="flex flex-wrap gap-2">
               {UNITS.map(unit => (
                 <Badge 
@@ -250,7 +288,6 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
                 </Badge>
               ))}
             </div>
-            <p className="text-[9px] text-muted-foreground px-1 italic">Es la unidad que usás para medir cuánto te queda (ej: kg o g).</p>
           </div>
 
           <div className="space-y-4 bg-primary-suave/30 p-5 rounded-[2rem] border-2 border-primary/5">
@@ -261,7 +298,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
             
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-black text-muted-foreground uppercase px-1">Pagué ($)</span>
+                <span className="text-[9px] font-black text-muted-foreground uppercase px-1">Pagué ($)</span>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">$</span>
                   <Input 
@@ -275,7 +312,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase px-1">Por esta cantidad</span>
+                  <span className="text-[9px] font-black text-muted-foreground uppercase px-1">Cantidad comprada</span>
                   <Input 
                     type="number" 
                     className="h-12 rounded-xl border-2 font-bold"
@@ -284,7 +321,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase px-1">En esta unidad</span>
+                  <span className="text-[9px] font-black text-muted-foreground uppercase px-1">Unidad</span>
                   <select 
                     className="w-full h-12 rounded-xl border-2 bg-white px-2 font-bold text-sm outline-none focus:border-primary transition-colors"
                     value={calcUnidad}
@@ -306,7 +343,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase text-muted-foreground tracking-widest px-1">Stock Actual</label>
+              <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Stock Actual</label>
               <Input 
                 type="number" 
                 className="h-12 rounded-xl border-2 font-bold"
@@ -315,7 +352,7 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase text-muted-foreground tracking-widest px-1">Stock Mínimo</label>
+              <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Stock Mínimo</label>
               <Input 
                 type="number" 
                 className="h-12 rounded-xl border-2 font-bold"
@@ -326,11 +363,11 @@ export function StockFormDialog({ ingredientToEdit }: { ingredientToEdit?: any }
           </div>
 
           <Button 
-            className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-lg"
+            className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
             onClick={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? "Guardando..." : ingredientToEdit ? "Actualizar Alimento" : "Guardar en Despensa"}
+            {isSaving ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </div>
       </DialogContent>

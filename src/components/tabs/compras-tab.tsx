@@ -1,8 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
-import { Check, Package, ArrowUpCircle, DollarSign, Info, AlertTriangle, RefreshCcw } from "lucide-react";
+import { Check, Package, ArrowUpCircle, DollarSign, Info, AlertTriangle, RefreshCcw, Tag, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +17,7 @@ import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
 import { categorizeIngredient, isSubPreparation } from '@/lib/categorizeIngredient';
 import { cn, formatPrecio, convertirCantidad, sugerirUnidadLogica, normalizarUnidad } from '@/lib/utils';
+import { StockFormDialog } from '@/components/stock/stock-form-dialog';
 
 export function ComprasTab() {
   const db = useFirestore();
@@ -235,7 +235,7 @@ export function ComprasTab() {
 
   const groupedItems: Record<string, any[]> = {};
   listaCompras.forEach(item => {
-    const cat = (item.categoria || "Almacén").toUpperCase();
+    const cat = (item.categoria || "Otros").toUpperCase();
     if (!groupedItems[cat]) groupedItems[cat] = [];
     groupedItems[cat].push(item);
   });
@@ -311,13 +311,31 @@ export function ComprasTab() {
               <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
                 {groupedItems[category].map((item) => (
                   <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
-                    <div className="p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50">
+                    <div className="p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group">
                       <Checkbox checked={item.isPurchased} onCheckedChange={() => toggleItem(item.id, item.isPurchased)} className="h-6 w-6 rounded-lg border-2" />
                       <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
-                        <div className="flex flex-col min-w-0">
-                          <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
-                            {item.nombre}
-                          </span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                              {item.nombre}
+                            </span>
+                            {!item.isPurchased && (
+                              <StockFormDialog 
+                                ingredientToEdit={{
+                                  id: item.ingredienteId,
+                                  nombre: item.nombre,
+                                  categoria: item.categoria,
+                                  unidad: item.unidad,
+                                  precioUnitario: item.precioUnitario
+                                }}
+                                trigger={
+                                  <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Tag className="h-3 w-3" />
+                                  </button>
+                                }
+                              />
+                            )}
+                          </div>
                           <span className="text-[9px] font-black text-muted-foreground uppercase">{item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}</span>
                         </div>
                         <div className="text-right shrink-0">
