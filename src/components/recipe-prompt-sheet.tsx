@@ -18,25 +18,39 @@ REGLAS ESTRICTAS — seguirlas sin excepción:
 - El campo "categorias" debe ser un array con uno o varios de:
   Desayuno | Almuerzo | Cena | Merienda | Postre | Snack
 
-━━━ INGREDIENTES ━━━
+━━━ INGREDIENTES Y CANTIDADES EXACTAS ━━━
 - Listar SOLO ingredientes crudos tal como se compran en el supermercado.
 - NUNCA usar como ingrediente una subpreparación como "sofrito", "salsa", etc.
-- El campo "categoria" debe ser exactamente uno de:
-  Lácteos | Carnes | Verduras | Frutas | Almacén | Bebidas | Otros
+- PROHIBICIÓN DE AMBIGÜEDAD: Está estrictamente prohibido usar "c/n", "a gusto" o "pizca". Todo ingrediente, incluyendo sal, pimienta, aceite de oliva o agua, DEBE tener una cantidad numérica exacta y una unidad de medida estandarizada (ej: gramos, ml, cucharadas).
+- El campo "categoria" de cada ingrediente debe ser EXACTAMENTE UNO de los siguientes:
+  1. Lácteos y Huevos
+  2. Carnes y Aves
+  3. Pescados y Mariscos
+  4. Frutas y Verduras
+  5. Almacén
+  6. Especias y Condimentos
+  7. Bebidas
+  8. Otros
+
+━━━ UTENSILIOS ━━━
+- Infiere los utensilios necesarios basándote estrictamente en las técnicas descritas en los pasos (ej: Sartén antiadherente, Cuchillo de chef, Tabla de picar, Licuadora).
 
 ━━━ PASOS ━━━
 - Cada paso debe ser ejecutable por alguien que nunca cocinó.
-- timerSegundos: número si hay tiempo de espera, null si es acción activa.
+- timerSegundos: número entero si hay tiempo de espera, null si es acción activa.
+
+━━━ TIPS DEL CHEF ━━━
+- Incluye 2 a 3 consejos prácticos sobre sustitución de ingredientes, técnicas para mejorar el sabor, o métodos de conservación del plato preparado.
 
 ━━━ MACROS ━━━
-- Calcular con precisión nutricional real POR PORCIÓN INDIVIDUAL.
-- Incluir: calorías (kcal), proteínas (g), carbohidratos (g), grasas (g), fibra (g), azúcar (g), sodio (mg).
+- Calcular con precisión nutricional real POR PORCIÓN INDIVIDUAL, tomando en cuenta las cantidades exactas de aceite y sal declaradas en los ingredientes.
+- Incluir: calorias (kcal), proteinas (g), carbohidratos (g), grasas (g), fibra (g), azucar (g), sodio (mg).
 
 ━━━ TAGS ━━━
 - Incluir entre 6 y 12 tags descriptivos (cocina, dieta, ocasión, técnica, tiempo).
 
-━━━ FORMATO ━━━
-- Respondé SOLO con JSON válido (objeto único o array de objetos).
+━━━ FORMATO DE SALIDA (RFC 8259) ━━━
+- Respondé SOLO con código JSON válido. Sin markdown de bloques de código fuera del JSON, sin texto introductorio ni conclusiones.
 
 {
   "nombre": "",
@@ -47,7 +61,9 @@ REGLAS ESTRICTAS — seguirlas sin excepción:
   "tiempoCoccion": 0,
   "dificultad": "Fácil|Media|Difícil",
   "ingredientes": [{"nombre":"", "cantidad":0, "unidad":"", "preparacion":"", "categoria":""}],
+  "utensilios": [""],
   "pasos": [{"orden":1, "titulo":"", "descripcion":"", "timerSegundos":null}],
+  "tips": [""],
   "macros": {"calorias":0, "proteinas":0, "carbohidratos":0, "grasas":0, "fibra":0, "azucar":0, "sodio":0},
   "tags": [""]
 }`
@@ -74,10 +90,10 @@ export function RecipePromptSheet({ onOpenImport }: { onOpenImport: () => void }
         <SheetHeader>
           <SheetTitle className="text-left font-black text-primary text-2xl flex items-center gap-2">
             <Bot className="h-6 w-6 text-accent" />
-            Generá con IA
+            Prompt Maestro Actualizado
           </SheetTitle>
           <SheetDescription className="text-left text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2">
-            Copiá este prompt para obtener colecciones de recetas con tags y macros precisos.
+            Copiá este prompt para obtener recetas con cantidades exactas y utensilios.
           </SheetDescription>
         </SheetHeader>
 
@@ -119,7 +135,7 @@ export function RecipePromptSheet({ onOpenImport }: { onOpenImport: () => void }
           <div className="flex items-start gap-3 bg-primary-suave p-4 rounded-2xl border border-primary/10">
             <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <p className="text-[10px] font-bold text-primary/80 leading-relaxed uppercase tracking-wider">
-              Podés pedirle a la IA: "Dame 5 recetas de pollo" y pegar el resultado completo. El sistema las separará automáticamente.
+              NUEVO: Ahora las recetas incluyen utensilios y tips. Se prohíbe el uso de "c/n" o "a gusto" para máxima precisión en macros.
             </p>
           </div>
         </div>

@@ -4,7 +4,8 @@ import * as React from "react"
 import { 
   ArrowLeft, Clock, Timer, ChefHat, Play, 
   Utensils, Calendar, ShoppingCart, Activity,
-  Trash2, AlertTriangle, Pencil
+  Trash2, AlertTriangle, Pencil, Info,
+  ChefHat as ChefIcon, Box, Knife, Pan
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -35,6 +36,14 @@ import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
 import { cn, formatPrecio, calcularCostoIngrediente } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
+
+function UtensilIcon({ name }: { name: string }) {
+  const n = name.toLowerCase();
+  if (n.includes('cuchillo')) return <Knife className="h-4 w-4" />;
+  if (n.includes('sartén') || n.includes('olla') || n.includes('cacerola')) return <Pan className="h-4 w-4" />;
+  if (n.includes('licuadora') || n.includes('procesadora') || n.includes('horno')) return <Activity className="h-4 w-4" />;
+  return <Box className="h-4 w-4" />;
+}
 
 export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const router = useRouter()
@@ -135,9 +144,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
           available = data.stockActual || 0
           ingredientId = snap.docs[0].id
           precioUnitario = data.precioUnitario || 0
-          if (data.categoria && data.categoria !== 'Otros' && data.categoria !== 'Almacén') {
-            categoria = data.categoria
-          }
+          categoria = data.categoria || categoria
         }
         
         if (needed > available) {
@@ -257,10 +264,11 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
         </section>
 
         <Tabs defaultValue="ingredients" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-primary-suave p-1 rounded-2xl h-14">
-            <TabsTrigger value="ingredients" className="rounded-xl font-black uppercase text-[10px] data-[state=active]:bg-white data-[state=active]:text-primary">Ingredientes</TabsTrigger>
-            <TabsTrigger value="steps" className="rounded-xl font-black uppercase text-[10px] data-[state=active]:bg-white data-[state=active]:text-primary">Pasos</TabsTrigger>
-            <TabsTrigger value="cost" className="rounded-xl font-black uppercase text-[10px] data-[state=active]:bg-white data-[state=active]:text-primary">Costo</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 bg-primary-suave p-1 rounded-2xl h-14">
+            <TabsTrigger value="ingredients" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Ingredientes</TabsTrigger>
+            <TabsTrigger value="steps" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Pasos</TabsTrigger>
+            <TabsTrigger value="details" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Utensilios</TabsTrigger>
+            <TabsTrigger value="cost" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Costo</TabsTrigger>
           </TabsList>
           
           <TabsContent value="ingredients" className="pt-6 space-y-4">
@@ -300,6 +308,38 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+
+          <TabsContent value="details" className="pt-6 space-y-6">
+            <section className="space-y-4">
+              <h3 className="text-xs font-black uppercase text-primary tracking-widest px-2">Utensilios necesarios</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(receta.utensilios || []).length > 0 ? (
+                  receta.utensilios.map((u: string, i: number) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-primary-suave/30 rounded-2xl border border-primary/5">
+                      <div className="h-8 w-8 rounded-xl bg-white flex items-center justify-center text-primary shadow-sm">
+                        <UtensilIcon name={u} />
+                      </div>
+                      <span className="text-xs font-bold text-foreground/80">{u}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="col-span-2 text-center text-[10px] font-bold text-muted-foreground uppercase py-4">No se especificaron utensilios</p>
+                )}
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-xs font-black uppercase text-primary tracking-widest px-2">Tips del Chef</h3>
+              <div className="space-y-3">
+                {(receta.tips || receta.consejoChef ? [receta.consejoChef, ...(receta.tips || [])] : []).filter(Boolean).map((t: string, i: number) => (
+                  <div key={i} className="bg-accent/5 p-4 rounded-3xl border-2 border-accent/10 flex gap-4">
+                    <Info className="h-5 w-5 text-accent shrink-0" />
+                    <p className="text-xs font-medium text-foreground/80 leading-relaxed italic">{t}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
           </TabsContent>
 
           <TabsContent value="cost" className="pt-6 space-y-4">
