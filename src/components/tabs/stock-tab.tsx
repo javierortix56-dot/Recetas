@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -94,8 +93,8 @@ export function StockTab() {
   }
 
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col gap-3 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-3">
+    <div className="flex flex-col gap-3 animate-in fade-in duration-500 pb-20">
+      <header className="flex flex-col gap-2.5 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-black tracking-tight text-primary">Despensa</h1>
           <div className="flex gap-2">
@@ -165,10 +164,10 @@ export function StockTab() {
       </header>
 
       {Object.keys(grouped).length > 0 ? (
-        <Accordion type="multiple" defaultValue={Object.keys(grouped)} className="space-y-2">
+        <Accordion type="multiple" defaultValue={Object.keys(grouped)} className="space-y-1.5">
           {Object.keys(grouped).sort().map(category => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-0.5 transition-all">
                 <div className="flex items-center gap-3">
                   <Package className="h-4 w-4 text-primary" />
                   <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
@@ -176,13 +175,13 @@ export function StockTab() {
               </AccordionTrigger>
               <AccordionContent className="pt-0.5 space-y-1 px-1">
                 {grouped[category].map((item) => (
-                  <div key={item.id} className="bg-white p-3 px-4 rounded-xl border border-border/50 flex items-center justify-between gap-4">
+                  <div key={item.id} className="bg-white py-2 px-3 rounded-xl border border-border/50 flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
                         <StockFormDialog ingredientToEdit={item} />
                       </div>
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-0.5">
                         {item.precioUnitario > 0 ? (
                           <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">{formatPrecio(item.precioUnitario)} / {item.unidad}</span>
                         ) : (
@@ -192,7 +191,7 @@ export function StockTab() {
                           </div>
                         )}
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <div className="flex justify-between items-center text-[8px] font-black uppercase text-muted-foreground">
                           <span>Actual: {item.stockActual}</span>
                           <span>Mínimo: {item.stockMinimo || 0}</span>
@@ -200,10 +199,10 @@ export function StockTab() {
                         <Progress value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} className="h-1" indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "bg-destructive" : "bg-primary"} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 bg-background p-1 rounded-xl shrink-0 border">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
+                    <div className="flex items-center gap-0.5 bg-background p-0.5 rounded-xl shrink-0 border">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
                       <div className="w-5 text-center font-black text-xs text-primary">{item.stockActual}</div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
                     </div>
                   </div>
                 ))}
