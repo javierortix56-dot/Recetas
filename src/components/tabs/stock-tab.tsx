@@ -176,14 +176,14 @@ export function StockTab() {
               <AccordionContent className="pt-0.5 space-y-1 px-1">
                 {grouped[category].map((item) => (
                   <div key={item.id} className="bg-white py-2 px-3 rounded-xl border border-border/50 flex items-center justify-between gap-3">
+                    {/* Información Izquierda */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
-                        <StockFormDialog ingredientToEdit={item} />
-                      </div>
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-bold text-sm truncate leading-tight mb-0.5">{item.nombre}</p>
+                      <div className="flex items-center gap-2 mb-1.5">
                         {item.precioUnitario > 0 ? (
-                          <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">{formatPrecio(item.precioUnitario)} / {item.unidad}</span>
+                          <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">
+                            {formatPrecio(item.precioUnitario)} / {item.unit || item.unidad}
+                          </span>
                         ) : (
                           <div className="flex items-center gap-1 text-destructive/40">
                             <AlertCircle className="h-2.5 w-2.5" />
@@ -191,18 +191,44 @@ export function StockTab() {
                           </div>
                         )}
                       </div>
-                      <div className="space-y-0.5">
+                      
+                      <div className="space-y-1">
                         <div className="flex justify-between items-center text-[8px] font-black uppercase text-muted-foreground">
                           <span>Actual: {item.stockActual}</span>
                           <span>Mínimo: {item.stockMinimo || 0}</span>
                         </div>
-                        <Progress value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} className="h-1" indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "bg-destructive" : "bg-primary"} />
+                        <Progress 
+                          value={Math.min((item.stockActual / (item.stockMinimo || 1)) * 100, 100)} 
+                          className="h-1" 
+                          indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && (item.stockMinimo || 0) > 0 ? "bg-destructive" : "bg-primary"} 
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center gap-0.5 bg-background p-0.5 rounded-xl shrink-0 border">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual - 1)}><Minus className="h-3 w-3" /></Button>
-                      <div className="w-5 text-center font-black text-xs text-primary">{item.stockActual}</div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-white" onClick={() => updateStockDirect(item.id, item.stockActual + 1)}><Plus className="h-3 w-3" /></Button>
+
+                    {/* Acciones Derecha */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <StockFormDialog ingredientToEdit={item} />
+                      <div className="flex items-center gap-0.5 bg-background p-0.5 rounded-xl border border-border/50">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
+                          onClick={() => updateStockDirect(item.id, item.stockActual - 1)}
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <div className="w-6 text-center font-black text-xs text-primary tabular-nums">
+                          {item.stockActual}
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
+                          onClick={() => updateStockDirect(item.id, item.stockActual + 1)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -211,7 +237,10 @@ export function StockTab() {
           ))}
         </Accordion>
       ) : (
-        <div className="py-20 text-center opacity-40"><Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><p className="text-xs font-black uppercase">Sin resultados en la despensa</p></div>
+        <div className="py-20 text-center opacity-40">
+          <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-xs font-black uppercase">Sin resultados en la despensa</p>
+        </div>
       )}
     </div>
   );
