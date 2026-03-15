@@ -21,7 +21,12 @@ const updateCache = (key: string, data: any) => {
   } catch {}
 };
 
+export type UserProfileName = 'javi' | 'elena';
+
 interface AppState {
+  // Perfil activo
+  activeProfile: UserProfileName;
+  
   // Datos
   recetas: any[];
   ingredientes: any[];
@@ -44,6 +49,7 @@ interface AppState {
   activeTab: string;
 
   // Setters
+  setActiveProfile: (profile: UserProfileName) => void;
   setRecetas: (data: any[]) => void;
   setIngredientes: (data: any[]) => void;
   setPlanificacion: (data: any[]) => void;
@@ -61,6 +67,8 @@ interface AppState {
 const cached = getCachedData();
 
 const initialState = {
+  activeProfile: (cached?.activeProfile as UserProfileName) ?? 'javi',
+  
   recetas: cached?.recetas ?? [],
   ingredientes: cached?.ingredientes ?? [],
   planificacion: cached?.planificacion ?? [],
@@ -83,6 +91,11 @@ const initialState = {
 export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
+  setActiveProfile: (profile) => {
+    updateCache('activeProfile', profile);
+    set({ activeProfile: profile, macrosCargados: false, macrosHoy: null, macrosSemana: [] });
+  },
+
   setRecetas: (data) => {
     updateCache('recetas', data);
     set({ recetas: data, recetasCargadas: true });
@@ -102,7 +115,7 @@ export const useAppStore = create<AppState>((set) => ({
   
   setMacrosSemana: (data) => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    const todayMacros = data.find(m => m.id === todayStr || m.date === todayStr) || null;
+    const todayMacros = data.find(m => m.date === todayStr) || null;
     
     if (typeof window !== 'undefined') {
       updateCache('macrosSemana', data);

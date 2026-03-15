@@ -12,9 +12,11 @@ import { doc, updateDoc, serverTimestamp, getDocs, collection, writeBatch, setDo
 import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, normalizeIngredientName } from "@/lib/categorizeIngredient"
 import { cn } from "@/lib/utils"
+import { useAppStore } from "@/store/app-store"
 
 export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
   const db = useFirestore()
+  const activeProfile = useAppStore(s => s.activeProfile)
   const [goals, setGoals] = React.useState(currentGoals)
   const [isSaving, setIsSaving] = React.useState(false)
   const [isRepairing, setIsRepairing] = React.useState(false)
@@ -22,15 +24,24 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
   const [isSeeding, setIsSeeding] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
 
+  // Sincronizar estado local si cambian los props (al cambiar de perfil)
+  React.useEffect(() => {
+    setGoals(currentGoals)
+  }, [currentGoals])
+
   const handleSave = async () => {
     if (!db) return
     setIsSaving(true)
     try {
-      await updateDoc(doc(db, "users", USER_ID), {
+      // Guardamos en el documento específico del perfil
+      const profileRef = doc(db, "users", USER_ID, "profiles", activeProfile)
+      await setDoc(profileRef, {
+        displayName: activeProfile.charAt(0).toUpperCase() + activeProfile.slice(1),
         objetivosMacros: goals,
         updatedAt: serverTimestamp()
-      })
-      toast({ title: "Objetivos guardados", description: "Tus metas diarias han sido actualizadas." })
+      }, { merge: true })
+      
+      toast({ title: "Objetivos guardados", description: `Metas de ${activeProfile} actualizadas.` })
       setIsOpen(false)
     } catch (e) {
       toast({ variant: "destructive", title: "Error", description: "No se pudieron guardar los objetivos." })
@@ -69,7 +80,7 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
 
       // 1. Reparar Ingredientes (Despensa)
       const ingredientsSnap = await getDocs(collection(db, "users", USER_ID, "ingredients"));
-      const nameMap = new Map<string, any>(); // Para detectar colisiones post-normalización
+      const nameMap = new Map<string, any>(); 
 
       ingredientsSnap.docs.forEach(d => {
         const data = d.data();
@@ -77,9 +88,7 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
         const normalizedName = normalizeIngredientName(originalName);
         const cat = categorizeIngredient(normalizedName);
         
-        // Si el nombre cambió por normalización, checkeamos si ya existe el normalizado
         if (nameMap.has(normalizedName)) {
-          // Ya existe un ingrediente con este nombre normalizado, borramos este duplicado
           batch.delete(d.ref);
         } else {
           nameMap.set(normalizedName, d.id);
@@ -121,12 +130,17 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
       logsSnap.docs.forEach(d => {
         const log = d.data();
         const date = log.date;
-        if (!summariesMap.has(date)) {
-          summariesMap.set(date, { 
+        const perfil = log.perfil || 'javi';
+        const summaryId = `${date}_${perfil}`;
+
+        if (!summariesMap.has(summaryId)) {
+          summariesMap.set(summaryId, { 
+            date,
+            perfil,
             totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 } 
           });
         }
-        const s = summariesMap.get(date).totalesDia;
+        const s = summariesMap.get(summaryId).totalesDia;
         
         s.calorias += Number(log.macros?.calorias || 0);
         s.proteinas += Number(log.macros?.proteinas || 0);
@@ -134,8 +148,8 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
         s.grasas += Number(log.macros?.grasas || 0);
       });
 
-      summariesMap.forEach((data, date) => {
-        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", date), { ...data, date, userId: USER_ID, updatedAt: serverTimestamp() }, { merge: true });
+      summariesMap.forEach((data, id) => {
+        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", id), { ...data, userId: USER_ID, updatedAt: serverTimestamp() }, { merge: true });
       });
 
       await batch.commit();
@@ -152,12 +166,9 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
     if (!db) return;
     setIsSeeding(true);
     try {
-      await setDoc(doc(db, "users", USER_ID), {
-        id: USER_ID,
-        displayName: "Usuario Local",
-        email: "local@cocina.com",
+      await setDoc(doc(db, "users", USER_ID, "profiles", activeProfile), {
+        displayName: activeProfile.charAt(0).toUpperCase() + activeProfile.slice(1),
         objetivosMacros: { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 },
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }, { merge: true });
       toast({ title: "Perfil inicializado ✓" });
@@ -177,9 +188,9 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-[2rem] p-6 max-h-[90vh] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-left font-black text-primary text-2xl">Ajustes y Objetivos</SheetTitle>
+          <SheetTitle className="text-left font-black text-primary text-2xl">Ajustes de {activeProfile}</SheetTitle>
           <SheetDescription className="text-left text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2">
-            Gestioná tus metas y el mantenimiento de la app
+            Gestioná tus metas individuales
           </SheetDescription>
         </SheetHeader>
 
@@ -250,8 +261,8 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
               >
                 <Wrench className={cn("h-6 w-6 text-primary", isRepairing && "animate-spin")} />
                 <div className="flex flex-col items-start">
-                  <span className="font-bold text-sm">{isRepairing ? "Reparando..." : "Reparar y Normalizar"}</span>
-                  <span className="text-[8px] font-black uppercase opacity-60">Limpia nombres (ej. Sal Fina) y recalcula macros</span>
+                  <span className="font-bold text-sm">{isRepairing ? "Reparando..." : "Reparar y Sincronizar"}</span>
+                  <span className="text-[8px] font-black uppercase opacity-60">Limpia datos y regenera resúmenes por perfil</span>
                 </div>
               </Button>
 
@@ -276,17 +287,10 @@ export function GoalSettingsSheet({ currentGoals }: { currentGoals: any }) {
               >
                 <Database className="h-6 w-6" />
                 <div className="flex flex-col items-start">
-                  <span className="font-bold text-sm">Resetear Perfil Local</span>
-                  <span className="text-[8px] font-black uppercase opacity-60">Reinicia nombre y metas estándar</span>
+                  <span className="font-bold text-sm">Resetear Metas Actuales</span>
+                  <span className="text-[8px] font-black uppercase opacity-60">Reinicia metas de {activeProfile} a estándar</span>
                 </div>
               </Button>
-            </div>
-
-            <div className="bg-primary-suave p-4 rounded-2xl border border-primary/10 flex items-start gap-3">
-              <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <p className="text-[9px] font-bold text-primary/80 leading-relaxed uppercase">
-                Usá "Reparar y Normalizar" para unificar ingredientes similares como "Sal" y "Sal Fina" en uno solo.
-              </p>
             </div>
           </div>
         </div>

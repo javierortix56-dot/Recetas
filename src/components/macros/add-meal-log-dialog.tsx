@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -13,12 +12,14 @@ import { toast } from "@/hooks/use-toast"
 import { GradientPlaceholder } from "@/components/gradient-placeholder"
 import { Card, CardContent } from "@/components/ui/card"
 import { USER_ID } from "@/lib/constants"
+import { useAppStore } from "@/store/app-store"
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"]
 
 export function AddMealLogDialog({ date, recipeToLog, children }: { date: string, recipeToLog?: any, children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
+  const activeProfile = useAppStore(s => s.activeProfile)
   const [search, setSearch] = React.useState("")
   const [momento, setMomento] = React.useState("Almuerzo")
   const [portions, setPortions] = React.useState(1) // Default 1 porción consumida
@@ -41,7 +42,6 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
     setIsSaving(true)
     try {
       const m = recipe.macros || {};
-      // Ajuste quirúrgico: registro individual siempre para 1 porción fija
       const calculatedMacros = {
         calorias: Math.round(Number(m.calorias || 0)),
         proteinas: Math.round(Number(m.proteinas || 0)),
@@ -50,21 +50,25 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
         fibra: Math.round(Number(m.fibra || 0)),
       }
 
+      // El log individual guarda quién comió
       const logData = {
         userId: USER_ID,
+        perfil: activeProfile,
         date,
         momento,
         recetaId: recipe.id,
         recetaNombre: recipe.nombre,
         recetaCategoria: recipe.categoria || "Almuerzo",
-        porciones: 1, // Consumo personal
+        porciones: 1, 
         macros: calculatedMacros,
         createdAt: serverTimestamp()
       }
 
       await addDoc(collection(db, "users", USER_ID, "daily_logs"), logData)
       
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", date)
+      // El resumen diario ahora es por perfil (ID único: fecha_perfil)
+      const summaryId = `${date}_${activeProfile}`
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId)
       const summarySnap = await getDoc(summaryRef)
       
       if (summarySnap.exists()) {
@@ -82,13 +86,14 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
         await setDoc(summaryRef, {
           date,
           userId: USER_ID,
+          perfil: activeProfile,
           totalesDia: calculatedMacros,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         })
       }
 
-      toast({ title: "Comida registrada ✓", description: `${recipe.nombre} agregado a ${momento}.` })
+      toast({ title: `Comida registrada para ${activeProfile} ✓` })
       setOpen(false)
     } catch (e) {
       console.error(e);
@@ -107,7 +112,7 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary">Registrar Comida</DialogTitle>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-1">
-            Para hoy, {date}
+            {activeProfile} · {date}
           </p>
         </DialogHeader>
 

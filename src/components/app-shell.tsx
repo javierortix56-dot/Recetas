@@ -9,6 +9,7 @@ import { StockTab } from './tabs/stock-tab';
 import { PlanificacionTab } from './tabs/planificacion-tab';
 import { ComprasTab } from './tabs/compras-tab';
 import { MacrosTab } from './tabs/macros-tab';
+import { ProfileSwitcher } from './profile-switcher';
 import { cn } from '@/lib/utils';
 
 /**
@@ -44,23 +45,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative w-full h-full min-h-screen overflow-hidden">
+      {/* Header global para tabs principales */}
+      {isCoreTab && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 py-3 flex justify-center max-w-lg mx-auto pointer-events-none">
+          <div className="pointer-events-auto">
+            <ProfileSwitcher />
+          </div>
+        </div>
+      )}
+
       {/* Paneles persistentes */}
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'inicio' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'inicio' && isCoreTab) ? 'visible' : 'hidden')}>
         <InicioTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'planificacion' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'planificacion' && isCoreTab) ? 'visible' : 'hidden')}>
         <PlanificacionTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'recetas' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'recetas' && isCoreTab) ? 'visible' : 'hidden')}>
         <RecetasTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'stock' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'stock' && isCoreTab) ? 'visible' : 'hidden')}>
         <StockTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'compras' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'compras' && isCoreTab) ? 'visible' : 'hidden')}>
         <ComprasTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-4", (activeTab === 'macros' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'macros' && isCoreTab) ? 'visible' : 'hidden')}>
         <MacrosTab />
       </div>
 
