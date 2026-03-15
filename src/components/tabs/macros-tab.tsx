@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, Trash2, Activity, Zap, Beef, Wheat, Droplets } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Activity, Zap, Beef, Wheat, Droplets, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,7 +53,7 @@ function MacroRing({ label, value, target, size = 80 }: { label: string, value: 
 export function MacrosTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { userProfile, macrosHoy, macrosSemana, macrosCargados, planificacion } = useAppStore();
+  const { userProfile, macrosHoy, macrosSemana, macrosCargados, planificacion, activeProfile } = useAppStore();
   const [mounted, setMounted] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(new Date());
 
@@ -67,9 +67,10 @@ export function MacrosTab() {
     if (!db || !dateStr) return null;
     return query(
       collection(db, "users", USER_ID, "daily_logs"), 
-      where("date", "==", dateStr)
+      where("date", "==", dateStr),
+      where("perfil", "==", activeProfile)
     );
-  }, [db, dateStr]);
+  }, [db, dateStr, activeProfile]);
 
   const { data: rawDayLogs, loading: loadingLogs } = useCollection(dayLogsQuery);
 
@@ -82,7 +83,9 @@ export function MacrosTab() {
     });
   }, [rawDayLogs]);
 
+  // Objetivos específicos del perfil activo
   const goals = userProfile?.objetivosMacros || { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
+  
   const todayStr = mounted ? format(new Date(), "yyyy-MM-dd") : "";
   const isToday = dateStr === todayStr;
   
@@ -123,7 +126,6 @@ export function MacrosTab() {
   const chartData = React.useMemo(() => {
     if (!mounted) return [];
     const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    // Calculamos el inicio de la semana BASADO EN LA FECHA SELECCIONADA
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
     const startTs = startOfDay(start).getTime();
     
@@ -141,7 +143,6 @@ export function MacrosTab() {
       const macroDate = new Date(dateVal + "T00:00:00");
       const diff = Math.floor((macroDate.getTime() - startTs) / (1000 * 60 * 60 * 24));
       
-      // Si el registro cae dentro de la semana de la fecha seleccionada
       if (diff >= 0 && diff < 7) {
         const t = m.totalesDia || {};
         data[diff].calorias = Number(t.calorias || 0);
@@ -159,7 +160,8 @@ export function MacrosTab() {
     try {
       await deleteDoc(doc(db, "users", USER_ID, "daily_logs", log.id));
       
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", dateStr);
+      const summaryId = `${dateStr}_${activeProfile}`
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId);
       const snap = await getDoc(summaryRef);
       if (snap.exists()) {
         const d = snap.data();
@@ -181,7 +183,7 @@ export function MacrosTab() {
   if (!mounted || (!macrosCargados && dayLogs.length === 0 && macrosSemana.length === 0)) {
     return (
       <div className="p-4 space-y-4">
-        <Skeleton className="h-64 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-[2rem]" />
         <Skeleton className="h-20 w-full rounded-2xl" />
       </div>
     );
@@ -191,20 +193,26 @@ export function MacrosTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-primary">Nutrición</h1>
+          <h1 className="text-3xl font-black text-primary leading-tight">Nutrición</h1>
           <div className="flex items-center gap-2 mt-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest min-w-[120px] text-center">
               {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
             </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
-        <GoalSettingsSheet currentGoals={goals} />
+        <div className="flex items-center gap-2">
+           <div className="text-right hidden sm:block">
+              <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest leading-none">Editando perfil</p>
+              <p className="text-[10px] font-black uppercase text-primary leading-none mt-1">{activeProfile}</p>
+           </div>
+           <GoalSettingsSheet currentGoals={goals} />
+        </div>
       </header>
 
       <Tabs defaultValue="dia" className="w-full">
@@ -214,13 +222,19 @@ export function MacrosTab() {
         </TabsList>
 
         <TabsContent value="dia" className="space-y-8">
-          <Card className="border-none shadow-recipe bg-white rounded-[2rem] overflow-hidden">
+          <Card className="border-none shadow-recipe bg-white rounded-[2.5rem] overflow-hidden border-2 border-primary/5">
             <CardContent className="p-8">
               <div className="flex justify-around items-center">
-                <MacroRing label="Kcal" value={currentMacros.calorias} target={goals.calorias} size={90} />
+                <MacroRing label="Kcal" value={currentMacros.calorias} target={goals.calorias} size={100} />
                 <MacroRing label="Prot" value={currentMacros.proteinas} target={goals.proteinas} />
                 <MacroRing label="Carbs" value={currentMacros.carbohidratos} target={goals.carbohidratos} />
                 <MacroRing label="Grasas" value={currentMacros.grasas} target={goals.grasas} />
+              </div>
+              <div className="mt-6 pt-6 border-t border-primary/5 flex justify-center items-center gap-4">
+                 <div className="flex items-center gap-2">
+                    <Target className="h-3 w-3 text-primary/40" />
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Tus metas: {goals.calorias} kcal · {goals.proteinas}p · {goals.carbohidratos}c · {goals.grasas}g</span>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -323,7 +337,7 @@ function MacroLogItem({ log, onClick, onDelete }: { log: any, onClick: () => voi
         onDragEnd={(_, info) => { if (info.offset.x < -50) onDelete(); }} 
         className="relative z-10"
       >
-        <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer" onClick={onClick}>
+        <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer border border-primary/5" onClick={onClick}>
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                <GradientPlaceholder categoria={log.recetaCategoria || 'Almuerzo'} />
