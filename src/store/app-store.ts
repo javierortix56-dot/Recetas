@@ -27,7 +27,7 @@ export type UserProfileName = 'javi' | 'mary';
 interface AppState {
   // Perfil activo
   activeProfile: UserProfileName;
-  isProfileConfirmed: boolean; // No persistido para forzar pregunta por sesión
+  isProfileConfirmed: boolean;
   
   // Datos
   recetas: any[];
@@ -71,7 +71,7 @@ const cached = getCachedData();
 
 const initialState = {
   activeProfile: (cached?.activeProfile as UserProfileName) ?? 'javi',
-  isProfileConfirmed: false, // Siempre empieza en false al abrir la app
+  isProfileConfirmed: true, // Cambiado a true por defecto para evitar overlay
   
   recetas: cached?.recetas ?? [],
   ingredientes: cached?.ingredientes ?? [],
@@ -99,7 +99,7 @@ export const useAppStore = create<AppState>((set) => ({
     updateCache('activeProfile', profile);
     set({ 
       activeProfile: profile, 
-      isProfileConfirmed: true, // Al cambiar activamente, confirmamos la sesión
+      isProfileConfirmed: true,
       macrosCargados: false, 
       macrosHoy: null, 
       macrosSemana: [], 

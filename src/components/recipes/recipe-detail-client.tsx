@@ -6,7 +6,7 @@ import {
   ArrowLeft, Clock, Timer, ChefHat, Play, 
   Utensils, Calendar, ShoppingCart, Activity,
   Trash2, AlertTriangle, Pencil, Info,
-  Box, CookingPot
+  Box, CookingPot, Flame
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -37,6 +37,20 @@ import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
 import { cn, formatPrecio, calcularCostoIngrediente } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
+
+// Helper robusto para obtener el timestamp de una imagen
+const getImageSource = (recipe: any) => {
+  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
+  if (!rawUrl) return null;
+  
+  let ts = "";
+  if (recipe.updatedAt) {
+    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
+    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
+  }
+  
+  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
+};
 
 function UtensilIcon({ name }: { name: string }) {
   const n = name.toLowerCase();
@@ -136,7 +150,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
         const snap = await getDocs(q)
         let available = 0
         let ingredientId = null
-        let categoria = categorizeIngredient(ing.nombre)
+        let categoria = "Almacén"
         let precioUnitario = 0
         
         if (!snap.empty) {
@@ -189,16 +203,13 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   if (isLoading) return <RecipeSkeleton />
   if (!receta) return <div className="p-8 text-center font-bold">Receta no encontrada</div>
 
-  const timestamp = receta.updatedAt?.toMillis?.() || "";
-  const rawUrl = receta.fotoURL || receta.imageUrl;
-  const imageSource = rawUrl ? (timestamp ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${timestamp}` : rawUrl) : null;
+  const imageSource = getImageSource(receta);
 
   return (
     <div className="flex flex-col min-h-screen bg-white pb-32">
       <div className="relative h-[280px] w-full bg-primary-suave/30">
         {imageSource ? (
           <Image 
-            key={imageSource} 
             src={imageSource} 
             alt={receta.nombre} 
             fill 

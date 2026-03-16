@@ -37,6 +37,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"];
 
+// Helper robusto para obtener el timestamp de una imagen
+const getImageSource = (recipe: any) => {
+  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
+  if (!rawUrl) return null;
+  
+  let ts = "";
+  if (recipe.updatedAt) {
+    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
+    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
+  }
+  
+  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
+};
+
 export function RecetasTab() {
   const router = useRouter();
   const db = useFirestore();
@@ -145,7 +159,7 @@ export function RecetasTab() {
           <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input placeholder="Buscar recetas o ingredientes..." className="pl-10 h-12 bg-white rounded-2xl font-bold shadow-sm border-2 border-primary/5" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Buscar recetas..." className="pl-10 h-12 bg-white rounded-2xl font-bold shadow-sm border-2 border-primary/5" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 snap-x items-center">
@@ -154,7 +168,6 @@ export function RecetasTab() {
               ))}
               <Button variant="ghost" size="sm" onClick={() => setIsTagsExpanded(!isTagsExpanded)} className={cn("rounded-full h-8 px-3 shrink-0 font-black text-[10px] uppercase tracking-widest gap-1", isTagsExpanded ? "bg-primary text-white" : "bg-primary-suave text-primary")}>
                 <Hash className="h-3 w-3" /> Tags {isTagsExpanded ? '↑' : '↓'}
-                {!isTagsExpanded && activeTag && <span className="bg-primary text-white text-[8px] rounded-full h-4 w-4 flex items-center justify-center ml-1">1</span>}
               </Button>
             </div>
 
@@ -185,28 +198,6 @@ export function RecetasTab() {
         </div>
       )}
 
-      <AnimatePresence>
-        {isSelectionMode && selectedIds.size > 0 && (
-          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-20 left-4 right-4 z-[60] max-w-lg mx-auto">
-            <div className="bg-primary shadow-2xl rounded-3xl p-4 flex items-center justify-between border-2 border-white/20">
-              <span className="text-white font-black text-lg">{selectedIds.size} seleccionadas</span>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button className="bg-white text-destructive rounded-2xl h-12 px-6 font-black uppercase text-xs gap-2"><Trash2 className="h-4 w-4" /> Borrar</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-[2rem]">
-                  <AlertDialogHeader><AlertDialogTitle className="font-black text-primary">¿Borrar {selectedIds.size} recetas?</AlertDialogTitle></AlertDialogHeader>
-                  <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleBatchDelete} className="bg-destructive text-white rounded-xl font-black">Eliminar</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <RecipeImportModal open={isImportOpen} onOpenChange={setIsImportOpen} />
     </div>
   );
@@ -223,10 +214,7 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
   const diff = recipe.dificultad === "Fácil" ? "bg-[#2D9A6B]" : recipe.dificultad === "Difícil" ? "bg-[#F43F5E]" : "bg-[#F59E0B]";
   
-  // Usar timestamp estable de Firestore para cache-busting o nada si no existe (evita bucles de carga)
-  const timestamp = recipe.updatedAt?.toMillis?.() || "";
-  const rawUrl = recipe.fotoURL || recipe.imageUrl;
-  const imageSource = rawUrl ? (timestamp ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${timestamp}` : rawUrl) : null;
+  const imageSource = getImageSource(recipe);
 
   return (
     <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe active:scale-[0.98] transition-all rounded-2xl h-full flex flex-col relative", isSelected ? "ring-4 ring-primary" : "bg-white")}>
@@ -245,13 +233,9 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
         )}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           <Badge className="bg-white/90 text-[9px] font-black text-primary border-none h-5 px-1.5 uppercase truncate shadow-sm">
-            {primaryCategory} {Array.isArray(recipe.categorias) && recipe.categorias.length > 1 && `+${recipe.categorias.length - 1}`}
+            {primaryCategory}
           </Badge>
         </div>
-        <Badge className="absolute bottom-2 right-2 bg-white/90 text-[9px] font-black text-foreground border-none h-5 px-1.5 flex items-center gap-1.5 shadow-sm">
-          <div className={cn("h-1.5 w-1.5 rounded-full", diff)} />
-          {recipe.dificultad}
-        </Badge>
       </div>
       <CardContent className="p-3 flex flex-col flex-1 gap-2.5">
         <h3 className="font-black text-[11px] leading-tight text-foreground min-h-[1.5rem]">{recipe.nombre}</h3>

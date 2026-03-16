@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -17,6 +18,21 @@ import { useAppStore } from '@/store/app-store';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine } from "recharts";
 import Image from "next/image";
 import { cn, formatPrecio } from '@/lib/utils';
+
+// Helper robusto para obtener el timestamp de una imagen
+const getImageSource = (recipe: any) => {
+  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
+  if (!rawUrl) return null;
+  
+  // Extraer milisegundos de forma segura para datos de Firebase o caché de LocalStorage
+  let ts = "";
+  if (recipe.updatedAt) {
+    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
+    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
+  }
+  
+  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
+};
 
 function MacroRing({ label, value, target, size = 60, strokeWidth = 6 }: { label: string, value: number, target: number, size?: number, strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
@@ -139,7 +155,6 @@ export function InicioTab() {
     return data;
   }, [macrosSemana, mounted]);
 
-  // Gasto Semanal Comparativo
   const spendingStats = React.useMemo(() => {
     if (!mounted) return null;
     const weekId = format(new Date(), "yyyy-'W'ww");
@@ -208,7 +223,7 @@ export function InicioTab() {
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
             {todayPlansSorted.map((plan) => {
               const recipe = recetas.find(r => r.id === plan.recipeId);
-              const imageUrl = plan.recipeImageUrl || recipe?.fotoURL || recipe?.imageUrl;
+              const imageUrl = getImageSource(plan) || getImageSource(recipe);
 
               return (
                 <Card key={plan.id} className="min-w-[180px] max-w-[180px] border-none shadow-sm rounded-2xl overflow-hidden snap-start active:scale-95 transition-transform" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
@@ -219,6 +234,7 @@ export function InicioTab() {
                         alt={plan.recipeName} 
                         fill 
                         className="object-cover" 
+                        unoptimized
                       />
                     ) : (
                       <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
@@ -252,7 +268,6 @@ export function InicioTab() {
           </CardContent>
         </Card>
 
-        {/* Nuevo Widget de Gasto Semanal */}
         <Card className="border-none shadow-recipe bg-white rounded-3xl overflow-hidden" onClick={() => router.push('/compras')}>
           <CardContent className="p-6 space-y-6">
             <div className="flex justify-between items-center">

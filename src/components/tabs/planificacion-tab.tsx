@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -52,6 +53,20 @@ import Image from "next/image";
 import { syncShoppingList } from '@/lib/sync-logic';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
+
+// Helper robusto para obtener el timestamp de una imagen
+const getImageSource = (recipe: any) => {
+  const rawUrl = recipe?.recipeImageUrl || recipe?.fotoURL || recipe?.imageUrl;
+  if (!rawUrl) return null;
+  
+  let ts = "";
+  if (recipe.updatedAt) {
+    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
+    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
+  }
+  
+  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
+};
 
 function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, icon: Icon }: { label: string, value: number, target: number, size?: number, strokeWidth?: number, icon?: any }) {
   const radius = (size - strokeWidth) / 2;
@@ -539,7 +554,7 @@ export function PlanificacionTab() {
                       {MOMENTOS.map((m) => {
                         const plan = plans.find(p => p.mealType === m);
                         const recipe = plan ? recetas.find(r => r.id === plan.recipeId) : null;
-                        const imageUrl = plan?.recipeImageUrl || recipe?.fotoURL || recipe?.imageUrl;
+                        const imageUrl = getImageSource(plan) || getImageSource(recipe);
 
                         return (
                           <div key={m} className="flex items-start gap-4">
@@ -547,7 +562,17 @@ export function PlanificacionTab() {
                             {plan ? (
                               <div className="flex-1 flex items-center gap-3 bg-white p-2 rounded-2xl relative shadow-sm border">
                                 <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative">
-                                  {imageUrl ? <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" /> : <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />}
+                                  {imageUrl ? (
+                                    <Image 
+                                      src={imageUrl} 
+                                      alt={plan.recipeName} 
+                                      fill 
+                                      className="object-cover" 
+                                      unoptimized
+                                    />
+                                  ) : (
+                                    <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
+                                  )}
                                 </div>
                                 <div className="flex-1 min-w-0 pr-8">
                                   <h4 className="font-bold text-sm truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>{plan.recipeName}</h4>

@@ -11,18 +11,15 @@ import { PlanificacionTab } from './tabs/planificacion-tab';
 import { ComprasTab } from './tabs/compras-tab';
 import { MacrosTab } from './tabs/macros-tab';
 import { ProfileSwitcher } from './profile-switcher';
-import { ProfileSelectionOverlay } from './profile-selection-overlay';
 import { cn } from '@/lib/utils';
 
 /**
  * @fileOverview Contenedor principal que maneja la persistencia de las pestañas.
- * Usa visibilidad CSS para mantener el estado del scroll y de los componentes.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activeTab, setActiveTab, isProfileConfirmed } = useAppStore();
+  const { activeTab, setActiveTab } = useAppStore();
   
-  // Normalización para soportar rutas con o sin barra final, y la raíz
   const normalizedPath = React.useMemo(() => {
     if (!pathname || pathname === '/' || pathname === '/inicio' || pathname === '/inicio/') return '/inicio';
     return pathname.replace(/\/$/, '');
@@ -45,14 +42,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isCoreTab = ['/inicio', '/planificacion', '/recetas', '/stock', '/compras', '/macros'].includes(normalizedPath);
 
-  // Si no se ha confirmado el perfil en esta sesión, mostramos el overlay bloqueante
-  if (!isProfileConfirmed) {
-    return <ProfileSelectionOverlay />;
-  }
-
   return (
     <div className="relative w-full h-full min-h-screen overflow-hidden">
-      {/* Header global para tabs principales */}
+      {/* Header global para pestañas principales siempre visible */}
       {isCoreTab && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 py-3 flex justify-center max-w-lg mx-auto pointer-events-none">
           <div className="pointer-events-auto">
@@ -81,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MacrosTab />
       </div>
 
-      {/* Contenido dinámico (ej. detalle de receta) */}
+      {/* Contenido dinámico */}
       <div className={cn("relative w-full min-h-screen", isCoreTab ? 'hidden' : 'block')}>
         {!isCoreTab && children}
       </div>
