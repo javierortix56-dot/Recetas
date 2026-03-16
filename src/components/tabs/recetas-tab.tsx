@@ -213,7 +213,6 @@ export function RecetasTab() {
 }
 
 function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection }: any) {
-  const [hasError, setHasError] = React.useState(false);
   const handleClick = (e: React.MouseEvent) => {
     if (isSelectionMode && onToggleSelection) {
       e.preventDefault();
@@ -224,23 +223,22 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
   const diff = recipe.dificultad === "Fácil" ? "bg-[#2D9A6B]" : recipe.dificultad === "Difícil" ? "bg-[#F43F5E]" : "bg-[#F59E0B]";
   
-  // Priorizar fotoURL sobre imageUrl y forzar refresco con cache-busting
-  const timestamp = recipe.updatedAt?.toMillis?.() || Date.now();
+  // Usar timestamp estable de Firestore para cache-busting o nada si no existe (evita bucles de carga)
+  const timestamp = recipe.updatedAt?.toMillis?.() || "";
   const rawUrl = recipe.fotoURL || recipe.imageUrl;
-  const imageSource = rawUrl ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${timestamp}` : null;
+  const imageSource = rawUrl ? (timestamp ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${timestamp}` : rawUrl) : null;
 
   return (
     <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe active:scale-[0.98] transition-all rounded-2xl h-full flex flex-col relative", isSelected ? "ring-4 ring-primary" : "bg-white")}>
       {isSelectionMode && <div className={cn("absolute top-2 right-2 z-20 h-6 w-6 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
       <div className="relative h-28 w-full pointer-events-none bg-primary-suave/30">
-        {imageSource && !hasError ? (
+        {imageSource ? (
           <Image 
             src={imageSource} 
             alt={recipe.nombre} 
             fill 
             className="object-cover" 
             unoptimized 
-            onError={() => setHasError(true)}
           />
         ) : (
           <GradientPlaceholder categoria={primaryCategory} />

@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -48,7 +49,6 @@ function UtensilIcon({ name }: { name: string }) {
 export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const router = useRouter()
   const db = useFirestore()
-  const [hasError, setHasError] = React.useState(false)
   
   const receta = useAppStore(s => s.recetas.find(r => r.id === recipeId))
   const recetasCargadas = useAppStore(s => s.recetasCargadas)
@@ -189,12 +189,14 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   if (isLoading) return <RecipeSkeleton />
   if (!receta) return <div className="p-8 text-center font-bold">Receta no encontrada</div>
 
-  const imageSource = (receta.fotoURL && receta.fotoURL !== "") ? receta.fotoURL : (receta.imageUrl && receta.imageUrl !== "") ? receta.imageUrl : null;
+  const timestamp = receta.updatedAt?.toMillis?.() || "";
+  const rawUrl = receta.fotoURL || receta.imageUrl;
+  const imageSource = rawUrl ? (timestamp ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${timestamp}` : rawUrl) : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-white pb-32">
-      <div className="relative h-[280px] w-full">
-        {imageSource && !hasError ? (
+      <div className="relative h-[280px] w-full bg-primary-suave/30">
+        {imageSource ? (
           <Image 
             key={imageSource} 
             src={imageSource} 
@@ -203,7 +205,6 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
             className="object-cover" 
             priority 
             unoptimized 
-            onError={() => setHasError(true)}
           />
         ) : (
           <GradientPlaceholder categoria={receta.categoria} className="rounded-none" />
