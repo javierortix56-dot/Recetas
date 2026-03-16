@@ -14,35 +14,9 @@ import { format, startOfWeek, startOfDay, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppStore } from '@/store/app-store';
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import Image from "next/image";
-import { cn, formatPrecio } from '@/lib/utils';
-
-/**
- * Helper definitivo para obtener el origen de la imagen.
- * Resuelve problemas de caché y nombres de campos inconsistentes.
- */
-export const getSafeImageSource = (item: any) => {
-  const url = item?.fotoURL || item?.imageUrl || item?.recipeImageUrl;
-  if (!url) return null;
-  
-  try {
-    let ts = "";
-    if (item.updatedAt) {
-      if (typeof item.updatedAt.toMillis === 'function') ts = item.updatedAt.toMillis();
-      else if (item.updatedAt.seconds) ts = item.updatedAt.seconds * 1000;
-      else if (typeof item.updatedAt === 'string' || typeof item.updatedAt === 'number') ts = new Date(item.updatedAt).getTime();
-    }
-    
-    // Si tenemos un timestamp estable, lo usamos para refrescar la caché solo cuando cambia el dato
-    if (ts && url.startsWith('http') && !url.includes('picsum')) {
-      return `${url}${url.includes('?') ? '&' : '?'}v=${ts}`;
-    }
-    return url;
-  } catch (e) {
-    return url;
-  }
-};
+import { cn, formatPrecio, getSafeImageSource } from '@/lib/utils';
 
 function MacroRing({ label, value, target, size = 60, strokeWidth = 6 }: { label: string, value: number, target: number, size?: number, strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
@@ -96,7 +70,6 @@ function WeeklyEvolutionChart({ data, target }: { data: any[], target: number })
             dy={10}
           />
           <YAxis hide domain={[0, maxVal * 1.1]} />
-          <ReferenceLine y={target} stroke="hsl(var(--primary))" strokeDasharray="3 3" strokeOpacity={0.3} />
           <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" animationDuration={1000} />
         </AreaChart>
       </ResponsiveContainer>
@@ -232,20 +205,12 @@ export function InicioTab() {
         {todayPlansSorted.length > 0 ? (
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
             {todayPlansSorted.map((plan) => {
-              const recipe = recetas.find(r => r.id === plan.recipeId);
-              const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
-
+              const imageUrl = getSafeImageSource(plan);
               return (
                 <Card key={plan.id} className="min-w-[180px] max-w-[180px] border-none shadow-sm rounded-2xl overflow-hidden snap-start active:scale-95 transition-transform" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
                   <div className="h-24 w-full relative bg-muted">
                     {imageUrl ? (
-                      <Image 
-                        src={imageUrl} 
-                        alt={plan.recipeName} 
-                        fill 
-                        className="object-cover" 
-                        unoptimized
-                      />
+                      <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
                     ) : (
                       <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
                     )}
@@ -254,7 +219,7 @@ export function InicioTab() {
                   <CardContent className="p-3">
                     <h4 className="font-bold text-xs truncate leading-tight">{plan.recipeName}</h4>
                     <p className="text-[9px] font-black text-primary uppercase mt-1">
-                      {Math.round(plan.macros?.calorias || recipe?.macros?.calorias || 0)} kcal
+                      {Math.round(plan.macros?.calorias || 0)} kcal
                     </p>
                   </CardContent>
                 </Card>
@@ -305,18 +270,6 @@ export function InicioTab() {
                 <p className="text-xl font-bold text-muted-foreground leading-tight">{formatPrecio(spendingStats?.previous || 0)}</p>
               </div>
             </div>
-
-            {spendingStats && (
-              <div className="space-y-2">
-                <div className="h-2 w-full bg-primary-suave rounded-full overflow-hidden flex">
-                  <div 
-                    className="h-full bg-primary transition-all duration-1000" 
-                    style={{ width: `${Math.min((spendingStats.current / (spendingStats.previous || spendingStats.current || 1)) * 100, 100)}%` }} 
-                  />
-                </div>
-                {!spendingStats.previous && <p className="text-[10px] font-bold text-muted-foreground italic text-center">Sin datos de la semana pasada</p>}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>

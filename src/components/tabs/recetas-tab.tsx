@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { 
   Search, Download, Clock, CheckSquare, 
-  Trash2, X, Check, Flame, Hash, Plus
+  X, Check, Flame, Hash, Plus
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,10 @@ import { GradientPlaceholder } from "@/components/gradient-placeholder";
 import { RecipeImportModal } from "@/components/recipe-import-modal";
 import { RecipePromptSheet } from "@/components/recipe-prompt-sheet";
 import { useAppStore } from '@/store/app-store';
-import { cn } from '@/lib/utils';
+import { cn, getSafeImageSource } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
-import { doc, writeBatch } from 'firebase/firestore';
-import { USER_ID } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getSafeImageSource } from './inicio-tab';
 
 const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"];
 
@@ -39,7 +36,6 @@ export function RecetasTab() {
 
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const allTagsSorted = React.useMemo(() => {
     const tagCounts: Record<string, number> = {};

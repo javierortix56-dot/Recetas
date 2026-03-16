@@ -13,6 +13,8 @@ import { GradientPlaceholder } from "@/components/gradient-placeholder"
 import { Card, CardContent } from "@/components/ui/card"
 import { USER_ID } from "@/lib/constants"
 import { useAppStore } from "@/store/app-store"
+import { getSafeImageSource } from "@/lib/utils"
+import Image from "next/image"
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"]
 
@@ -66,7 +68,7 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
         createdAt: serverTimestamp()
       });
 
-      // 2. Resumen diario atómico con increment()
+      // 2. Resumen diario atómico
       const summaryId = `${date}_${activeProfile}`
       const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId)
       
@@ -129,8 +131,12 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
               <div className="space-y-6">
                 <Card className="border-none shadow-sm bg-primary-suave/50 rounded-2xl overflow-hidden">
                   <CardContent className="p-4 flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-2xl overflow-hidden shrink-0">
-                      <GradientPlaceholder categoria={recipeToLog.categoria} />
+                    <div className="h-14 w-14 rounded-2xl overflow-hidden shrink-0 relative bg-muted">
+                      {getSafeImageSource(recipeToLog) ? (
+                        <Image src={getSafeImageSource(recipeToLog)!} alt={recipeToLog.nombre} fill className="object-cover" unoptimized />
+                      ) : (
+                        <GradientPlaceholder categoria={recipeToLog.categoria} />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-black text-lg truncate text-primary leading-tight">{recipeToLog.nombre}</h4>
@@ -169,25 +175,32 @@ export function AddMealLogDialog({ date, recipeToLog, children }: { date: string
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
-                  {filteredRecipes.map((recipe) => (
-                    <Card 
-                      key={recipe.id} 
-                      className="border-none shadow-sm bg-background/50 hover:bg-primary/5 cursor-pointer transition-colors rounded-2xl active:scale-[0.98]"
-                      onClick={() => handleSelectRecipe(recipe)}
-                    >
-                      <CardContent className="p-3 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0">
-                          <GradientPlaceholder categoria={recipe.categoria} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-sm truncate leading-tight">{recipe.nombre}</h4>
-                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-0.5">
-                            {recipe.macros?.calorias || 0} kcal / porc
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {filteredRecipes.map((recipe) => {
+                    const imageSource = getSafeImageSource(recipe);
+                    return (
+                      <Card 
+                        key={recipe.id} 
+                        className="border-none shadow-sm bg-background/50 hover:bg-primary/5 cursor-pointer transition-colors rounded-2xl active:scale-[0.98]"
+                        onClick={() => handleSelectRecipe(recipe)}
+                      >
+                        <CardContent className="p-3 flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                            {imageSource ? (
+                              <Image src={imageSource} alt={recipe.nombre} fill className="object-cover" unoptimized />
+                            ) : (
+                              <GradientPlaceholder categoria={recipe.categoria} />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-sm truncate leading-tight">{recipe.nombre}</h4>
+                            <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-0.5">
+                              {recipe.macros?.calorias || 0} kcal / porc
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </>
             )}

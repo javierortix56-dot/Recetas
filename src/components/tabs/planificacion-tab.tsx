@@ -43,14 +43,13 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from '@/store/app-store';
 import { AddMealPlanDialog } from '@/components/plan/add-meal-plan-dialog';
 import { USER_ID } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { cn, getSafeImageSource } from '@/lib/utils';
 import { GradientPlaceholder } from '@/components/gradient-placeholder';
 import { motion, AnimatePresence } from 'framer-motion';
 import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
 import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
 import Image from "next/image";
 import { syncShoppingList } from '@/lib/sync-logic';
-import { getSafeImageSource } from './inicio-tab';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 

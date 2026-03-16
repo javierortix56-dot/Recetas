@@ -16,6 +16,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { USER_ID } from "@/lib/constants"
 import { useAppStore } from "@/store/app-store"
 import { syncShoppingList } from "@/lib/sync-logic"
+import { getSafeImageSource } from "@/lib/utils"
+import Image from "next/image"
 
 interface AddMealPlanDialogProps {
   date: Date
@@ -99,7 +101,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
         createdAt: serverTimestamp()
       });
 
-      // 3. Actualizar Resumen usando increment() para ahorrar ancho de banda y evitar getDocs
+      // 3. Actualizar Resumen usando increment()
       const summaryId = `${dateStr}_${activeProfile}`
       const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", summaryId)
       
@@ -117,8 +119,6 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       }, { merge: true });
 
       await batch.commit();
-
-      // Sincronización diferencial
       await syncShoppingList(db);
       
       toast({ title: "Planificado ✓" })
@@ -162,17 +162,26 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
             </div>
           </div>
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
-            {filteredRecipes.map((recipe) => (
-              <Card key={recipe.id} className="border-none shadow-sm bg-background/50 hover:bg-primary/5 cursor-pointer transition-colors rounded-2xl" onClick={() => handleSelectRecipe(recipe)}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0"><GradientPlaceholder categoria={recipe.categoria} /></div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm truncate">{recipe.nombre}</h4>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase">{recipe.macros?.calorias || 0} kcal / porc</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {filteredRecipes.map((recipe) => {
+              const imageSource = getSafeImageSource(recipe);
+              return (
+                <Card key={recipe.id} className="border-none shadow-sm bg-background/50 hover:bg-primary/5 cursor-pointer transition-colors rounded-2xl" onClick={() => handleSelectRecipe(recipe)}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                      {imageSource ? (
+                        <Image src={imageSource} alt={recipe.nombre} fill className="object-cover" unoptimized />
+                      ) : (
+                        <GradientPlaceholder categoria={recipe.categoria} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm truncate">{recipe.nombre}</h4>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">{recipe.macros?.calorias || 0} kcal / porc</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </DialogContent>

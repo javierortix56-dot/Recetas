@@ -5,7 +5,7 @@ import {
   ArrowLeft, Clock, Timer, ChefHat, Play, 
   Utensils, Calendar, ShoppingCart, Activity,
   Trash2, AlertTriangle, Pencil, Info,
-  Box, CookingPot, Flame
+  Box, CookingPot
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -33,10 +33,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { format } from "date-fns"
 import { USER_ID } from "@/lib/constants"
-import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
-import { cn, formatPrecio, calcularCostoIngrediente } from "@/lib/utils"
+import { isSubPreparation } from "@/lib/categorizeIngredient"
+import { getSafeImageSource, formatPrecio } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
-import { getSafeImageSource } from "../tabs/inicio-tab"
 
 function UtensilIcon({ name }: { name: string }) {
   const n = name.toLowerCase();
@@ -56,14 +55,12 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
 
   const [currentPortions, setCurrentPortions] = React.useState(3)
   const [stockStatus, setStockStatus] = React.useState<Record<string, 'green' | 'yellow' | 'red' | 'gray'>>({})
-  const [ingredientPrices, setIngredientPrices] = React.useState<Record<string, { precio: number, unidad: string }>>({})
   const [isDeleting, setIsDeleting] = React.useState(false)
 
   React.useEffect(() => {
     const checkStockAndPrices = async () => {
       if (!db || !receta?.ingredientes) return
       const status: Record<string, 'green' | 'yellow' | 'red' | 'gray'> = {}
-      const prices: Record<string, { precio: number, unidad: string }> = {}
       const ingredientsCol = collection(db, "users", USER_ID, "ingredients")
       
       await Promise.all(receta.ingredientes.map(async (ing: any) => {
@@ -75,15 +72,9 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
           if (data.stockActual > data.stockMinimo) status[ing.nombre] = 'green'
           else if (data.stockActual > 0) status[ing.nombre] = 'yellow'
           else status[ing.nombre] = 'red'
-          
-          prices[ing.nombre] = { 
-            precio: data.precioUnitario || 0, 
-            unidad: data.unidad || "unidad" 
-          }
         }
       }))
       setStockStatus(status)
-      setIngredientPrices(prices)
     }
     checkStockAndPrices()
   }, [receta, db])

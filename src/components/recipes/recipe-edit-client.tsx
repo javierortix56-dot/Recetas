@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -17,12 +16,12 @@ import { USER_ID } from "@/lib/constants"
 import Image from "next/image"
 import { normalizeIngredientName, categorizeIngredient } from "@/lib/categorizeIngredient"
 import { useAppStore } from "@/store/app-store"
+import { getSafeImageSource } from "@/lib/utils"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 const CATEGORIES = ["Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"]
 
-/**
- * Comprime una imagen en el cliente antes de subirla para mejorar la velocidad.
- */
 async function compressImage(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -56,8 +55,8 @@ async function compressImage(file: File): Promise<Blob> {
         
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
-          else reject(new Error('Canvas compression failed'));
-        }, 'image/jpeg', 0.85); // Calidad 85% para un balance ideal
+          else reject(new Error('Compresión fallida'));
+        }, 'image/jpeg', 0.85);
       };
     };
     reader.onerror = (error) => reject(error);
@@ -79,7 +78,6 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
   const [imageFile, setImageFile] = React.useState<File | null>(null)
   const [imagePreview, setImagePreview] = React.useState<string | null>(null)
   const [newUtensil, setNewUtensil] = React.useState("")
-  const [newTip, setNewTip] = React.useState("")
 
   React.useEffect(() => {
     if (receta && !formData) {
@@ -92,28 +90,9 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
         pasos: receta.pasos || [],
         macros: receta.macros || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 }
       })
-      setImagePreview(receta.fotoURL || receta.imageUrl || null)
+      setImagePreview(getSafeImageSource(receta))
     }
   }, [receta, formData])
-
-  React.useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-          const file = items[i].getAsFile();
-          if (file) {
-            setImageFile(file);
-            setImagePreview(URL.createObjectURL(file));
-            toast({ title: "¡Imagen pegada! 📋" });
-          }
-        }
-      }
-    };
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -134,39 +113,43 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
     try {
       if (imageFile && storage) {
-        toast({ title: "Procesando imagen...", description: "Comprimiendo y subiendo para mayor velocidad." })
-        
-        // 1. Comprimir en el cliente
+        toast({ title: "Subiendo imagen...", description: "Comprimiendo foto para mayor velocidad." })
         const compressedBlob = await compressImage(imageFile);
-        
-        // 2. Subir a Storage
         const timestamp = Date.now()
         const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}.jpg`)
         const res = await uploadBytes(storageRef, compressedBlob)
         finalFotoURL = await getDownloadURL(res.ref)
       }
 
-      // Limpiamos referencias duplicadas para consistencia
-      const { imageUrl, ...restData } = formData;
-
       const updatedData = {
-        ...restData,
+        ...formData,
         ingredientes: (formData.ingredientes || []).map((ing: any) => ({
           ...ing,
           nombre: normalizeIngredientName(ing.nombre),
           categoria: categorizeIngredient(ing.nombre)
         })),
         fotoURL: finalFotoURL,
+        imageUrl: null, 
         updatedAt: serverTimestamp(),
       }
 
-      await updateDoc(doc(db, "users", USER_ID, "recipes", recipeId), updatedData)
-      toast({ title: "¡Receta actualizada! 🎉" })
+      const docRef = doc(db, "users", USER_ID, "recipes", recipeId);
       
-      // Pequeña pausa para asegurar sincronización antes de volver
-      setTimeout(() => {
-        router.push(`/recetas/${recipeId}`)
-      }, 300)
+      updateDoc(docRef, updatedData)
+        .then(() => {
+          toast({ title: "¡Receta actualizada! 🎉" });
+          router.push(`/recetas/${recipeId}`);
+        })
+        .catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: updatedData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          setIsSaving(false);
+        });
+
     } catch (e) {
       console.error("Error al guardar:", e)
       toast({ variant: "destructive", title: "Error al guardar" })
@@ -174,40 +157,10 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
     }
   }
 
-  const addIngrediente = () => {
-    const newIng = { nombre: "", cantidad: 1, unidad: "unidad", preparacion: "" }
-    setFormData({ ...formData, ingredientes: [...(formData.ingredientes || []), newIng] })
-  }
-
-  const updateIngrediente = (idx: number, field: string, value: any) => {
-    const newIngs = [...formData.ingredientes]
-    newIngs[idx] = { ...newIngs[idx], [field]: value }
-    setFormData({ ...formData, ingredientes: newIngs })
-  }
-
-  const removeIngrediente = (idx: number) => {
-    setFormData({ ...formData, ingredientes: formData.ingredientes.filter((_: any, i: number) => i !== idx) })
-  }
-
-  const addPaso = () => {
-    const newPaso = { orden: (formData.pasos?.length || 0) + 1, titulo: "", descripcion: "", timerSegundos: 0 }
-    setFormData({ ...formData, pasos: [...(formData.pasos || []), newPaso] })
-  }
-
-  const updatePaso = (idx: number, field: string, value: any) => {
-    const newPasos = [...formData.pasos]
-    newPasos[idx] = { ...newPasos[idx], [field]: value }
-    setFormData({ ...formData, pasos: newPasos })
-  }
-
-  const removePaso = (idx: number) => {
-    setFormData({ ...formData, pasos: formData.pasos.filter((_: any, i: number) => i !== idx) })
-  }
-
   if (isLoading || !formData) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4">
       <Loader2 className="h-10 w-10 text-primary animate-spin" />
-      <p className="font-black uppercase text-[10px] tracking-widest text-primary">Cargando...</p>
+      <p className="font-black uppercase text-[10px] tracking-widest text-primary">Cargando editor...</p>
     </div>
   )
 
@@ -227,7 +180,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
       <div className="p-6 space-y-8 max-w-lg mx-auto w-full">
         <section className="space-y-4">
-          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Imagen del plato</label>
+          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Foto del plato</label>
           <div 
             className="relative h-56 w-full rounded-[2.5rem] border-4 border-dashed border-primary/10 bg-primary-suave/30 overflow-hidden group cursor-pointer hover:border-primary/30 transition-all"
             onClick={() => document.getElementById('image-upload')?.click()}
@@ -237,12 +190,11 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-primary/60">
                 <ImageIcon className="h-12 w-12" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Subir o Pegar foto</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Toca para cargar foto</span>
               </div>
             )}
             <input id="image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
           </div>
-          <p className="text-[9px] font-black text-muted-foreground text-center uppercase tracking-widest">Optimizado para cargas rápidas · Máx 10MB</p>
         </section>
 
         <section className="space-y-4">
@@ -257,7 +209,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
         </section>
 
         <section className="space-y-3">
-          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Momentos del día</label>
+          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Categorías</label>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map(cat => {
               const isSelected = (formData.categorias || []).includes(cat)
@@ -265,7 +217,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
                 <Badge 
                   key={cat} 
                   variant={isSelected ? "default" : "secondary"}
-                  className={`px-4 py-2 rounded-full cursor-pointer font-bold ${isSelected ? "bg-primary text-white" : "bg-primary-suave text-primary border-none"}`}
+                  className={`px-4 py-2 rounded-full cursor-pointer font-bold transition-all ${isSelected ? "bg-primary text-white" : "bg-primary-suave text-primary border-none"}`}
                   onClick={() => {
                     const current = formData.categorias || []
                     const next = isSelected ? current.filter((c: string) => c !== cat) : [...current, cat]
@@ -298,41 +250,24 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black uppercase text-primary tracking-widest">Ingredientes</h3>
-            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addIngrediente}><Plus className="h-3 w-3 mr-1" /> Agregar</Button>
+            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={() => setFormData({...formData, ingredientes: [...formData.ingredientes, {nombre:"", cantidad:1, unidad:"unidad"}]})}><Plus className="h-3 w-3 mr-1" /> Agregar</Button>
           </div>
-          <div className="space-y-3">
-            {formData.ingredientes?.map((ing: any, i: number) => (
-              <Card key={i} className="border-none shadow-sm bg-white rounded-2xl overflow-hidden border-2 border-primary/5">
-                <CardContent className="p-3 grid grid-cols-12 gap-2">
-                  <Input placeholder="Ingrediente" className="col-span-6 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.nombre} onChange={(e) => updateIngrediente(i, 'nombre', e.target.value)} />
-                  <Input type="number" placeholder="Cant." className="col-span-3 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.cantidad} onChange={(e) => updateIngrediente(i, 'cantidad', Number(e.target.value))} />
-                  <Input placeholder="Unid." className="col-span-2 h-10 rounded-xl border-none bg-background/50 px-2 font-bold" value={ing.unidad} onChange={(e) => updateIngrediente(i, 'unidad', e.target.value)} />
-                  <Button variant="ghost" size="icon" className="col-span-1 h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => removeIngrediente(i)}><Trash2 className="h-4 w-4" /></Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase text-primary tracking-widest">Preparación</h3>
-            <Button variant="ghost" size="sm" className="text-primary font-black text-[10px] uppercase" onClick={addPaso}><Plus className="h-3 w-3 mr-1" /> Agregar Paso</Button>
-          </div>
-          <div className="space-y-4">
-            {formData.pasos?.map((paso: any, i: number) => (
-              <Card key={i} className="rounded-3xl border-2 border-border/50 overflow-hidden">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest">Paso {i + 1}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => removePaso(i)}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                  <Input placeholder="Título del paso (opcional)" className="h-10 border-none font-bold p-0 text-primary" value={paso.titulo} onChange={(e) => updatePaso(i, 'titulo', e.target.value)} />
-                  <Textarea placeholder="Instrucción detallada..." className="min-h-[80px] border-none p-0 text-sm font-medium" value={paso.descripcion} onChange={(e) => updatePaso(i, 'descripcion', e.target.value)} />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {formData.ingredientes?.map((ing: any, i: number) => (
+            <Card key={i} className="border-none shadow-sm bg-white rounded-2xl overflow-hidden border-2 border-primary/5">
+              <CardContent className="p-3 grid grid-cols-12 gap-2">
+                <Input placeholder="Ingrediente" className="col-span-6 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.nombre} onChange={(e) => {
+                  const n = [...formData.ingredientes]; n[i].nombre = e.target.value; setFormData({...formData, ingredientes: n});
+                }} />
+                <Input type="number" placeholder="Cant." className="col-span-3 h-10 rounded-xl border-none bg-background/50 font-bold" value={ing.cantidad} onChange={(e) => {
+                  const n = [...formData.ingredientes]; n[i].cantidad = Number(e.target.value); setFormData({...formData, ingredientes: n});
+                }} />
+                <Input placeholder="Unid." className="col-span-2 h-10 rounded-xl border-none bg-background/50 px-2 font-bold" value={ing.unidad} onChange={(e) => {
+                  const n = [...formData.ingredientes]; n[i].unidad = e.target.value; setFormData({...formData, ingredientes: n});
+                }} />
+                <Button variant="ghost" size="icon" className="col-span-1 h-10 w-10 text-destructive" onClick={() => setFormData({...formData, ingredientes: formData.ingredientes.filter((_:any, idx:number) => i !== idx)})}><Trash2 className="h-4 w-4" /></Button>
+              </CardContent>
+            </Card>
+          ))}
         </section>
       </div>
     </div>
