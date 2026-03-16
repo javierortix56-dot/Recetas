@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -37,20 +36,7 @@ import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient"
 import { cn, formatPrecio, calcularCostoIngrediente } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
-
-// Helper robusto para obtener el timestamp de una imagen
-const getImageSource = (recipe: any) => {
-  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
-  if (!rawUrl) return null;
-  
-  let ts = "";
-  if (recipe.updatedAt) {
-    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
-    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
-  }
-  
-  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
-};
+import { getSafeImageSource } from "../tabs/inicio-tab"
 
 function UtensilIcon({ name }: { name: string }) {
   const n = name.toLowerCase();
@@ -109,31 +95,6 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   }, [receta])
 
   const scale = receta ? currentPortions / (receta.porciones || 1) : 1
-
-  const recipeCosts = React.useMemo(() => {
-    if (!receta?.ingredientes) return { total: 0, ingredients: [], incomplete: false };
-    
-    let total = 0;
-    let incomplete = false;
-    const ingredientCosts = receta.ingredientes.map((ing: any) => {
-      const priceData = ingredientPrices[ing.nombre];
-      const quantityScaled = ing.cantidad * scale;
-      const cost = priceData ? calcularCostoIngrediente(quantityScaled, ing.unidad, priceData.precio, priceData.unidad) : 0;
-      
-      if (!priceData || priceData.precio === 0) incomplete = true;
-      total += cost;
-      
-      return {
-        nombre: ing.nombre,
-        cantidad: quantityScaled,
-        unidad: ing.unidad,
-        costo: cost,
-        hasPrice: !!priceData && priceData.precio > 0
-      };
-    });
-
-    return { total, ingredients: ingredientCosts, incomplete };
-  }, [receta, ingredientPrices, scale]);
 
   const handleAddMissingToShoppingList = async () => {
     if (!db || !receta) return
@@ -203,11 +164,11 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   if (isLoading) return <RecipeSkeleton />
   if (!receta) return <div className="p-8 text-center font-bold">Receta no encontrada</div>
 
-  const imageSource = getImageSource(receta);
+  const imageSource = getSafeImageSource(receta);
 
   return (
     <div className="flex flex-col min-h-screen bg-white pb-32">
-      <div className="relative h-[280px] w-full bg-primary-suave/30">
+      <div className="relative h-[280px] w-full bg-muted">
         {imageSource ? (
           <Image 
             src={imageSource} 
@@ -344,7 +305,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
             <section className="space-y-4">
               <h3 className="text-xs font-black uppercase text-primary tracking-widest px-2">Tips del Chef</h3>
               <div className="space-y-3">
-                {(receta.tips || receta.consejoChef ? [receta.consejoChef, ...(receta.tips || [])] : []).filter(Boolean).map((t: string, i: number) => (
+                {(receta.tips || []).map((t: string, i: number) => (
                   <div key={i} className="bg-accent/5 p-4 rounded-3xl border-2 border-accent/10 flex gap-4">
                     <Info className="h-5 w-5 text-accent shrink-0" />
                     <p className="text-xs font-medium text-foreground/80 leading-relaxed italic">{t}</p>
@@ -352,44 +313,6 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
                 ))}
               </div>
             </section>
-          </TabsContent>
-
-          <TabsContent value="cost" className="pt-6 space-y-4">
-            <Card className="border-none shadow-sm bg-primary-suave/30 rounded-3xl overflow-hidden border-2 border-primary/5">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="space-y-1">
-                    <p className="text-3xl font-black text-primary leading-none">{formatPrecio(recipeCosts.total / currentPortions)}</p>
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">por porción</p>
-                  </div>
-                  <div className="text-right space-y-1">
-                    <p className="text-xl font-black text-primary/60 leading-none">{formatPrecio(recipeCosts.total)}</p>
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total para {currentPortions}p</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 pt-4 border-t border-primary/10">
-                  {recipeCosts.ingredients.map((ing, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={cn("h-1.5 w-1.5 rounded-full", ing.hasPrice ? "bg-primary" : "bg-destructive")} />
-                        <span className="text-xs font-bold text-foreground/80">{ing.nombre} <span className="opacity-40">· {ing.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 1 })} {ing.unidad}</span></span>
-                      </div>
-                      <span className="text-[10px] font-black text-primary">{ing.hasPrice ? formatPrecio(ing.costo) : "$ —"}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {recipeCosts.incomplete && (
-                  <div className="mt-6 flex items-start gap-2 bg-destructive/5 p-3 rounded-xl border border-destructive/10">
-                    <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-                    <p className="text-[9px] font-bold text-destructive uppercase leading-tight">
-                      Precio incompleto — algunos ingredientes no tienen precio cargado en Stock.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

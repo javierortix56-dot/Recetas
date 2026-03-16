@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,16 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -34,22 +23,9 @@ import { doc, writeBatch } from 'firebase/firestore';
 import { USER_ID } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getSafeImageSource } from './inicio-tab';
 
 const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"];
-
-// Helper robusto para obtener el timestamp de una imagen
-const getImageSource = (recipe: any) => {
-  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
-  if (!rawUrl) return null;
-  
-  let ts = "";
-  if (recipe.updatedAt) {
-    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
-    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
-  }
-  
-  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
-};
 
 export function RecetasTab() {
   const router = useRouter();
@@ -101,25 +77,6 @@ export function RecetasTab() {
     setSelectedIds(newSelected);
   };
 
-  const handleBatchDelete = async () => {
-    if (!db || selectedIds.size === 0) return;
-    setIsDeleting(true);
-    try {
-      const batch = writeBatch(db);
-      selectedIds.forEach(id => {
-        batch.delete(doc(db, "users", USER_ID, "recipes", id));
-      });
-      await batch.commit();
-      toast({ title: "Recetas eliminadas" });
-      setSelectedIds(new Set());
-      setIsSelectionMode(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error" });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   if (!recetasCargadas && recetas.length === 0) {
     return (
       <div className="grid grid-cols-3 gap-4">
@@ -133,7 +90,7 @@ export function RecetasTab() {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-32">
       <header className="flex flex-col gap-4 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2">
           <h1 className="text-3xl font-black tracking-tight text-primary">
             {isSelectionMode ? `(${selectedIds.size})` : 'Recetas'}
           </h1>
@@ -212,14 +169,12 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
   };
   
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
-  const diff = recipe.dificultad === "Fácil" ? "bg-[#2D9A6B]" : recipe.dificultad === "Difícil" ? "bg-[#F43F5E]" : "bg-[#F59E0B]";
-  
-  const imageSource = getImageSource(recipe);
+  const imageSource = getSafeImageSource(recipe);
 
   return (
     <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe active:scale-[0.98] transition-all rounded-2xl h-full flex flex-col relative", isSelected ? "ring-4 ring-primary" : "bg-white")}>
       {isSelectionMode && <div className={cn("absolute top-2 right-2 z-20 h-6 w-6 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
-      <div className="relative h-28 w-full pointer-events-none bg-primary-suave/30">
+      <div className="relative h-28 w-full pointer-events-none bg-muted">
         {imageSource ? (
           <Image 
             src={imageSource} 
@@ -238,7 +193,7 @@ function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection
         </div>
       </div>
       <CardContent className="p-3 flex flex-col flex-1 gap-2.5">
-        <h3 className="font-black text-[11px] leading-tight text-foreground min-h-[1.5rem]">{recipe.nombre}</h3>
+        <h3 className="font-black text-[11px] leading-tight text-foreground min-h-[1.5rem] line-clamp-2">{recipe.nombre}</h3>
         <div className="space-y-1 mt-auto">
           <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase">
             <Clock className="h-3 w-3" /> {(recipe.tiempoPreparacion || 0) + (recipe.tiempoCoccion || 0)}'

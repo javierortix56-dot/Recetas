@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -51,22 +50,9 @@ import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
 import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
 import Image from "next/image";
 import { syncShoppingList } from '@/lib/sync-logic';
+import { getSafeImageSource } from './inicio-tab';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
-
-// Helper robusto para obtener el timestamp de una imagen
-const getImageSource = (recipe: any) => {
-  const rawUrl = recipe?.recipeImageUrl || recipe?.fotoURL || recipe?.imageUrl;
-  if (!rawUrl) return null;
-  
-  let ts = "";
-  if (recipe.updatedAt) {
-    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
-    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
-  }
-  
-  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
-};
 
 function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, icon: Icon }: { label: string, value: number, target: number, size?: number, strokeWidth?: number, icon?: any }) {
   const radius = (size - strokeWidth) / 2;
@@ -450,7 +436,7 @@ export function PlanificacionTab() {
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between pt-2">
         <div className="flex flex-col">
           <h1 className="text-2xl font-black text-primary">Planificación</h1>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Semana de {activeProfile}</p>
@@ -469,7 +455,7 @@ export function PlanificacionTab() {
                 <AlertDialogContent className="rounded-[2rem]">
                   <AlertDialogHeader>
                     <AlertDialogTitle className="font-black text-primary text-xl">¿Desplanificar tu semana?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm font-medium">Se quitarán tus comidas de esta semana. Los planes de los demás no se tocarán.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-sm font-medium">Se quitarán tus comidas de esta semana.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="gap-2">
                     <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
@@ -513,12 +499,6 @@ export function PlanificacionTab() {
             <WeeklyMacroRing label="Carbos" value={weeklyTotals.carbohidratos} target={weeklyGoals.carbohidratos} icon={Wheat} />
             <WeeklyMacroRing label="Grasas" value={weeklyTotals.grasas} target={weeklyGoals.grasas} icon={Droplets} />
           </div>
-
-          <div className="mt-6 pt-4 border-t border-primary/5">
-            <p className="text-[8px] font-black text-muted-foreground uppercase text-center tracking-widest leading-relaxed">
-              Basado en {planificacion.length} comidas planeadas para esta semana.
-            </p>
-          </div>
         </CardContent>
       </Card>
 
@@ -554,14 +534,14 @@ export function PlanificacionTab() {
                       {MOMENTOS.map((m) => {
                         const plan = plans.find(p => p.mealType === m);
                         const recipe = plan ? recetas.find(r => r.id === plan.recipeId) : null;
-                        const imageUrl = getImageSource(plan) || getImageSource(recipe);
+                        const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
 
                         return (
                           <div key={m} className="flex items-start gap-4">
                             <span className="w-20 text-[10px] font-black text-muted-foreground uppercase pt-3 shrink-0">{m}</span>
                             {plan ? (
                               <div className="flex-1 flex items-center gap-3 bg-white p-2 rounded-2xl relative shadow-sm border">
-                                <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative">
+                                <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative bg-muted">
                                   {imageUrl ? (
                                     <Image 
                                       src={imageUrl} 

@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  ChevronRight, Calendar, Activity, DollarSign, TrendingDown, TrendingUp, Minus
+  ChevronRight, Calendar, Activity, DollarSign, TrendingDown, TrendingUp, Minus, Flame
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,19 +18,30 @@ import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, ReferenceLine } fro
 import Image from "next/image";
 import { cn, formatPrecio } from '@/lib/utils';
 
-// Helper robusto para obtener el timestamp de una imagen
-const getImageSource = (recipe: any) => {
-  const rawUrl = recipe?.fotoURL || recipe?.imageUrl;
-  if (!rawUrl) return null;
+/**
+ * Helper definitivo para obtener el origen de la imagen.
+ * Resuelve problemas de caché y nombres de campos inconsistentes.
+ */
+export const getSafeImageSource = (item: any) => {
+  const url = item?.fotoURL || item?.imageUrl || item?.recipeImageUrl;
+  if (!url) return null;
   
-  // Extraer milisegundos de forma segura para datos de Firebase o caché de LocalStorage
-  let ts = "";
-  if (recipe.updatedAt) {
-    if (typeof recipe.updatedAt.toMillis === 'function') ts = recipe.updatedAt.toMillis();
-    else if (recipe.updatedAt.seconds) ts = recipe.updatedAt.seconds * 1000;
+  try {
+    let ts = "";
+    if (item.updatedAt) {
+      if (typeof item.updatedAt.toMillis === 'function') ts = item.updatedAt.toMillis();
+      else if (item.updatedAt.seconds) ts = item.updatedAt.seconds * 1000;
+      else if (typeof item.updatedAt === 'string' || typeof item.updatedAt === 'number') ts = new Date(item.updatedAt).getTime();
+    }
+    
+    // Si tenemos un timestamp estable, lo usamos para refrescar la caché solo cuando cambia el dato
+    if (ts && url.startsWith('http') && !url.includes('picsum')) {
+      return `${url}${url.includes('?') ? '&' : '?'}v=${ts}`;
+    }
+    return url;
+  } catch (e) {
+    return url;
   }
-  
-  return ts ? `${rawUrl}${rawUrl.includes('?') ? '&' : '?'}t=${ts}` : rawUrl;
 };
 
 function MacroRing({ label, value, target, size = 60, strokeWidth = 6 }: { label: string, value: number, target: number, size?: number, strokeWidth?: number }) {
@@ -223,11 +233,11 @@ export function InicioTab() {
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
             {todayPlansSorted.map((plan) => {
               const recipe = recetas.find(r => r.id === plan.recipeId);
-              const imageUrl = getImageSource(plan) || getImageSource(recipe);
+              const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
 
               return (
                 <Card key={plan.id} className="min-w-[180px] max-w-[180px] border-none shadow-sm rounded-2xl overflow-hidden snap-start active:scale-95 transition-transform" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
-                  <div className="h-24 w-full relative">
+                  <div className="h-24 w-full relative bg-muted">
                     {imageUrl ? (
                       <Image 
                         src={imageUrl} 
@@ -239,7 +249,7 @@ export function InicioTab() {
                     ) : (
                       <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
                     )}
-                    <Badge className="absolute top-2 right-2 bg-white/90 text-[8px] font-black text-primary border-none">{plan.mealType}</Badge>
+                    <Badge className="absolute top-2 right-2 bg-white/90 text-[8px] font-black text-primary border-none shadow-sm">{plan.mealType}</Badge>
                   </div>
                   <CardContent className="p-3">
                     <h4 className="font-bold text-xs truncate leading-tight">{plan.recipeName}</h4>

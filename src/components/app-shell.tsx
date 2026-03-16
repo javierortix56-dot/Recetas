@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * @fileOverview Contenedor principal que maneja la persistencia de las pestañas.
+ * Se ha eliminado la pantalla de bienvenida obligatoria para una entrada directa.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative w-full h-full min-h-screen overflow-hidden">
-      {/* Header global para pestañas principales siempre visible */}
+      {/* Selector de perfil superior - Siempre visible en pestañas principales */}
       {isCoreTab && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 py-3 flex justify-center max-w-lg mx-auto pointer-events-none">
           <div className="pointer-events-auto">
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MacrosTab />
       </div>
 
-      {/* Contenido dinámico */}
+      {/* Contenido dinámico (Subpáginas) */}
       <div className={cn("relative w-full min-h-screen", isCoreTab ? 'hidden' : 'block')}>
         {!isCoreTab && children}
       </div>
