@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -33,7 +32,7 @@ export function ProfileSelectionOverlay() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-12 space-y-2"
       >
-        <h1 className="text-4xl font-black text-primary tracking-tight">¡Hola! 👋</h1>
+        <h1 className="text-4xl font-black text-primary tracking-tight">¡Hola!</h1>
         <p className="text-muted-foreground font-bold uppercase text-xs tracking-[0.2em]">¿Quién va a cocinar hoy?</p>
       </motion.div>
 

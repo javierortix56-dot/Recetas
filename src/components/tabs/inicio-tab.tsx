@@ -83,14 +83,11 @@ export function InicioTab() {
   const [mounted, setMounted] = React.useState(false);
   const { userProfile, macrosHoy, planificacion, macrosSemana, recetas, historialCompras } = useAppStore();
 
-  const [greeting, setGreeting] = React.useState("");
   const [formattedDate, setFormattedDate] = React.useState("");
 
   React.useEffect(() => {
     setMounted(true);
     const now = new Date();
-    const hour = now.getHours();
-    setGreeting(hour < 12 ? "Buenos días ☀️" : hour < 20 ? "Buenas tardes 🌤️" : "Buenas noches 🌙");
     setFormattedDate(format(now, "EEEE d 'de' MMMM", { locale: es }));
   }, []);
 
@@ -170,8 +167,10 @@ export function InicioTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-primary leading-tight">{greeting} {userProfile?.displayName?.split(' ')[0] || 'Chef'}</h1>
-          <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">{formattedDate}</p>
+          <h1 className="text-3xl font-black text-primary leading-none uppercase tracking-tighter">
+            {userProfile?.displayName?.split(' ')[0] || 'Chef'}
+          </h1>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1.5">{formattedDate}</p>
         </div>
         <Avatar className="h-10 w-10 ring-4 ring-primary/5">
           <AvatarFallback className="bg-primary-suave text-primary font-black text-xs">CF</AvatarFallback>
