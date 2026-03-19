@@ -17,6 +17,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Cocina Familiar',
   },
+  icons: {
+    apple: 'https://picsum.photos/seed/hamburger/180/180',
+  },
 };
 
 export function generateViewport() {
