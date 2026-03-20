@@ -11,7 +11,7 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc } from "firebase/firestore";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -91,7 +91,18 @@ export function ComprasTab() {
             const data = snap.data();
             const current = Number(data.stockActual) || 0;
             const cantASumar = convertirCantidad(Number(item.cantidad), item.unidad, data.unidad);
-            batch.update(ingRef, { stockActual: current + cantASumar, updatedAt: serverTimestamp() });
+            const newStock = current + cantASumar;
+            batch.update(ingRef, { stockActual: newStock, updatedAt: serverTimestamp() });
+            addDoc(collection(db, "users", USER_ID, "stock_historial"), {
+              ingredienteId: item.ingredienteId,
+              ingredienteNombre: item.nombre,
+              tipo: 'compra',
+              cantidadAntes: current,
+              cantidadDespues: newStock,
+              diferencia: cantASumar,
+              unidad: data.unidad,
+              fecha: serverTimestamp(),
+            });
           }
         }
         
