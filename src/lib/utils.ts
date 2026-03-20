@@ -13,29 +13,15 @@ export const getSafeImageSource = (item: any) => {
   if (!item) return null;
   // Buscamos en todas las propiedades posibles (plan, receta, ingrediente)
   const url = item.fotoURL || item.imageUrl || item.recipeImageUrl || (item.recipe && (item.recipe.fotoURL || item.recipe.imageUrl));
-  
-  if (!url) return null;
-  if (url.includes('picsum.photos')) return url;
 
-  try {
-    let ts = "";
-    const updatedAt = item.updatedAt || (item.recipe && item.recipe.updatedAt);
-    
-    if (updatedAt) {
-      if (typeof updatedAt.toMillis === 'function') ts = updatedAt.toMillis();
-      else if (updatedAt.seconds) ts = updatedAt.seconds * 1000;
-      else if (typeof updatedAt === 'string' || typeof updatedAt === 'number') ts = new Date(updatedAt).getTime();
-    }
-    
-    // Si tenemos un timestamp, lo usamos para refrescar la caché solo cuando cambia el dato
-    if (ts && url.startsWith('http')) {
-      const separator = url.includes('?') ? '&' : '?';
-      return `${url}${separator}v=${ts}`;
-    }
-    return url;
-  } catch (e) {
-    return url;
+  if (!url) return null;
+
+  // Para URLs de Firebase Storage, usamos el proxy para evitar errores CORS
+  if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
+    return `/api/image?url=${encodeURIComponent(url)}`;
   }
+
+  return url;
 };
 
 /**
