@@ -211,7 +211,7 @@ export function InicioTab() {
         </div>
         
         {todayPlansSorted.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
+          <div className="flex flex-wrap gap-4 pb-2 px-1">
             {todayPlansSorted.map((plan) => {
               const imageUrl = getSafeImageSource(plan);
               return (

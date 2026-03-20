@@ -210,7 +210,7 @@ export function StockTab() {
         )}
 
         {isSelectionMode && (
-          <div className="flex gap-2 py-1 overflow-x-auto scrollbar-hide">
+          <div className="flex flex-wrap gap-2 py-1">
             <Button 
               variant="outline" 
               size="sm" 

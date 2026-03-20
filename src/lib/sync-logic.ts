@@ -3,13 +3,13 @@
  * Minimiza las escrituras en Firestore mediante comparaciones diferenciales y bloqueo de concurrencia.
  */
 
-import { 
-  Firestore, 
-  collection, 
-  getDocs, 
-  writeBatch, 
-  doc, 
-  serverTimestamp 
+import {
+  Firestore,
+  collection,
+  getDocs,
+  writeBatch,
+  doc,
+  serverTimestamp
 } from "firebase/firestore";
 import { USER_ID } from "@/lib/constants";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
@@ -24,7 +24,7 @@ let isSyncing = false;
  */
 export const syncShoppingList = async (db: Firestore) => {
   if (!db || isSyncing) return;
-  
+
   isSyncing = true;
   console.log("Iniciando sincronización diferencial de lista de compras...");
 
@@ -39,11 +39,13 @@ export const syncShoppingList = async (db: Firestore) => {
     const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const currentShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-    
+
     // Mapas para procesamiento eficiente
     const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing as any]));
     const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-    
+    // Mapa de justificación: qué recetas necesitan cada ingrediente
+    const recipesByIngredient = new Map<string, string[]>();
+
     // 2. Calcular necesidades desde el plan
     allPlans.forEach((plan: any) => {
       const planPortions = Number(plan.plannedPortions) || 1;
@@ -53,11 +55,17 @@ export const syncShoppingList = async (db: Firestore) => {
       (plan.ingredientes || []).forEach((ing: any) => {
         const nombreIng = (ing.nombre || "").toLowerCase().trim();
         if (!nombreIng || isSubPreparation(nombreIng)) return;
-        
+
+        // Registrar qué recetas usan este ingrediente
+        const recipes = recipesByIngredient.get(nombreIng) || [];
+        const recipeName = plan.recipeName || "Receta";
+        if (!recipes.includes(recipeName)) recipes.push(recipeName);
+        recipesByIngredient.set(nombreIng, recipes);
+
         const rawQty = (Number(ing.cantidad) || 0) * scale;
         const stockItem = stockMap.get(nombreIng);
-        
-        const convertedQty = stockItem 
+
+        const convertedQty = stockItem
           ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
           : rawQty;
 
@@ -65,11 +73,11 @@ export const syncShoppingList = async (db: Firestore) => {
         if (existing) {
           existing.cantidad += convertedQty;
         } else {
-          neededMap.set(nombreIng, { 
-            nombre: ing.nombre, 
-            cantidad: convertedQty, 
-            unidad: stockItem?.unidad || ing.unidad || "unid", 
-            categoria: ing.categoria || categorizeIngredient(ing.nombre) 
+          neededMap.set(nombreIng, {
+            nombre: ing.nombre,
+            cantidad: convertedQty,
+            unidad: stockItem?.unidad || ing.unidad || "unid",
+            categoria: ing.categoria || categorizeIngredient(ing.nombre)
           });
         }
       });
@@ -84,14 +92,19 @@ export const syncShoppingList = async (db: Firestore) => {
       const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
       const minNeed = Number(ing.stockMinimo ?? 0);
       const enStock = Number(ing.stockActual || 0);
-      
+
       const totalRequerido = Math.max(planNeed, minNeed);
       const faltante = totalRequerido - enStock;
 
       if (faltante > 0) {
         const precio = ing.precioUnitario || 0;
         const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-        
+
+        const recipes = recipesByIngredient.get(nombreNorm) || [];
+        const justificacion = recipes.length > 0
+          ? recipes.join(" · ")
+          : "Stock mínimo";
+
         desiredShoppingMap.set(nombreNorm, {
           nombre: ing.nombre,
           cantidad: Number(finalQty.toFixed(2)),
@@ -100,7 +113,9 @@ export const syncShoppingList = async (db: Firestore) => {
           ingredienteId: ing.id,
           precioUnitario: precio,
           subtotal: precio * finalQty,
-          isPurchased: false
+          isPurchased: false,
+          source: "plan",
+          justificacion,
         });
       }
     });
@@ -109,6 +124,7 @@ export const syncShoppingList = async (db: Firestore) => {
     neededMap.forEach((data, nombreNorm) => {
       if (!desiredShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
         const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
+        const recipes = recipesByIngredient.get(nombreNorm) || [];
         desiredShoppingMap.set(nombreNorm, {
           ...data,
           cantidad: Number(finalQty.toFixed(2)),
@@ -116,7 +132,9 @@ export const syncShoppingList = async (db: Firestore) => {
           ingredienteId: "",
           precioUnitario: 0,
           subtotal: 0,
-          isPurchased: false
+          isPurchased: false,
+          source: "plan",
+          justificacion: recipes.join(" · ") || "Plan de comidas",
         });
       }
     });
@@ -125,10 +143,12 @@ export const syncShoppingList = async (db: Firestore) => {
     const batch = writeBatch(db);
     let writeCount = 0;
 
-    // A. Identificar qué borrar
+    // A. Identificar qué borrar — NUNCA borrar ítems manuales
     for (const current of currentShoppingItems) {
-      if (current.isPurchased) continue; 
-      
+      if (current.isPurchased) continue;
+      // Preservar items manuales
+      if (current.source === "manual" || current.reason === "Manual") continue;
+
       const nombreNorm = (current.nombre || "").toLowerCase().trim();
       if (!desiredShoppingMap.has(nombreNorm)) {
         batch.delete(doc(db, "users", USER_ID, "shopping_list_items", current.id));
@@ -138,16 +158,19 @@ export const syncShoppingList = async (db: Firestore) => {
 
     // B. Identificar qué crear o actualizar
     desiredShoppingMap.forEach((desiredData, nombreNorm) => {
-      const existing = currentShoppingItems.find(i => 
-        !i.isPurchased && (i.nombre || "").toLowerCase().trim() === nombreNorm
+      const existing = currentShoppingItems.find(i =>
+        !i.isPurchased &&
+        (i.source === "plan" || (!i.source && i.reason !== "Manual")) &&
+        (i.nombre || "").toLowerCase().trim() === nombreNorm
       );
 
       if (existing) {
-        const hasChanges = 
+        const hasChanges =
           Math.abs(existing.cantidad - desiredData.cantidad) > 0.01 ||
           existing.unidad !== desiredData.unidad ||
           existing.categoria !== desiredData.categoria ||
-          existing.precioUnitario !== desiredData.precioUnitario;
+          existing.precioUnitario !== desiredData.precioUnitario ||
+          existing.justificacion !== desiredData.justificacion;
 
         if (hasChanges) {
           batch.update(doc(db, "users", USER_ID, "shopping_list_items", existing.id), {

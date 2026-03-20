@@ -115,7 +115,7 @@ export function RecetasTab() {
               <Input placeholder="Buscar recetas..." className="pl-10 h-12 bg-white rounded-2xl font-bold shadow-sm border-2 border-primary/5" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 snap-x items-center">
+            <div className="flex flex-wrap gap-2 pb-1 items-center">
               {CATEGORIES.map((cat) => (
                 <Badge key={cat} variant={activeCategory === cat ? "default" : "secondary"} className={cn("px-4 py-2 rounded-full cursor-pointer whitespace-nowrap text-[10px] font-black snap-start transition-all uppercase tracking-widest", activeCategory === cat ? "bg-primary text-white shadow-md" : "bg-primary-suave text-primary border-none")} onClick={() => setActiveCategory(cat)}>{cat}</Badge>
               ))}

@@ -217,9 +217,9 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
           </div>
         </div>
         <div className="absolute bottom-6 left-6 right-6">
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-2 snap-x">
+          <div className="flex flex-wrap gap-2 pb-2 mb-2">
             {(receta.categorias || [receta.categoria]).map((cat: string) => (
-              <Badge key={cat} className="bg-primary text-white border-none font-black uppercase text-[10px] h-6 snap-start">{cat}</Badge>
+              <Badge key={cat} className="bg-primary text-white border-none font-black uppercase text-[10px] h-6">{cat}</Badge>
             ))}
             <Badge className="bg-accent text-white border-none font-black uppercase text-[10px] h-6 snap-start">{receta.dificultad}</Badge>
           </div>
@@ -230,7 +230,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
       <div className="p-6 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
         {/* Macros rápidos */}
         {receta.macros && (
-          <section className="flex gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 snap-x">
+          <section className="flex flex-wrap gap-2 px-1">
             {[
               { label: 'Kcal', value: receta.macros.calorias, color: 'bg-primary/10 text-primary' },
               { label: 'Prot', value: receta.macros.proteinas, unit: 'g', color: 'bg-blue-50 text-blue-600' },
@@ -251,7 +251,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
         )}
 
         {/* Chips de info */}
-        <section className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide -mx-6 px-6 snap-x">
+        <section className="flex flex-wrap gap-2.5 pb-1">
           <div className="flex items-center gap-2 bg-primary-suave px-4 py-2.5 rounded-2xl border border-primary/10 snap-start shrink-0">
             <Utensils className="h-4 w-4 text-primary" />
             <div className="flex items-center gap-2 text-primary font-black">
