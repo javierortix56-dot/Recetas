@@ -11,18 +11,38 @@ export function cn(...inputs: ClassValue[]) {
  */
 export const getSafeImageSource = (item: any) => {
   if (!item) return null;
-  // Buscamos en todas las propiedades posibles (plan, receta, ingrediente)
   const url = item.fotoURL || item.imageUrl || item.recipeImageUrl || (item.recipe && (item.recipe.fotoURL || item.recipe.imageUrl));
-
   if (!url) return null;
-
-  // Para URLs de Firebase Storage, usamos el proxy para evitar errores CORS
-  if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
-    return `/api/image?url=${encodeURIComponent(url)}`;
-  }
-
+  // Data URLs (base64) y URLs externas se devuelven tal cual
   return url;
 };
+
+export async function compressImageToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 700;
+        let { width, height } = img;
+        if (width > height) {
+          if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+        } else {
+          if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
+  });
+}
 
 /**
  * Formatea un número como moneda ARS ($ 1.500)

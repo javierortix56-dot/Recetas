@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "@/hooks/use-toast"
-import { useFirestore, useStorage } from "@/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { useFirestore } from "@/firebase"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { compressImageToBase64 } from "@/lib/utils"
 import { USER_ID } from "@/lib/constants"
 import Image from "next/image"
 import { normalizeIngredientName, categorizeIngredient } from "@/lib/categorizeIngredient"
@@ -22,52 +22,10 @@ import { FirestorePermissionError } from "@/firebase/errors"
 
 const CATEGORIES = ["Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"]
 
-async function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new (window as any).Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Compresión fallida'));
-        }, 'image/jpeg', 0.85);
-      };
-    };
-    reader.onerror = (error) => reject(error);
-  });
-}
-
 export function RecipeEditClient({ recipeId }: { recipeId: string }) {
   const router = useRouter()
   const db = useFirestore()
-  const storage = useStorage()
-  
+
   const receta = useAppStore(s => s.recetas.find(r => r.id === recipeId))
   const recetasCargadas = useAppStore(s => s.recetasCargadas)
   const isLoading = !recetasCargadas
@@ -112,13 +70,9 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
     let finalFotoURL = formData.fotoURL || formData.imageUrl || null
 
     try {
-      if (imageFile && storage) {
-        toast({ title: "Subiendo imagen...", description: "Comprimiendo foto para mayor velocidad." })
-        const compressedBlob = await compressImage(imageFile);
-        const timestamp = Date.now()
-        const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}.jpg`)
-        const res = await uploadBytes(storageRef, compressedBlob)
-        finalFotoURL = await getDownloadURL(res.ref)
+      if (imageFile) {
+        toast({ title: "Procesando imagen..." });
+        finalFotoURL = await compressImageToBase64(imageFile);
       }
 
       const updatedData = {
@@ -135,11 +89,7 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
 
       const docRef = doc(db, "users", USER_ID, "recipes", recipeId);
       
-      updateDoc(docRef, updatedData)
-        .then(() => {
-          toast({ title: "¡Receta actualizada! 🎉" });
-          router.push(`/recetas/${recipeId}`);
-        })
+      await updateDoc(docRef, updatedData)
         .catch(async (serverError) => {
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
@@ -149,6 +99,8 @@ export function RecipeEditClient({ recipeId }: { recipeId: string }) {
           errorEmitter.emit('permission-error', permissionError);
           setIsSaving(false);
         });
+      toast({ title: "¡Receta actualizada!" });
+      router.push(`/recetas/${recipeId}`);
 
     } catch (e) {
       console.error("Error al guardar:", e)
