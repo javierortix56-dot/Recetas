@@ -174,6 +174,7 @@ export const syncShoppingList = async (db: Firestore) => {
 
   } catch (error) {
     console.error("Error en syncShoppingList:", error);
+    throw error;
   } finally {
     isSyncing = false;
   }

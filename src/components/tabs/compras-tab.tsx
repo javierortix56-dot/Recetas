@@ -148,13 +148,18 @@ export function ComprasTab() {
     }
   };
 
-  const toggleItem = (id: string, current: boolean) => {
+  const toggleItem = async (id: string, current: boolean) => {
     if (!db) return;
     optimisticToggleCompra(id);
-    updateDoc(doc(db, "users", USER_ID, "shopping_list_items", id), { 
-      isPurchased: !current, 
-      purchasedAt: !current ? serverTimestamp() : null 
-    });
+    try {
+      await updateDoc(doc(db, "users", USER_ID, "shopping_list_items", id), {
+        isPurchased: !current,
+        purchasedAt: !current ? serverTimestamp() : null
+      });
+    } catch {
+      optimisticToggleCompra(id); // revertir cambio optimista
+      toast({ variant: "destructive", title: "Error al marcar ítem" });
+    }
   };
 
   if (!listaComprasCargada && listaCompras.length === 0) {

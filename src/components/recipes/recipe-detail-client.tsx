@@ -153,7 +153,25 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   }
 
   if (isLoading) return <RecipeSkeleton />
-  if (!receta) return <div className="p-8 text-center font-bold">Receta no encontrada</div>
+  if (!receta) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 p-8 text-center">
+      <div className="bg-primary-suave w-24 h-24 rounded-full flex items-center justify-center">
+        <ChefHat className="h-12 w-12 text-primary/40" />
+      </div>
+      <div>
+        <h2 className="text-2xl font-black text-primary mb-2">Receta no encontrada</h2>
+        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+          Esta receta no existe o fue eliminada.
+        </p>
+      </div>
+      <Button
+        className="h-12 px-8 rounded-2xl bg-primary text-white font-black uppercase text-xs"
+        onClick={() => router.replace("/recetas")}
+      >
+        Ver todas las recetas
+      </Button>
+    </div>
+  )
 
   const imageSource = getSafeImageSource(receta);
 

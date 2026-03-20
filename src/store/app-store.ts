@@ -97,14 +97,16 @@ export const useAppStore = create<AppState>((set) => ({
 
   setActiveProfile: (profile) => {
     updateCache('activeProfile', profile);
-    set({ 
-      activeProfile: profile, 
+    set({
+      activeProfile: profile,
       isProfileConfirmed: true,
-      macrosCargados: false, 
-      macrosHoy: null, 
-      macrosSemana: [], 
-      planificacion: [], 
-      planificacionCargada: false 
+      macrosCargados: false,
+      macrosHoy: null,
+      macrosSemana: [],
+      planificacion: [],
+      planificacionCargada: false,
+      userProfile: null,
+      profileCargado: false,
     });
   },
 
