@@ -228,68 +228,119 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
       </div>
 
       <div className="p-6 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-        <section className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide -mx-6 px-6 snap-x">
+        {/* Macros rápidos */}
+        {receta.macros && (
+          <section className="flex gap-2 overflow-x-auto scrollbar-hide -mx-6 px-6 snap-x">
+            {[
+              { label: 'Kcal', value: receta.macros.calorias, color: 'bg-primary/10 text-primary' },
+              { label: 'Prot', value: receta.macros.proteinas, unit: 'g', color: 'bg-blue-50 text-blue-600' },
+              { label: 'Carbs', value: receta.macros.carbohidratos, unit: 'g', color: 'bg-amber-50 text-amber-600' },
+              { label: 'Grasas', value: receta.macros.grasas, unit: 'g', color: 'bg-rose-50 text-rose-500' },
+            ].map(m => (
+              <div key={m.label} className={`flex flex-col items-center px-4 py-2.5 rounded-2xl snap-start shrink-0 ${m.color}`}>
+                <span className="text-lg font-black leading-none">{Math.round(m.value || 0)}{m.unit || ''}</span>
+                <span className="text-[8px] font-black uppercase tracking-widest mt-0.5">{m.label}</span>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* Descripción */}
+        {receta.descripcion && (
+          <p className="text-sm text-foreground/70 font-medium leading-relaxed italic px-1">{receta.descripcion}</p>
+        )}
+
+        {/* Chips de info */}
+        <section className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide -mx-6 px-6 snap-x">
           <div className="flex items-center gap-2 bg-primary-suave px-4 py-2.5 rounded-2xl border border-primary/10 snap-start shrink-0">
             <Utensils className="h-4 w-4 text-primary" />
             <div className="flex items-center gap-2 text-primary font-black">
-              <button onClick={() => setCurrentPortions(Math.max(1, currentPortions - 1))} className="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm">-</button>
+              <button onClick={() => setCurrentPortions(Math.max(1, currentPortions - 1))} className="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm active:scale-90 transition-transform">-</button>
               <span className="w-4 text-center text-sm">{currentPortions}</span>
-              <button onClick={() => setCurrentPortions(currentPortions + 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm">+</button>
+              <button onClick={() => setCurrentPortions(currentPortions + 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-lg shadow-sm active:scale-90 transition-transform">+</button>
             </div>
           </div>
           <div className="flex items-center gap-2 bg-background px-4 py-2.5 rounded-2xl border border-border snap-start shrink-0">
-            <Clock className="h-4 w-4 text-primary" /><span className="text-xs font-bold text-muted-foreground uppercase">Prep: {receta.tiempoPreparacion} min</span>
+            <Clock className="h-4 w-4 text-primary" /><span className="text-xs font-bold text-muted-foreground uppercase">Prep: {receta.tiempoPreparacion}'</span>
           </div>
           <div className="flex items-center gap-2 bg-background px-4 py-2.5 rounded-2xl border border-border snap-start shrink-0">
-            <ChefHat className="h-4 w-4 text-primary" /><span className="text-xs font-bold text-muted-foreground uppercase">Cocción: {receta.tiempoCoccion} min</span>
+            <ChefHat className="h-4 w-4 text-primary" /><span className="text-xs font-bold text-muted-foreground uppercase">Cocción: {receta.tiempoCoccion}'</span>
           </div>
         </section>
 
         <Tabs defaultValue="ingredients" className="w-full">
           <TabsList className="grid w-full grid-cols-4 bg-primary-suave p-1 rounded-2xl h-14">
-            <TabsTrigger value="ingredients" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Ingredientes</TabsTrigger>
-            <TabsTrigger value="steps" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Pasos</TabsTrigger>
-            <TabsTrigger value="details" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Utensilios</TabsTrigger>
-            <TabsTrigger value="cost" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary">Costo</TabsTrigger>
+            <TabsTrigger value="ingredients" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Ingredientes</TabsTrigger>
+            <TabsTrigger value="steps" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Pasos</TabsTrigger>
+            <TabsTrigger value="details" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Utensilios</TabsTrigger>
+            <TabsTrigger value="cost" className="rounded-xl font-black uppercase text-[9px] data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all">Costo</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="ingredients" className="pt-6 space-y-4">
-            <div className="space-y-3">
+            <div className="space-y-2">
               {receta.ingredientes?.map((ing: any, i: number) => {
                 const status = stockStatus[ing.nombre] || 'gray'
-                const colors = { green: 'bg-[#2D9A6B]', yellow: 'bg-[#F59E0B]', red: 'bg-[#F43F5E]', gray: 'bg-[#6B7280]' }
+                const statusConfig: Record<string, { bg: string, ring: string, icon: string, label: string }> = {
+                  green: { bg: 'bg-emerald-500', ring: 'ring-emerald-100', icon: '✓', label: 'En stock' },
+                  yellow: { bg: 'bg-amber-400', ring: 'ring-amber-100', icon: '!', label: 'Poco' },
+                  red: { bg: 'bg-red-500', ring: 'ring-red-100', icon: '✕', label: 'Sin stock' },
+                  gray: { bg: 'bg-gray-300', ring: 'ring-gray-100', icon: '?', label: 'Sin datos' },
+                }
+                const sc = statusConfig[status]
                 return (
-                  <div key={i} className="flex items-center justify-between p-4 bg-background rounded-2xl border border-border shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-2.5 w-2.5 rounded-full ${colors[status]} shrink-0`} />
-                      <div className="flex flex-col">
-                        <span className="font-bold text-foreground">{ing.nombre}</span>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{ing.preparacion}</span>
-                      </div>
+                  <div key={i} className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-border/50 shadow-sm hover:shadow-recipe transition-shadow">
+                    <div className={`h-8 w-8 rounded-xl ${sc.bg} ${sc.ring} ring-4 flex items-center justify-center shrink-0`}>
+                      <span className="text-white text-[10px] font-black">{sc.icon}</span>
                     </div>
-                    <span className="text-sm font-black text-primary">{(ing.cantidad * scale).toLocaleString('es-ES', { maximumFractionDigits: 1 })} {ing.unidad}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-sm text-foreground block truncate">{ing.nombre}</span>
+                      {ing.preparacion && <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">{ing.preparacion}</span>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-black text-primary block">{(ing.cantidad * scale).toLocaleString('es-ES', { maximumFractionDigits: 1 })}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">{ing.unidad}</span>
+                    </div>
                   </div>
                 )
               })}
             </div>
-            <Button variant="outline" className="w-full rounded-2xl h-14 font-black uppercase text-xs border-2 text-primary border-primary/20" onClick={handleAddMissingToShoppingList}>
+            <Button variant="outline" className="w-full rounded-2xl h-14 font-black uppercase text-xs border-2 text-primary border-primary/20 hover:bg-primary hover:text-white transition-colors" onClick={handleAddMissingToShoppingList}>
               <ShoppingCart className="h-4 w-4 mr-2" /> Agregar faltantes a Compras
             </Button>
           </TabsContent>
 
-          <TabsContent value="steps" className="pt-6 space-y-6">
-            {receta.pasos?.map((step: any, i: number) => (
-              <Card key={i} className="border-none shadow-recipe bg-white rounded-3xl overflow-hidden">
-                <div className="bg-primary px-4 py-2 flex justify-between items-center text-white">
-                  <span className="text-[10px] font-black uppercase">Paso {i + 1} de {receta.pasos.length}</span>
-                  {step.timerSegundos && <Badge className="bg-white/20 text-white border-none font-bold text-[10px]"><Timer className="h-3 w-3 mr-1" /> {Math.floor(step.timerSegundos / 60)} MIN</Badge>}
-                </div>
-                <CardContent className="p-5 space-y-3">
-                  <h4 className="font-black text-lg text-primary">{step.titulo}</h4>
-                  <p className="text-sm text-foreground font-medium leading-relaxed whitespace-pre-wrap">{step.descripcion}</p>
-                </CardContent>
-              </Card>
-            ))}
+          <TabsContent value="steps" className="pt-6">
+            <div className="relative">
+              {/* Línea vertical del timeline */}
+              <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-primary/15 rounded-full" />
+              <div className="space-y-0">
+                {receta.pasos?.map((step: any, i: number) => {
+                  const isLast = i === (receta.pasos?.length || 1) - 1;
+                  return (
+                    <div key={i} className="relative flex gap-4 pb-8">
+                      {/* Nodo del timeline */}
+                      <div className="relative z-10 shrink-0">
+                        <div className="h-10 w-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-sm shadow-glow">
+                          {i + 1}
+                        </div>
+                      </div>
+                      {/* Contenido */}
+                      <div className="flex-1 bg-white rounded-3xl border border-border/50 shadow-sm p-5 -mt-0.5">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-black text-base text-primary leading-tight">{step.titulo || `Paso ${i + 1}`}</h4>
+                          {step.timerSegundos > 0 && (
+                            <Badge className="bg-primary/10 text-primary border-none font-black text-[9px] shrink-0 ml-2">
+                              <Timer className="h-3 w-3 mr-1" /> {Math.floor(step.timerSegundos / 60)}'
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground/75 font-medium leading-relaxed whitespace-pre-wrap">{step.descripcion}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="details" className="pt-6 space-y-6">
@@ -298,8 +349,8 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
               <div className="grid grid-cols-2 gap-3">
                 {(receta.utensilios || []).length > 0 ? (
                   receta.utensilios.map((u: string, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-primary-suave/30 rounded-2xl border border-primary/5">
-                      <div className="h-8 w-8 rounded-xl bg-white flex items-center justify-center text-primary shadow-sm">
+                    <div key={i} className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-border/50 shadow-sm">
+                      <div className="h-9 w-9 rounded-xl bg-primary-suave flex items-center justify-center text-primary">
                         <UtensilIcon name={u} />
                       </div>
                       <span className="text-xs font-bold text-foreground/80">{u}</span>
@@ -311,30 +362,37 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
               </div>
             </section>
 
-            <section className="space-y-4">
-              <h3 className="text-xs font-black uppercase text-primary tracking-widest px-2">Tips del Chef</h3>
-              <div className="space-y-3">
-                {(receta.tips || []).map((t: string, i: number) => (
-                  <div key={i} className="bg-accent/5 p-4 rounded-3xl border-2 border-accent/10 flex gap-4">
-                    <Info className="h-5 w-5 text-accent shrink-0" />
-                    <p className="text-xs font-medium text-foreground/80 leading-relaxed italic">{t}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+            {(receta.tips || []).length > 0 && (
+              <section className="space-y-4">
+                <h3 className="text-xs font-black uppercase text-primary tracking-widest px-2">Tips del Chef</h3>
+                <div className="space-y-3">
+                  {receta.tips.map((t: string, i: number) => (
+                    <div key={i} className="bg-accent/5 p-4 rounded-3xl border border-accent/15 flex gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                        <Info className="h-4 w-4 text-accent" />
+                      </div>
+                      <p className="text-xs font-medium text-foreground/75 leading-relaxed italic pt-1.5">{t}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </TabsContent>
         </Tabs>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border p-4 flex gap-2 z-50 safe-area-pb max-w-lg mx-auto">
-        <AddMealPlanDialog date={new Date()} momento="Almuerzo" recipeToLog={receta}>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl shrink-0 border-2"><Calendar className="h-6 w-6" /></Button>
-        </AddMealPlanDialog>
-        <AddMealLogDialog date={format(new Date(), "yyyy-MM-dd")} recipeToLog={receta}>
-          <Button className="flex-1 h-14 rounded-2xl bg-primary text-white font-black uppercase text-xs">
-            <Activity className="h-4 w-4 mr-2" /> Registrar Macros
-          </Button>
-        </AddMealLogDialog>
+      {/* Bar flotante de acciones */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-pb pointer-events-none">
+        <div className="bg-white/80 backdrop-blur-2xl border border-white/50 shadow-nav rounded-[1.75rem] p-2.5 flex gap-2 pointer-events-auto max-w-lg mx-auto">
+          <AddMealPlanDialog date={new Date()} momento="Almuerzo" recipeToLog={receta}>
+            <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl shrink-0 border-2 border-primary/15"><Calendar className="h-5 w-5" /></Button>
+          </AddMealPlanDialog>
+          <AddMealLogDialog date={format(new Date(), "yyyy-MM-dd")} recipeToLog={receta}>
+            <Button className="flex-1 h-12 rounded-2xl bg-primary text-white font-black uppercase text-xs shadow-glow">
+              <Activity className="h-4 w-4 mr-2" /> Registrar Macros
+            </Button>
+          </AddMealLogDialog>
+        </div>
       </div>
     </div>
   )

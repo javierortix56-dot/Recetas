@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { 
-  Search, Download, Clock, CheckSquare, 
-  X, Check, Flame, Hash, Plus
+import {
+  Search, Download, Clock, CheckSquare,
+  X, Check, Flame, Hash, Plus, Users
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -188,15 +188,22 @@ function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSe
           ) : (
             <GradientPlaceholder categoria={primaryCategory} className="rounded-none" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          <div className="absolute top-3 left-3">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
+          <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
             <Badge className="bg-white/90 backdrop-blur-sm text-[8px] font-black text-primary border-none h-5 px-2 uppercase shadow-sm">
               {primaryCategory}
             </Badge>
+            {recipe.dificultad && (
+              <div className="flex gap-0.5">
+                {[1, 2, 3].map(d => (
+                  <div key={d} className={cn("h-1.5 w-1.5 rounded-full", d <= (recipe.dificultad === "Fácil" ? 1 : recipe.dificultad === "Media" ? 2 : 3) ? "bg-white" : "bg-white/30")} />
+                ))}
+              </div>
+            )}
           </div>
           <div className="absolute bottom-3 left-3 right-3">
             <h3 className="font-black text-sm leading-tight text-white drop-shadow-sm line-clamp-2">{recipe.nombre}</h3>
-            <div className="flex items-center gap-3 mt-1.5">
+            <div className="flex items-center gap-2.5 mt-1.5">
               {totalTime > 0 && (
                 <span className="flex items-center gap-1 text-[9px] font-bold text-white/80">
                   <Clock className="h-3 w-3" /> {totalTime}'
@@ -205,6 +212,11 @@ function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSe
               <span className="flex items-center gap-1 text-[9px] font-black text-white/90">
                 <Flame className="h-3 w-3" /> {recipe.macros?.calorias || 0} kcal
               </span>
+              {recipe.porciones > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold text-white/70">
+                  <Users className="h-3 w-3" /> {recipe.porciones}
+                </span>
+              )}
             </div>
           </div>
         </div>
