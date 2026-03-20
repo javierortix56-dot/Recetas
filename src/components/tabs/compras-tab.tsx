@@ -29,6 +29,17 @@ export function ComprasTab() {
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+  const hasSyncedRef = React.useRef(false);
+
+  // Auto-sync al montar en modo Plan para limpiar ítems obsoletos
+  React.useEffect(() => {
+    if (!db || hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+    setIsSyncing(true);
+    syncShoppingList(db)
+      .catch(() => {})
+      .finally(() => setIsSyncing(false));
+  }, [db]);
 
   // Filtrar según el modo activo
   const filteredItems = React.useMemo(() => {
@@ -339,8 +350,10 @@ export function ComprasTab() {
                             {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
                           </span>
                           {mode === "plan" && item.justificacion && !item.isPurchased && (
-                            <span className="text-[8px] font-medium text-primary/50 mt-0.5 truncate">
-                              {item.justificacion}
+                            <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
+                              {item.justificacion === "Stock mínimo"
+                                ? "⚠ Stock mínimo configurado"
+                                : `Receta: ${item.justificacion}`}
                             </span>
                           )}
                         </div>
