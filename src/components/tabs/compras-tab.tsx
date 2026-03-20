@@ -35,8 +35,8 @@ export function ComprasTab() {
     if (mode === "mercado") {
       return listaCompras.filter(i => i.source === "manual" || i.reason === "Manual");
     }
-    // Plan: items generados por sincronización
-    return listaCompras.filter(i => i.source === "plan" || (!i.source && i.reason !== "Manual"));
+    // Plan: solo ítems explícitamente generados por sync
+    return listaCompras.filter(i => i.source === "plan");
   }, [listaCompras, mode]);
 
   const groupedItems = React.useMemo(() => {
