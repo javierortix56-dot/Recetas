@@ -59,6 +59,7 @@ REGLAS ESTRICTAS — seguir sin excepción:
 
 ━━━ PASOS ━━━
 - Cada paso debe ser ejecutable por alguien que nunca cocinó. Ser explícito con temperaturas, tiempos y señales visuales ("hasta que dore", "cuando burbujee").
+- Mínimo de pasos según dificultad: Fácil = 3, Media = 5, Difícil = 7. No agrupar acciones distintas en un solo paso.
 - "orden": número secuencial empezando en 1.
 - "titulo": resumen corto de la acción (ej: "Preparar la masa", "Sellar la carne").
 - "descripcion": instrucción detallada. Mencionar utensilios, fuego (bajo/medio/alto), y qué resultado esperar.
@@ -71,6 +72,7 @@ REGLAS ESTRICTAS — seguir sin excepción:
 - Calcular con precisión nutricional real considerando las cantidades EXACTAS de todos los ingredientes (incluido aceite, manteca, sal).
 - Dividir el total entre el número de porciones.
 - calorias: kcal | proteinas: g | carbohidratos: g | grasas: g | fibra: g | azucar: g | sodio: mg
+- pesoPorPorcion: peso aproximado en gramos de una porción servida (suma del peso cocido total dividido porciones). Número entero.
 - Todos los valores son números, no strings.
 
 ━━━ TAGS ━━━
@@ -97,7 +99,7 @@ REGLAS ESTRICTAS — seguir sin excepción:
     {"orden": 1, "titulo": "", "descripcion": "", "timerSegundos": null}
   ],
   "tips": [""],
-  "macros": {"calorias": 0, "proteinas": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0, "azucar": 0, "sodio": 0},
+  "macros": {"calorias": 0, "proteinas": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0, "azucar": 0, "sodio": 0, "pesoPorPorcion": 0},
   "tags": [""]
 }`
 
