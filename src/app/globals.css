@@ -47,6 +47,16 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
+/* Smooth image loading */
+img {
+  image-rendering: auto;
+}
+
+/* Mejora de selección en mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Optimización de scrollbars para chips horizontales */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

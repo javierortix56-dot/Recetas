@@ -79,22 +79,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Paneles persistentes */}
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'inicio' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'inicio' && isCoreTab) ? 'visible' : 'hidden')}>
         <InicioTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'planificacion' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'planificacion' && isCoreTab) ? 'visible' : 'hidden')}>
         <PlanificacionTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'recetas' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'recetas' && isCoreTab) ? 'visible' : 'hidden')}>
         <RecetasTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'stock' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'stock' && isCoreTab) ? 'visible' : 'hidden')}>
         <StockTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'compras' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'compras' && isCoreTab) ? 'visible' : 'hidden')}>
         <ComprasTab />
       </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-24 px-4 pt-16", (activeTab === 'macros' && isCoreTab) ? 'visible' : 'hidden')}>
+      <div className={cn("tab-panel absolute inset-0 overflow-y-auto pb-28 px-4 pt-16", (activeTab === 'macros' && isCoreTab) ? 'visible' : 'hidden')}>
         <MacrosTab />
       </div>
 
