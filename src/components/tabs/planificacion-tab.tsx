@@ -227,7 +227,7 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
     } catch (e) {
       console.error(e);
@@ -325,7 +325,7 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       
       toast({ title: `Día de ${activeProfile} planeado ✓` });
       setExpandedDay(dateStr);
@@ -367,7 +367,7 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: `Semana desplanificada` });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al limpiar plan" });
@@ -384,7 +384,7 @@ export function PlanificacionTab() {
       await writeBatch(db)
         .update(planRef, { plannedPortions: newPortions, updatedAt: serverTimestamp() })
         .commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
     } catch (e) {}
   };
 
@@ -415,7 +415,7 @@ export function PlanificacionTab() {
       }, { merge: true });
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       
       toast({ title: "Comida eliminada" });
       setSelectedPlan(null);

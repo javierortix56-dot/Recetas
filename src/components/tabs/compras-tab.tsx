@@ -24,7 +24,7 @@ type ComprasMode = "mercado" | "plan";
 
 export function ComprasTab() {
   const db = useFirestore();
-  const { listaCompras, listaComprasCargada, optimisticToggleCompra } = useAppStore();
+  const { listaCompras, listaComprasCargada, optimisticToggleCompra, activeProfile } = useAppStore();
   const [mode, setMode] = React.useState<ComprasMode>("plan");
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
@@ -36,7 +36,7 @@ export function ComprasTab() {
     if (!db || hasSyncedRef.current) return;
     hasSyncedRef.current = true;
     setIsSyncing(true);
-    syncShoppingList(db)
+    syncShoppingList(db, activeProfile)
       .catch(() => {})
       .finally(() => setIsSyncing(false));
   }, [db]);
@@ -84,7 +84,7 @@ export function ComprasTab() {
     if (!db) return;
     setIsSyncing(true);
     try {
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: "Sincronizado con el plan ✓" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al sincronizar" });
@@ -161,7 +161,7 @@ export function ComprasTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: "Stock actualizado ✓" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al actualizar stock" });

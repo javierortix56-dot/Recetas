@@ -9,9 +9,12 @@ import {
   getDocs,
   writeBatch,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where
 } from "firebase/firestore";
 import { USER_ID } from "@/lib/constants";
+import { UserProfileName } from "@/store/app-store";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
 
@@ -19,19 +22,25 @@ import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
 let isSyncing = false;
 
 /**
- * Sincroniza la lista de compras basándose en los planes de comida y el stock actual.
+ * Sincroniza la lista de compras basándose en los planes de comida del perfil activo y el stock actual.
  * Utiliza una estrategia diferencial para minimizar las escrituras.
+ *
+ * La lista de compras es COMPARTIDA por la familia. Este sync considera solo los planes del
+ * perfil activo para evitar que los planes de otro perfil generen ítems inesperados.
  */
-export const syncShoppingList = async (db: Firestore) => {
+export const syncShoppingList = async (db: Firestore, activeProfile: UserProfileName) => {
   if (!db || isSyncing) return;
 
   isSyncing = true;
-  console.log("Iniciando sincronización diferencial de lista de compras...");
+  console.log(`Iniciando sync de lista de compras para perfil: ${activeProfile}...`);
 
   try {
-    // 1. Cargar datos necesarios en paralelo
+    // 1. Cargar datos necesarios en paralelo — planes filtrados por perfil activo
     const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
-      getDocs(collection(db, "users", USER_ID, "meal_plans")),
+      getDocs(query(
+        collection(db, "users", USER_ID, "meal_plans"),
+        where("perfil", "==", activeProfile)
+      )),
       getDocs(collection(db, "users", USER_ID, "ingredients")),
       getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
     ]);
@@ -46,11 +55,13 @@ export const syncShoppingList = async (db: Firestore) => {
     // Mapa de justificación: qué recetas necesitan cada ingrediente
     const recipesByIngredient = new Map<string, string[]>();
 
-    // 2. Calcular necesidades desde el plan
+    // 2. Calcular necesidades desde el plan del perfil activo
     allPlans.forEach((plan: any) => {
       const planPortions = Number(plan.plannedPortions) || 1;
       const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-      const scale = planPortions / originalPortions;
+      const scale = planPortions > 0 && originalPortions > 0
+        ? planPortions / originalPortions
+        : 1;
 
       (plan.ingredientes || []).forEach((ing: any) => {
         const nombreIng = (ing.nombre || "").toLowerCase().trim();
@@ -91,7 +102,8 @@ export const syncShoppingList = async (db: Firestore) => {
       const nombreNorm = (ing.nombre || "").toLowerCase().trim();
       const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
       const minNeed = Number(ing.stockMinimo ?? 0);
-      const enStock = Number(ing.stockActual || 0);
+      // Usar ?? 0 para que stock negativo (error de datos) se trate como 0
+      const enStock = Math.max(0, Number(ing.stockActual ?? 0));
 
       const totalRequerido = Math.max(planNeed, minNeed);
       const faltante = totalRequerido - enStock;
@@ -193,6 +205,8 @@ export const syncShoppingList = async (db: Firestore) => {
     if (writeCount > 0) {
       await batch.commit();
       console.log(`Sync completado: ${writeCount} operaciones realizadas.`);
+    } else {
+      console.log("Sync completado: sin cambios.");
     }
 
   } catch (error) {
