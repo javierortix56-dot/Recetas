@@ -11,7 +11,7 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc, getDocs, query, where } from "firebase/firestore";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -88,6 +88,31 @@ export function ComprasTab() {
       toast({ title: "Sincronizado con el plan ✓" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al sincronizar" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Limpieza forzada: borra todos los ítems del plan directo en Firestore y luego resincroniza
+  const handleForceClear = async () => {
+    if (!db) return;
+    setIsSyncing(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, "users", USER_ID, "shopping_list_items"),
+        where("source", "==", "plan")
+      ));
+      if (snap.empty) {
+        toast({ title: "La lista del plan ya está vacía" });
+        return;
+      }
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      await syncShoppingList(db, activeProfile);
+      toast({ title: `${snap.size} ítem(s) eliminados ✓` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al limpiar" });
     } finally {
       setIsSyncing(false);
     }
@@ -242,6 +267,14 @@ export function ComprasTab() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Recalcular desde el Plan</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleForceClear} disabled={isSyncing} className="h-10 w-10 bg-destructive/10 text-destructive rounded-full">
+                    <Package className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar lista del plan</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}

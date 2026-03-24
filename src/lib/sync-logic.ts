@@ -101,6 +101,9 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       });
     });
 
+    console.log(`[Sync] Planes encontrados: ${allPlans.length} | Ingredientes: ${allIngredients.length} | Items actuales en lista: ${currentShoppingItems.length}`);
+    console.log(`[Sync] Ingredientes en plan (neededMap):`, [...neededMap.entries()].map(([k, v]) => `${k}: ${v.cantidad} ${v.unidad}`));
+
     // 3. Generar el mapa de lo que REALMENTE debería estar en la lista de compras
     const desiredShoppingMap = new Map<string, any>();
 
@@ -116,6 +119,7 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       const faltante = totalRequerido - enStock;
 
       if (faltante > 0) {
+        console.log(`[Sync] NECESITA COMPRA → ${ing.nombre}: planNeed=${planNeed}, minNeed=${minNeed}, enStock=${enStock}, faltante=${faltante}`);
         const precio = ing.precioUnitario || 0;
         const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
 
@@ -210,11 +214,13 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       }
     });
 
+    console.log(`[Sync] desiredShoppingMap final (${desiredShoppingMap.size} ítems):`, [...desiredShoppingMap.keys()]);
+
     if (writeCount > 0) {
       await batch.commit();
-      console.log(`Sync completado: ${writeCount} operaciones realizadas.`);
+      console.log(`[Sync] Completado: ${writeCount} operaciones (creates/updates/deletes) realizadas.`);
     } else {
-      console.log("Sync completado: sin cambios.");
+      console.log("[Sync] Completado: sin cambios necesarios.");
     }
 
   } catch (error) {
