@@ -58,11 +58,13 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
     ]);
 
-    const allPlans       = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const todayStr = new Date().toISOString().split("T")[0]; // "yyyy-MM-dd"
+    const allPlansRaw    = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const allPlans       = allPlansRaw.filter(p => !p.date || p.date >= todayStr);
     const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
     const allShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
 
-    console.log(`[Sync] Planes(${activeProfile}): ${allPlans.length} | Ingredientes: ${allIngredients.length} | Items actuales: ${allShoppingItems.length}`);
+    console.log(`[Sync] Planes(${activeProfile}): ${allPlans.length} (desde ${todayStr}, total=${allPlansRaw.length}) | Ingredientes: ${allIngredients.length} | Items actuales: ${allShoppingItems.length}`);
 
     const stockMap = new Map<string, any>(
       allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing])
