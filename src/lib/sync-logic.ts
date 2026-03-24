@@ -1,6 +1,13 @@
 /**
- * @fileOverview Lógica centralizada y optimizada para la sincronización de la lista de compras.
- * Minimiza las escrituras en Firestore mediante comparaciones diferenciales y bloqueo de concurrencia.
+ * @fileOverview Lógica centralizada para la sincronización de la lista de compras.
+ *
+ * Estrategia: DELETE + RECREATE
+ * En lugar de lógica diferencial compleja (que tiene edge cases), este sync:
+ * 1. Borra TODOS los ítems del plan (source === "plan") de Firestore
+ * 2. Calcula desde cero lo que se necesita (MRP: plan + stock mínimo vs stock actual)
+ * 3. Crea solo los ítems necesarios
+ *
+ * Los ítems manuales (source === "manual" | reason === "Manual") nunca se tocan.
  */
 
 import {
@@ -18,31 +25,30 @@ import { UserProfileName } from "@/store/app-store";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
 
-// Bloqueo de concurrencia: si hay un sync en curso y llega otro, lo ejecutamos al terminar
+// Bloqueo de concurrencia: si hay un sync en curso, el nuevo se encola
 let isSyncing = false;
 let pendingSync: { db: Firestore; profile: UserProfileName } | null = null;
 
 /**
- * Sincroniza la lista de compras basándose en los planes de comida del perfil activo y el stock actual.
- * Utiliza una estrategia diferencial para minimizar las escrituras.
+ * MRP de la lista de compras:
+ * Para cada ingrediente: faltante = MAX(necesidadPlan, stockMínimo) - stockActual
+ * Si faltante > 0 → agregar a la lista de compras
  *
- * La lista de compras es COMPARTIDA por la familia. Este sync considera solo los planes del
- * perfil activo para evitar que los planes de otro perfil generen ítems inesperados.
+ * Solo considera los planes del perfil activo.
  */
 export const syncShoppingList = async (db: Firestore, activeProfile: UserProfileName) => {
   if (!db) return;
 
-  // Si ya hay un sync corriendo, guardar la solicitud y ejecutarla al terminar
   if (isSyncing) {
     pendingSync = { db, profile: activeProfile };
     return;
   }
 
   isSyncing = true;
-  console.log(`Iniciando sync de lista de compras para perfil: ${activeProfile}...`);
+  console.log(`[Sync] Iniciando para perfil="${activeProfile}"...`);
 
   try {
-    // 1. Cargar datos necesarios en paralelo — planes filtrados por perfil activo
+    // 1. Cargar datos en paralelo
     const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
       getDocs(query(
         collection(db, "users", USER_ID, "meal_plans"),
@@ -52,187 +58,147 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
     ]);
 
-    const allPlans = plansSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const currentShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const allPlans       = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const allShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
 
-    // Mapas para procesamiento eficiente
-    const stockMap = new Map(allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing as any]));
-    const neededMap = new Map<string, { nombre: string, cantidad: number, unidad: string, categoria: string }>();
-    // Mapa de justificación: qué recetas necesitan cada ingrediente
+    console.log(`[Sync] Planes(${activeProfile}): ${allPlans.length} | Ingredientes: ${allIngredients.length} | Items actuales: ${allShoppingItems.length}`);
+
+    const stockMap = new Map<string, any>(
+      allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing])
+    );
+
+    // 2. Calcular necesidades del plan (MRP)
+    const neededMap = new Map<string, { nombre: string; cantidad: number; unidad: string; categoria: string }>();
     const recipesByIngredient = new Map<string, string[]>();
 
-    // 2. Calcular necesidades desde el plan del perfil activo
-    allPlans.forEach((plan: any) => {
-      const planPortions = Number(plan.plannedPortions) || 1;
+    allPlans.forEach((plan) => {
+      const planPortions     = Number(plan.plannedPortions) || 1;
       const originalPortions = Number(plan.recipeOriginalPortions) || 1;
-      const scale = planPortions > 0 && originalPortions > 0
-        ? planPortions / originalPortions
-        : 1;
+      const scale = (planPortions > 0 && originalPortions > 0) ? planPortions / originalPortions : 1;
 
       (plan.ingredientes || []).forEach((ing: any) => {
-        const nombreIng = (ing.nombre || "").toLowerCase().trim();
-        if (!nombreIng || isSubPreparation(nombreIng)) return;
+        const key = (ing.nombre || "").toLowerCase().trim();
+        if (!key || isSubPreparation(key)) return;
 
-        // Registrar qué recetas usan este ingrediente
-        const recipes = recipesByIngredient.get(nombreIng) || [];
-        const recipeName = plan.recipeName || "Receta";
-        if (!recipes.includes(recipeName)) recipes.push(recipeName);
-        recipesByIngredient.set(nombreIng, recipes);
+        const recipes = recipesByIngredient.get(key) || [];
+        if (!recipes.includes(plan.recipeName || "Receta")) recipes.push(plan.recipeName || "Receta");
+        recipesByIngredient.set(key, recipes);
 
+        const stockItem = stockMap.get(key);
         const rawQty = (Number(ing.cantidad) || 0) * scale;
-        const stockItem = stockMap.get(nombreIng);
+        const qty = stockItem ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad) : rawQty;
 
-        const convertedQty = stockItem
-          ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad)
-          : rawQty;
-
-        const existing = neededMap.get(nombreIng);
+        const existing = neededMap.get(key);
         if (existing) {
-          existing.cantidad += convertedQty;
+          existing.cantidad += qty;
         } else {
-          neededMap.set(nombreIng, {
-            nombre: ing.nombre,
-            cantidad: convertedQty,
-            unidad: stockItem?.unidad || ing.unidad || "unid",
-            categoria: ing.categoria || categorizeIngredient(ing.nombre)
+          neededMap.set(key, {
+            nombre:    ing.nombre,
+            cantidad:  qty,
+            unidad:    stockItem?.unidad || ing.unidad || "unid",
+            categoria: ing.categoria || categorizeIngredient(ing.nombre),
           });
         }
       });
     });
 
-    console.log(`[Sync] Planes encontrados: ${allPlans.length} | Ingredientes: ${allIngredients.length} | Items actuales en lista: ${currentShoppingItems.length}`);
-    console.log(`[Sync] Ingredientes en plan (neededMap):`, [...neededMap.entries()].map(([k, v]) => `${k}: ${v.cantidad} ${v.unidad}`));
+    console.log(`[Sync] Ingredientes requeridos por plan: [${[...neededMap.keys()].join(", ") || "ninguno"}]`);
 
-    // 3. Generar el mapa de lo que REALMENTE debería estar en la lista de compras
-    const desiredShoppingMap = new Map<string, any>();
+    // 3. Calcular qué debería haber en la lista (desiredItems)
+    const desiredItems = new Map<string, any>();
 
-    // A. Basado en stock mínimo vs actual y necesidades del plan
-    allIngredients.forEach((ing: any) => {
-      const nombreNorm = (ing.nombre || "").toLowerCase().trim();
-      const planNeed = neededMap.get(nombreNorm)?.cantidad || 0;
-      const minNeed = Number(ing.stockMinimo ?? 0);
-      // Usar ?? 0 para que stock negativo (error de datos) se trate como 0
-      const enStock = Math.max(0, Number(ing.stockActual ?? 0));
+    // A. Ingredientes del maestro: comparar plan + mínimo vs stock actual
+    allIngredients.forEach((ing) => {
+      const key      = (ing.nombre || "").toLowerCase().trim();
+      const planNeed = neededMap.get(key)?.cantidad || 0;
+      const minNeed  = Number(ing.stockMinimo ?? 0);
+      const enStock  = Math.max(0, Number(ing.stockActual ?? 0));
 
       const totalRequerido = Math.max(planNeed, minNeed);
-      const faltante = totalRequerido - enStock;
+      const faltante       = totalRequerido - enStock;
 
       if (faltante > 0) {
-        console.log(`[Sync] NECESITA COMPRA → ${ing.nombre}: planNeed=${planNeed}, minNeed=${minNeed}, enStock=${enStock}, faltante=${faltante}`);
-        const precio = ing.precioUnitario || 0;
+        const recipes       = recipesByIngredient.get(key) || [];
+        const justificacion = recipes.length > 0 ? recipes.join(" · ") : "Stock mínimo";
         const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
 
-        const recipes = recipesByIngredient.get(nombreNorm) || [];
-        const justificacion = recipes.length > 0
-          ? recipes.join(" · ")
-          : "Stock mínimo";
+        console.log(`[Sync] NECESITA COMPRA → "${ing.nombre}": plan=${planNeed}, min=${minNeed}, stock=${enStock}, faltante=${faltante.toFixed(2)} | motivo="${justificacion}"`);
 
-        desiredShoppingMap.set(nombreNorm, {
-          nombre: ing.nombre,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          categoria: ing.categoria || categorizeIngredient(ing.nombre),
+        desiredItems.set(key, {
+          nombre:        ing.nombre,
+          cantidad:      Number(finalQty.toFixed(2)),
+          unidad:        finalUnit,
+          categoria:     ing.categoria || categorizeIngredient(ing.nombre),
           ingredienteId: ing.id,
-          precioUnitario: precio,
-          subtotal: precio * finalQty,
-          isPurchased: false,
-          source: "plan",
+          precioUnitario: ing.precioUnitario || 0,
+          subtotal:      (ing.precioUnitario || 0) * finalQty,
+          isPurchased:   false,
+          source:        "plan",
           justificacion,
         });
       }
     });
 
-    // B. Agregar ítems del plan que no están en el maestro de ingredientes
-    neededMap.forEach((data, nombreNorm) => {
-      if (!desiredShoppingMap.has(nombreNorm) && !stockMap.has(nombreNorm)) {
-        const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
-        const recipes = recipesByIngredient.get(nombreNorm) || [];
-        desiredShoppingMap.set(nombreNorm, {
-          ...data,
-          cantidad: Number(finalQty.toFixed(2)),
-          unidad: finalUnit,
-          ingredienteId: "",
-          precioUnitario: 0,
-          subtotal: 0,
-          isPurchased: false,
-          source: "plan",
-          justificacion: recipes.join(" · ") || "Plan de comidas",
-        });
-      }
+    // B. Ingredientes del plan que no están en el maestro de stock
+    neededMap.forEach((data, key) => {
+      if (desiredItems.has(key) || stockMap.has(key)) return;
+      const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
+      const recipes = recipesByIngredient.get(key) || [];
+      console.log(`[Sync] NECESITA COMPRA (sin stock) → "${data.nombre}": sin entrada en ingredientes`);
+      desiredItems.set(key, {
+        ...data,
+        cantidad:      Number(finalQty.toFixed(2)),
+        unidad:        finalUnit,
+        ingredienteId: "",
+        precioUnitario: 0,
+        subtotal:      0,
+        isPurchased:   false,
+        source:        "plan",
+        justificacion: recipes.join(" · ") || "Plan de comidas",
+      });
     });
 
-    // 4. ESTRATEGIA DIFERENCIAL (Escritura inteligente)
+    console.log(`[Sync] Lista deseada: ${desiredItems.size} ítems → [${[...desiredItems.keys()].join(", ") || "vacía"}]`);
+
+    // 4. ESTRATEGIA DELETE + RECREATE para ítems del plan
     const batch = writeBatch(db);
-    let writeCount = 0;
+    let ops = 0;
 
-    // A. Identificar qué borrar — NUNCA borrar ítems manuales.
-    // Los ítems del plan se borran si ya no son necesarios, incluso si están marcados como comprados,
-    // para que una desplanificación deje la lista limpia.
-    for (const current of currentShoppingItems) {
-      // Preservar items manuales siempre
-      if (current.source === "manual" || current.reason === "Manual") continue;
-
-      const nombreNorm = (current.nombre || "").toLowerCase().trim();
-      if (!desiredShoppingMap.has(nombreNorm)) {
-        batch.delete(doc(db, "users", USER_ID, "shopping_list_items", current.id));
-        writeCount++;
+    // Borrar TODOS los ítems actuales del plan (source="plan" o sin source y sin reason Manual)
+    // Preservar siempre los ítems manuales
+    for (const item of allShoppingItems) {
+      const isManual = item.source === "manual" || item.reason === "Manual";
+      const isPlanItem = item.source === "plan" || (!item.source && !isManual);
+      if (isPlanItem) {
+        batch.delete(doc(db, "users", USER_ID, "shopping_list_items", item.id));
+        ops++;
       }
     }
 
-    // B. Identificar qué crear o actualizar
-    desiredShoppingMap.forEach((desiredData, nombreNorm) => {
-      const existing = currentShoppingItems.find(i =>
-        !i.isPurchased &&
-        (i.source === "plan" || (!i.source && i.reason !== "Manual")) &&
-        (i.nombre || "").toLowerCase().trim() === nombreNorm
-      );
-
-      if (existing) {
-        const hasChanges =
-          Math.abs(existing.cantidad - desiredData.cantidad) > 0.01 ||
-          existing.unidad !== desiredData.unidad ||
-          existing.categoria !== desiredData.categoria ||
-          existing.precioUnitario !== desiredData.precioUnitario ||
-          existing.justificacion !== desiredData.justificacion;
-
-        if (hasChanges) {
-          batch.update(doc(db, "users", USER_ID, "shopping_list_items", existing.id), {
-            ...desiredData,
-            updatedAt: serverTimestamp()
-          });
-          writeCount++;
-        }
-      } else {
-        const newRef = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-        batch.set(newRef, {
-          userId: USER_ID,
-          ...desiredData,
-          createdAt: serverTimestamp()
-        });
-        writeCount++;
-      }
+    // Crear los ítems nuevos desde desiredItems
+    desiredItems.forEach((data) => {
+      const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
+      batch.set(ref, { userId: USER_ID, ...data, createdAt: serverTimestamp() });
+      ops++;
     });
 
-    console.log(`[Sync] desiredShoppingMap final (${desiredShoppingMap.size} ítems):`, [...desiredShoppingMap.keys()]);
-
-    if (writeCount > 0) {
+    if (ops > 0) {
       await batch.commit();
-      console.log(`[Sync] Completado: ${writeCount} operaciones (creates/updates/deletes) realizadas.`);
+      console.log(`[Sync] Completado: ${ops} operaciones (borrados + creados).`);
     } else {
-      console.log("[Sync] Completado: sin cambios necesarios.");
+      console.log("[Sync] Sin cambios.");
     }
 
   } catch (error) {
-    console.error("Error en syncShoppingList:", error);
+    console.error("[Sync] ERROR:", error);
     throw error;
   } finally {
     isSyncing = false;
-    // Si hubo una solicitud pendiente mientras corría este sync, ejecutarla ahora
     if (pendingSync) {
-      const { db: pendingDb, profile: pendingProfile } = pendingSync;
+      const { db: pDb, profile: pProfile } = pendingSync;
       pendingSync = null;
-      syncShoppingList(pendingDb, pendingProfile);
+      syncShoppingList(pDb, pProfile);
     }
   }
 };

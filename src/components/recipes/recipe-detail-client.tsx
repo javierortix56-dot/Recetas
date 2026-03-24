@@ -126,6 +126,8 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
             precioUnitario: precioUnitario,
             subtotal: precioUnitario * Number(buyQty.toFixed(1)),
             isPurchased: false,
+            source: "manual",
+            reason: "Manual",
             createdAt: serverTimestamp()
           })
           addedCount++
