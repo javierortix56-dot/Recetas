@@ -18,8 +18,9 @@ import { UserProfileName } from "@/store/app-store";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
 
-// Bloqueo de concurrencia para evitar múltiples ejecuciones simultáneas
+// Bloqueo de concurrencia: si hay un sync en curso y llega otro, lo ejecutamos al terminar
 let isSyncing = false;
+let pendingSync: { db: Firestore; profile: UserProfileName } | null = null;
 
 /**
  * Sincroniza la lista de compras basándose en los planes de comida del perfil activo y el stock actual.
@@ -29,7 +30,13 @@ let isSyncing = false;
  * perfil activo para evitar que los planes de otro perfil generen ítems inesperados.
  */
 export const syncShoppingList = async (db: Firestore, activeProfile: UserProfileName) => {
-  if (!db || isSyncing) return;
+  if (!db) return;
+
+  // Si ya hay un sync corriendo, guardar la solicitud y ejecutarla al terminar
+  if (isSyncing) {
+    pendingSync = { db, profile: activeProfile };
+    return;
+  }
 
   isSyncing = true;
   console.log(`Iniciando sync de lista de compras para perfil: ${activeProfile}...`);
@@ -155,10 +162,11 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
     const batch = writeBatch(db);
     let writeCount = 0;
 
-    // A. Identificar qué borrar — NUNCA borrar ítems manuales
+    // A. Identificar qué borrar — NUNCA borrar ítems manuales.
+    // Los ítems del plan se borran si ya no son necesarios, incluso si están marcados como comprados,
+    // para que una desplanificación deje la lista limpia.
     for (const current of currentShoppingItems) {
-      if (current.isPurchased) continue;
-      // Preservar items manuales
+      // Preservar items manuales siempre
       if (current.source === "manual" || current.reason === "Manual") continue;
 
       const nombreNorm = (current.nombre || "").toLowerCase().trim();
@@ -214,5 +222,11 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
     throw error;
   } finally {
     isSyncing = false;
+    // Si hubo una solicitud pendiente mientras corría este sync, ejecutarla ahora
+    if (pendingSync) {
+      const { db: pendingDb, profile: pendingProfile } = pendingSync;
+      pendingSync = null;
+      syncShoppingList(pendingDb, pendingProfile);
+    }
   }
 };
