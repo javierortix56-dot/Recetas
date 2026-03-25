@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart, CalendarDays } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,12 +20,9 @@ import { StockFormDialog } from '@/components/stock/stock-form-dialog';
 import { AddShoppingItemDialog } from '@/components/shopping/add-shopping-item-dialog';
 import { syncShoppingList } from '@/lib/sync-logic';
 
-type ComprasMode = "mercado" | "plan";
-
 export function ComprasTab() {
   const db = useFirestore();
   const { listaCompras, listaComprasCargada, optimisticToggleCompra, activeProfile } = useAppStore();
-  const [mode, setMode] = React.useState<ComprasMode>("plan");
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
@@ -41,14 +38,8 @@ export function ComprasTab() {
       .finally(() => setIsSyncing(false));
   }, [db]);
 
-  // Filtrar según el modo activo
-  const filteredItems = React.useMemo(() => {
-    if (mode === "mercado") {
-      return listaCompras.filter(i => i.source === "manual" || i.reason === "Manual");
-    }
-    // Plan: solo ítems explícitamente generados por sync
-    return listaCompras.filter(i => i.source === "plan");
-  }, [listaCompras, mode]);
+  // Mostrar todos los ítems juntos (plan + manuales)
+  const filteredItems = listaCompras;
 
   const groupedItems = React.useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -241,13 +232,11 @@ export function ComprasTab() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {mode === "mercado" && (
-            <AddShoppingItemDialog>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
-                <Plus className="h-6 w-6" />
-              </Button>
-            </AddShoppingItemDialog>
-          )}
+          <AddShoppingItemDialog>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+              <Plus className="h-6 w-6" />
+            </Button>
+          </AddShoppingItemDialog>
 
           <Button
             variant="ghost"
@@ -258,26 +247,16 @@ export function ComprasTab() {
             {expandedItems.length === categories.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </Button>
 
-          {mode === "plan" && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
-                    <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Recalcular desde el Plan</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={handleForceClear} disabled={isSyncing} className="h-10 w-10 bg-destructive/10 text-destructive rounded-full">
-                    <Package className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Limpiar lista del plan</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
+                  <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sincronizar con el Plan</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           <Button
             onClick={handleUpdateStock}
@@ -289,28 +268,6 @@ export function ComprasTab() {
           </Button>
         </div>
       </header>
-
-      {/* Selector de modo */}
-      <div className="flex bg-primary-suave rounded-2xl p-1 gap-1">
-        <button
-          onClick={() => setMode("plan")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
-            mode === "plan" ? "bg-white text-primary shadow-sm" : "text-muted-foreground"
-          )}
-        >
-          <CalendarDays className="h-3.5 w-3.5" /> Plan de Comidas
-        </button>
-        <button
-          onClick={() => setMode("mercado")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
-            mode === "mercado" ? "bg-white text-primary shadow-sm" : "text-muted-foreground"
-          )}
-        >
-          <ShoppingCart className="h-3.5 w-3.5" /> Mercado
-        </button>
-      </div>
 
       {filteredItems.length > 0 && (
         <Card className="border-none shadow-sm bg-primary-suave/50 rounded-3xl overflow-hidden border-2 border-primary/5">
@@ -358,10 +315,13 @@ export function ComprasTab() {
                       <Checkbox checked={item.isPurchased} onCheckedChange={() => toggleItem(item.id, item.isPurchased)} className="h-6 w-6 rounded-lg border-2" />
                       <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
                         <div className="flex flex-col min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
                               {item.nombre}
                             </span>
+                            {(item.source === "manual" || item.reason === "Manual") && (
+                              <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
+                            )}
                             {!item.isPurchased && (
                               <StockFormDialog
                                 ingredientToEdit={{
@@ -382,7 +342,7 @@ export function ComprasTab() {
                           <span className="text-[9px] font-black text-muted-foreground uppercase">
                             {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
                           </span>
-                          {mode === "plan" && item.justificacion && !item.isPurchased && (
+                          {item.justificacion && !item.isPurchased && item.source === "plan" && (
                             <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
                               {item.justificacion === "Stock mínimo"
                                 ? "⚠ Stock mínimo configurado"
@@ -408,22 +368,16 @@ export function ComprasTab() {
       ) : (
         <div className="py-24 text-center space-y-4">
           <div className="bg-primary-suave w-24 h-24 rounded-full flex items-center justify-center mx-auto">
-            {mode === "plan" ? <CalendarDays className="h-12 w-12 text-primary" /> : <ShoppingCart className="h-12 w-12 text-primary" />}
+            <ShoppingCart className="h-12 w-12 text-primary" />
           </div>
-          <h2 className="text-2xl font-black text-primary">
-            {mode === "plan" ? "Sin pendientes del plan" : "Lista manual vacía"}
-          </h2>
+          <h2 className="text-2xl font-black text-primary">Lista vacía</h2>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-            {mode === "plan"
-              ? "Sincronizá el plan para ver qué te falta comprar."
-              : "Agregá productos que veas que faltan en el mercado."}
+            Sincronizá el plan o agregá productos manualmente.
           </p>
-          {mode === "plan" && (
-            <Button onClick={handleSync} disabled={isSyncing} className="bg-primary text-white rounded-2xl gap-2">
-              <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-              Sincronizar ahora
-            </Button>
-          )}
+          <Button onClick={handleSync} disabled={isSyncing} className="bg-primary text-white rounded-2xl gap-2">
+            <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+            Sincronizar ahora
+          </Button>
         </div>
       )}
     </div>

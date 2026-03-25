@@ -4,6 +4,7 @@ import * as React from "react"
 import { Bot, Copy, Check, Download, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { toast } from "@/hooks/use-toast"
 
 const PROMPT_TEMPLATE = `Generame recetas en formato JSON. Una sola receta = objeto {}. Varias = array [{}, {}].
@@ -97,7 +98,7 @@ REGLAS ESTRICTAS — seguir sin excepción:
   "tags": [""]
 }`
 
-export function RecipePromptSheet({ onOpenImport }: { onOpenImport: () => void }) {
+export function RecipePromptSheet({ onOpenImport, asMenuItem }: { onOpenImport: () => void; asMenuItem?: boolean }) {
   const [copied, setCopied] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
 
@@ -111,9 +112,15 @@ export function RecipePromptSheet({ onOpenImport }: { onOpenImport: () => void }
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full bg-accent/10 text-accent">
-          <Bot className="h-6 w-6" />
-        </Button>
+        {asMenuItem ? (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsOpen(true); }} className="gap-3 font-bold">
+            <Bot className="h-4 w-4" /> Prompt IA
+          </DropdownMenuItem>
+        ) : (
+          <Button variant="ghost" size="icon" className="rounded-full bg-accent/10 text-accent">
+            <Bot className="h-6 w-6" />
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-[2rem] p-6 max-h-[90vh] overflow-y-auto">
         <SheetHeader>

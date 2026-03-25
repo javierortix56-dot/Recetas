@@ -1,13 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Trash2, 
-  Eye, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Eye,
   Plus,
-  MoreVertical,
   Sparkles,
   Loader2,
   CalendarX,
@@ -21,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -553,7 +551,7 @@ export function PlanificacionTab() {
                                     <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
                                   )}
                                 </div>
-                                <div className="flex-1 min-w-0 pr-8">
+                                <div className="flex-1 min-w-0 pr-16">
                                   <h4 className="font-bold text-sm truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>{plan.recipeName}</h4>
                                   <div className="flex items-center gap-3 mt-1">
                                     <div className="flex items-center gap-1.5">
@@ -567,7 +565,10 @@ export function PlanificacionTab() {
                                     </div>
                                   </div>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSelectedPlan(plan)}><MoreVertical className="h-4 w-4" /></Button>
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => router.push(`/recetas/${plan.recipeId}`)}><Eye className="h-3.5 w-3.5" /></Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setSelectedPlan(plan)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                </div>
                               </div>
                             ) : (
                               <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
@@ -588,15 +589,22 @@ export function PlanificacionTab() {
         })}
       </div>
 
-      <Sheet open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
-        <SheetContent side="bottom" className="rounded-t-[2rem] p-6 pb-12">
-          <SheetHeader className="mb-6"><SheetTitle className="text-left font-black text-primary text-xl">Gestionar Comida</SheetTitle></SheetHeader>
-          <div className="grid gap-2">
-            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4" onClick={() => { router.push(`/recetas/${selectedPlan.recipeId}`); setSelectedPlan(null); }}><Eye className="h-6 w-6 text-primary" /><span className="font-bold">Ver Receta completa</span></Button>
-            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4 text-destructive" onClick={handleDeleteFromPlan} disabled={isDeleting}><Trash2 className="h-6 w-6" /><span className="font-bold">Eliminar de tu plan</span></Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <AlertDialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black text-primary text-xl">¿Eliminar del plan?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              Se quitará <span className="font-bold text-foreground">{selectedPlan?.recipeName}</span> de tu plan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFromPlan} disabled={isDeleting} className="bg-destructive text-white rounded-xl font-black">
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
