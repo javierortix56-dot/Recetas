@@ -561,47 +561,54 @@ export function PlanificacionTab() {
               </div>
 
               {MOMENTOS.map((m) => {
-                const plan = plans.find(p => p.mealType === m);
-                const recipe = plan ? recetas.find(r => r.id === plan.recipeId) : null;
-                const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
+                const mealPlans = plans.filter(p => p.mealType === m);
 
                 return (
-                  <div key={m} className="flex items-center gap-3">
-                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right">{m}</span>
-                    {plan ? (
-                      <div className="flex-1 flex items-center gap-2.5 bg-white p-2 rounded-2xl relative shadow-sm border border-border/60">
-                        <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
-                          {imageUrl ? (
-                            <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
-                          ) : (
-                            <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 pr-16">
-                          <h4 className="font-bold text-xs truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
-                            {plan.recipeName}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">-</button>
-                              <span className="text-[9px] font-black tabular-nums">{plan.plannedPortions || 3}p</span>
-                              <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">+</button>
+                  <div key={m} className="flex gap-3 items-start">
+                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right pt-3">{m}</span>
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      {mealPlans.map((plan) => {
+                        const recipe = recetas.find(r => r.id === plan.recipeId);
+                        const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
+                        return (
+                          <div key={plan.id} className="flex items-center gap-2.5 bg-white p-2 rounded-2xl relative shadow-sm border border-border/60">
+                            <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                              {imageUrl ? (
+                                <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
+                              ) : (
+                                <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
+                              )}
                             </div>
-                            <span className="text-[9px] font-black text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
+                            <div className="flex-1 min-w-0 pr-14">
+                              <h4 className="font-bold text-xs truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
+                                {plan.recipeName}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">-</button>
+                                  <span className="text-[9px] font-black tabular-nums">{plan.plannedPortions || 3}p</span>
+                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">+</button>
+                                </div>
+                                <span className="text-[9px] font-black text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
+                              </div>
+                            </div>
+                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => router.push(`/recetas/${plan.recipeId}`)}><Eye className="h-3 w-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setSelectedPlan(plan)}><Trash2 className="h-3 w-3" /></Button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => router.push(`/recetas/${plan.recipeId}`)}><Eye className="h-3 w-3" /></Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setSelectedPlan(plan)}><Trash2 className="h-3 w-3" /></Button>
-                        </div>
-                      </div>
-                    ) : (
+                        );
+                      })}
                       <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
-                        <button className="flex-1 h-10 border border-dashed border-border rounded-2xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors">
-                          <Plus className="h-3.5 w-3.5" /><span className="text-[9px] font-black uppercase">Agregar</span>
+                        <button className={cn(
+                          "w-full border border-dashed border-border rounded-2xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors",
+                          mealPlans.length === 0 ? "h-10" : "h-7 rounded-xl border-border/50"
+                        )}>
+                          <Plus className="h-3 w-3" />
+                          {mealPlans.length === 0 && <span className="text-[9px] font-black uppercase">Agregar</span>}
                         </button>
                       </AddMealPlanDialog>
-                    )}
+                    </div>
                   </div>
                 );
               })}

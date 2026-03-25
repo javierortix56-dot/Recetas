@@ -18,6 +18,7 @@ import { useFirestore } from "@/firebase";
 import { StockFormDialog } from "@/components/stock/stock-form-dialog";
 import { BulkCategoryDialog } from "@/components/stock/bulk-category-dialog";
 import { StockHistorialDialog } from "@/components/stock/stock-historial-dialog";
+import { CategoryManagerDialog, normalizeCategoria } from "@/components/stock/category-manager-dialog";
 import { toast } from "@/hooks/use-toast";
 import { useAppStore } from '@/store/app-store';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -35,17 +36,6 @@ export function StockTab() {
   const [showPlannedOnly, setShowPlannedOnly] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
 
-  // Normaliza categorías viejas/inconsistentes a las canónicas
-  const normalizeCategoria = (cat: string): string => {
-    const c = (cat || "Otros").toLowerCase().trim();
-    if (c === "frutas" || c === "verduras" || c === "frutas y verduras" || c === "frutas&verduras") return "Frutas y Verduras";
-    if (c === "lacteos" || c === "lácteos" || c === "lacteos y huevos" || c === "huevos") return "Lácteos y Huevos";
-    if (c === "carnes" || c === "aves" || c === "carnes y aves") return "Carnes y Aves";
-    if (c === "pescados" || c === "mariscos" || c === "pescados y mariscos") return "Pescados y Mariscos";
-    if (c === "especias" || c === "condimentos" || c === "especias y condimentos") return "Especias y Condimentos";
-    if (c === "almacen" || c === "almacén") return "Almacén";
-    return cat.charAt(0).toUpperCase() + cat.slice(1);
-  };
 
   // Ingredientes que aparecen en el plan de la semana
   const plannedIngredientNames = React.useMemo(() => {
@@ -199,6 +189,7 @@ export function StockTab() {
                       <Check className="h-4 w-4" /> Seleccionar
                     </DropdownMenuItem>
                     <StockHistorialDialog asMenuItem />
+                    <CategoryManagerDialog asMenuItem />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-3 font-bold text-accent focus:text-accent">
