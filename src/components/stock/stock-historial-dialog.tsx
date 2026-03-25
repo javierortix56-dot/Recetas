@@ -4,6 +4,7 @@ import * as React from 'react';
 import { History, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -12,7 +13,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-export function StockHistorialDialog() {
+export function StockHistorialDialog({ asMenuItem }: { asMenuItem?: boolean } = {}) {
   const db = useFirestore();
   const [open, setOpen] = React.useState(false);
   const [entries, setEntries] = React.useState<any[]>([]);
@@ -54,9 +55,15 @@ export function StockHistorialDialog() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
-          <History className="h-5 w-5" />
-        </Button>
+        {asMenuItem ? (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }} className="gap-3 font-bold">
+            <History className="h-4 w-4" /> Historial de stock
+          </DropdownMenuItem>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
+            <History className="h-5 w-5" />
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-[2rem] max-h-[80vh] overflow-y-auto">
         <SheetHeader className="pb-4">

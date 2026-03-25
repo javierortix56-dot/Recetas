@@ -2,17 +2,17 @@
 
 import * as React from 'react';
 import { useSearchParams } from "next/navigation";
-import { 
-  Search, Plus, Minus, Package, 
+import {
+  Search, Plus, Minus, Package,
   AlertCircle, RotateCcw, X, Check,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, MoreVertical, History
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc, addDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { StockFormDialog } from "@/components/stock/stock-form-dialog";
@@ -21,7 +21,6 @@ import { StockHistorialDialog } from "@/components/stock/stock-historial-dialog"
 import { toast } from "@/hooks/use-toast";
 import { useAppStore } from '@/store/app-store';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { USER_ID } from '@/lib/constants';
 import { cn, formatPrecio } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -145,40 +144,37 @@ export function StockTab() {
             {isSelectionMode ? `(${selectedIds.size})` : 'Despensa'}
           </h1>
           <div className="flex gap-2">
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
-              className={cn("rounded-full h-10 w-10", isSelectionMode ? "bg-primary text-white" : "bg-primary-suave text-primary")}
-            >
-              {isSelectionMode ? <X className="h-5 w-5" /> : <Check className="h-5 w-5" />}
-            </Button>
-
-            {!isSelectionMode && (
+            {isSelectionMode ? (
+              <Button size="icon" variant="ghost" onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="rounded-full h-10 w-10 bg-primary text-white">
+                <X className="h-5 w-5" />
+              </Button>
+            ) : (
               <>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={toggleExpandAll} 
-                  className="h-10 w-10 rounded-full bg-primary-suave text-primary"
-                >
+                <StockFormDialog />
+                <Button variant="ghost" size="icon" onClick={toggleExpandAll} className="h-10 w-10 rounded-full bg-primary-suave text-primary">
                   {expandedItems.length === categoriesInView.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </Button>
-
-                <TooltipProvider>
-                  <Tooltip>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-2xl">
+                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-bold">
+                      <Check className="h-4 w-4" /> Seleccionar
+                    </DropdownMenuItem>
+                    <StockHistorialDialog asMenuItem />
                     <AlertDialog>
-                      <TooltipTrigger asChild>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-accent bg-accent/10">
-                            <RotateCcw className={cn("h-5 w-5", isResetting && "animate-spin")} />
-                          </Button>
-                        </AlertDialogTrigger>
-                      </TooltipTrigger>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-3 font-bold text-accent focus:text-accent">
+                          <RotateCcw className="h-4 w-4" /> Resetear mínimos a 0
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
                       <AlertDialogContent className="rounded-[2rem]">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="font-black text-primary">¿Poner todos los mínimos en 0?</AlertDialogTitle>
-                          <AlertDialogDescription>Esto hará que nada aparezca en la lista de compras automáticamente a menos que lo planees o te quedes sin nada.</AlertDialogDescription>
+                          <AlertDialogDescription>Nada aparecerá automáticamente en la lista de compras salvo que lo planees.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="gap-2">
                           <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
@@ -186,12 +182,8 @@ export function StockTab() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                    <TooltipContent>Resetear stock mínimo a 0</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                
-                <StockHistorialDialog />
-                <StockFormDialog />
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
@@ -263,30 +255,24 @@ export function StockTab() {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate leading-tight mb-0.5">{item.nombre}</p>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        {item.precioUnitario > 0 ? (
-                          <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">
-                            {formatPrecio(item.precioUnitario)} / {item.unidad}
+                      <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo ? (
+                          <span className="text-[8px] font-black text-destructive uppercase flex items-center gap-0.5">
+                            <AlertCircle className="h-2.5 w-2.5" /> Bajo
                           </span>
-                        ) : (
-                          <div className="flex items-center gap-1 text-destructive/40">
-                            <AlertCircle className="h-2.5 w-2.5" />
-                            <span className="text-[8px] font-black uppercase">Sin precio</span>
-                          </div>
+                        ) : null}
+                        <span className={cn("text-[9px] font-black tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
+                          {item.stockActual} {item.unidad}
+                        </span>
+                        {item.stockMinimo > 0 && (
+                          <span className="text-[8px] font-bold text-muted-foreground">mín {item.stockMinimo}</span>
                         )}
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center text-[8px] font-black uppercase text-muted-foreground">
-                          <span>Actual: {item.stockActual}</span>
-                          <span>Mínimo: {item.stockMinimo || 0}</span>
-                        </div>
-                        <Progress 
-                          value={item.stockMinimo > 0 ? Math.min((item.stockActual / item.stockMinimo) * 100, 100) : 100} 
-                          className="h-1" 
-                          indicatorClassName={item.stockActual <= (item.stockMinimo || 0) && (item.stockMinimo || 0) > 0 ? "bg-destructive" : "bg-primary"} 
-                        />
+                        {item.precioUnitario > 0 && (
+                          <span className="text-[8px] font-bold text-muted-foreground opacity-60">
+                            {formatPrecio(item.precioUnitario)}/{item.unidad}
+                          </span>
+                        )}
                       </div>
                     </div>
 
