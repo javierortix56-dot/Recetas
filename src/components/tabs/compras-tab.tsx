@@ -1,14 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart, MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
 import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc, getDocs, query, where } from "firebase/firestore";
@@ -195,6 +195,23 @@ export function ComprasTab() {
     }
   };
 
+  const handleDeleteAllManual = async () => {
+    if (!db) return;
+    const manualItems = listaCompras.filter(i => i.source === "manual" || i.reason === "Manual");
+    if (manualItems.length === 0) {
+      toast({ title: "No hay ítems manuales" });
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      manualItems.forEach(i => batch.delete(doc(db, "users", USER_ID, "shopping_list_items", i.id)));
+      await batch.commit();
+      toast({ title: `${manualItems.length} ítem(s) manuales eliminados ✓` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al borrar manuales" });
+    }
+  };
+
   const toggleItem = async (id: string, current: boolean) => {
     if (!db) return;
     optimisticToggleCompra(id);
@@ -239,33 +256,33 @@ export function ComprasTab() {
           </AddShoppingItemDialog>
 
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleExpandAll}
-            className="h-10 w-10 rounded-full bg-primary-suave text-primary"
-          >
-            {expandedItems.length === categories.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-          </Button>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
-                  <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Sincronizar con el Plan</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <Button
             onClick={handleUpdateStock}
             disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock}
-            className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-6 gap-2"
+            className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-4 gap-2"
           >
             <ArrowUpCircle className="h-4 w-4" />
             {isUpdatingStock ? "..." : "Terminar"}
           </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onClick={toggleExpandAll} className="gap-3 font-bold">
+                {expandedItems.length === categories.length ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {expandedItems.length === categories.length ? "Contraer todo" : "Expandir todo"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSync} disabled={isSyncing} className="gap-3 font-bold">
+                <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> Sincronizar plan
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDeleteAllManual} className="gap-3 font-bold text-destructive focus:text-destructive">
+                <Trash2 className="h-4 w-4" /> Borrar todos manuales
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -350,11 +367,21 @@ export function ComprasTab() {
                             </span>
                           )}
                         </div>
-                        <div className="text-right shrink-0">
-                          {item.precioUnitario > 0 ? (
-                            <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
-                          ) : (
-                            <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            {item.precioUnitario > 0 ? (
+                              <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                            ) : (
+                              <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                            )}
+                          </div>
+                          {(item.source === "manual" || item.reason === "Manual") && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
+                              className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           )}
                         </div>
                       </div>
