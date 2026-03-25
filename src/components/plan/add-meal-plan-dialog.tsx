@@ -119,7 +119,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       }, { merge: true });
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       
       toast({ title: "Planificado ✓" })
       setOpen(false)

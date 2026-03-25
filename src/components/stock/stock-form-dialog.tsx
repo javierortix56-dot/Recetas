@@ -13,6 +13,7 @@ import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, normalizeIngredientName, IngredientCategory } from "@/lib/categorizeIngredient"
 import { formatPrecio, calcularPrecioUnitarioBase } from "@/lib/utils"
 import { syncShoppingList } from "@/lib/sync-logic"
+import { useAppStore } from "@/store/app-store"
 
 const CATEGORIES: IngredientCategory[] = [
   "Lácteos y Huevos",
@@ -30,6 +31,7 @@ const UNITS = ["kg", "g", "l", "ml", "unidad", "docena"]
 export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdit?: any, trigger?: React.ReactNode }) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
+  const activeProfile = useAppStore(s => s.activeProfile)
   const [isSaving, setIsSaving] = React.useState(false)
 
   const [calcPrecio, setCalcPrecio] = React.useState<number>(0)
@@ -109,7 +111,7 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
       }
       
       // Sync optimizado
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       
       toast({ title: "Cambios guardados ✓" })
       setOpen(false)

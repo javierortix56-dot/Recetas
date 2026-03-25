@@ -19,6 +19,13 @@ export function AddShoppingItemDialog({ children }: { children: React.ReactNode 
   const [quantity, setQuantity] = React.useState(1)
   const [isSaving, setIsSaving] = React.useState(false)
 
+  React.useEffect(() => {
+    if (open) {
+      setSearch("")
+      setQuantity(1)
+    }
+  }, [open])
+
   const ingredientsQuery = useMemoFirebase(() => {
     if (!db) return null
     return query(collection(db, "users", USER_ID, "ingredients"), orderBy("nombre", "asc"))

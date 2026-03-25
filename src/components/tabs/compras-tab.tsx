@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,7 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc, getDocs, query, where } from "firebase/firestore";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -20,24 +20,45 @@ import { StockFormDialog } from '@/components/stock/stock-form-dialog';
 import { AddShoppingItemDialog } from '@/components/shopping/add-shopping-item-dialog';
 import { syncShoppingList } from '@/lib/sync-logic';
 
+type ComprasMode = "mercado" | "plan";
+
 export function ComprasTab() {
   const db = useFirestore();
-  const { listaCompras, listaComprasCargada, optimisticToggleCompra } = useAppStore();
+  const { listaCompras, listaComprasCargada, optimisticToggleCompra, activeProfile } = useAppStore();
+  const [mode, setMode] = React.useState<ComprasMode>("plan");
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
-  
-  // Contraído por defecto: array vacío
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+  const hasSyncedRef = React.useRef(false);
+
+  // Auto-sync al montar en modo Plan para limpiar ítems obsoletos
+  React.useEffect(() => {
+    if (!db || hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+    setIsSyncing(true);
+    syncShoppingList(db, activeProfile)
+      .catch(() => {})
+      .finally(() => setIsSyncing(false));
+  }, [db]);
+
+  // Filtrar según el modo activo
+  const filteredItems = React.useMemo(() => {
+    if (mode === "mercado") {
+      return listaCompras.filter(i => i.source === "manual" || i.reason === "Manual");
+    }
+    // Plan: solo ítems explícitamente generados por sync
+    return listaCompras.filter(i => i.source === "plan");
+  }, [listaCompras, mode]);
 
   const groupedItems = React.useMemo(() => {
     const groups: Record<string, any[]> = {};
-    listaCompras.forEach(item => {
+    filteredItems.forEach(item => {
       const cat = (item.categoria || "Otros").toUpperCase();
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
     });
     return groups;
-  }, [listaCompras]);
+  }, [filteredItems]);
 
   const categories = React.useMemo(() => Object.keys(groupedItems).sort(), [groupedItems]);
 
@@ -50,23 +71,48 @@ export function ComprasTab() {
   };
 
   const totalEstimado = React.useMemo(() => {
-    return listaCompras
+    return filteredItems
       .filter(i => !i.isPurchased)
       .reduce((sum, item) => sum + (item.subtotal || 0), 0);
-  }, [listaCompras]);
+  }, [filteredItems]);
 
   const itemsSinPrecio = React.useMemo(() => {
-    return listaCompras.filter(i => !i.isPurchased && (!i.precioUnitario || i.precioUnitario === 0)).length;
-  }, [listaCompras]);
+    return filteredItems.filter(i => !i.isPurchased && (!i.precioUnitario || i.precioUnitario === 0)).length;
+  }, [filteredItems]);
 
   const handleSync = async () => {
     if (!db) return;
     setIsSyncing(true);
     try {
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: "Sincronizado con el plan ✓" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al sincronizar" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Limpieza forzada: borra todos los ítems del plan directo en Firestore y luego resincroniza
+  const handleForceClear = async () => {
+    if (!db) return;
+    setIsSyncing(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, "users", USER_ID, "shopping_list_items"),
+        where("source", "==", "plan")
+      ));
+      if (snap.empty) {
+        toast({ title: "La lista del plan ya está vacía" });
+        return;
+      }
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      await syncShoppingList(db, activeProfile);
+      toast({ title: `${snap.size} ítem(s) eliminados ✓` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al limpiar" });
     } finally {
       setIsSyncing(false);
     }
@@ -76,7 +122,7 @@ export function ComprasTab() {
     if (!db) return;
     const purchased = listaCompras.filter(i => i.isPurchased);
     if (purchased.length === 0) return;
-    
+
     setIsUpdatingStock(true);
     try {
       const batch = writeBatch(db);
@@ -91,10 +137,21 @@ export function ComprasTab() {
             const data = snap.data();
             const current = Number(data.stockActual) || 0;
             const cantASumar = convertirCantidad(Number(item.cantidad), item.unidad, data.unidad);
-            batch.update(ingRef, { stockActual: current + cantASumar, updatedAt: serverTimestamp() });
+            const newStock = current + cantASumar;
+            batch.update(ingRef, { stockActual: newStock, updatedAt: serverTimestamp() });
+            addDoc(collection(db, "users", USER_ID, "stock_historial"), {
+              ingredienteId: item.ingredienteId,
+              ingredienteNombre: item.nombre,
+              tipo: 'compra',
+              cantidadAntes: current,
+              cantidadDespues: newStock,
+              diferencia: cantASumar,
+              unidad: data.unidad,
+              fecha: serverTimestamp(),
+            });
           }
         }
-        
+
         realTotalSpent += (item.subtotal || 0);
         itemsCompradosDetalle.push({
           nombre: item.nombre,
@@ -110,7 +167,7 @@ export function ComprasTab() {
       const weekId = format(new Date(), "yyyy-'W'ww");
       const historyRef = doc(db, "users", USER_ID, "historial_compras", weekId);
       const historySnap = await getDoc(historyRef);
-      
+
       if (historySnap.exists()) {
         const existingData = historySnap.data();
         batch.update(historyRef, {
@@ -129,12 +186,12 @@ export function ComprasTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db);
+      await syncShoppingList(db, activeProfile);
       toast({ title: "Stock actualizado ✓" });
-    } catch (e) { 
-      toast({ variant: "destructive", title: "Error al actualizar stock" }); 
-    } finally { 
-      setIsUpdatingStock(false); 
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al actualizar stock" });
+    } finally {
+      setIsUpdatingStock(false);
     }
   };
 
@@ -142,19 +199,23 @@ export function ComprasTab() {
     if (!db) return;
     try {
       await deleteDoc(doc(db, "users", USER_ID, "shopping_list_items", id));
-      toast({ title: "Ítem eliminado" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al borrar" });
     }
   };
 
-  const toggleItem = (id: string, current: boolean) => {
+  const toggleItem = async (id: string, current: boolean) => {
     if (!db) return;
     optimisticToggleCompra(id);
-    updateDoc(doc(db, "users", USER_ID, "shopping_list_items", id), { 
-      isPurchased: !current, 
-      purchasedAt: !current ? serverTimestamp() : null 
-    });
+    try {
+      await updateDoc(doc(db, "users", USER_ID, "shopping_list_items", id), {
+        isPurchased: !current,
+        purchasedAt: !current ? serverTimestamp() : null
+      });
+    } catch {
+      optimisticToggleCompra(id);
+      toast({ variant: "destructive", title: "Error al marcar ítem" });
+    }
   };
 
   if (!listaComprasCargada && listaCompras.length === 0) {
@@ -167,45 +228,60 @@ export function ComprasTab() {
     );
   }
 
+  const purchasedCount = listaCompras.filter(i => i.isPurchased).length;
+  const totalCount = listaCompras.length;
+
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
-            {listaCompras.filter(i => i.isPurchased).length} de {listaCompras.length} en el carrito
+            {purchasedCount} de {totalCount} en el carrito
           </p>
         </div>
-        <div className="flex gap-2">
-          <AddShoppingItemDialog>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
-              <Plus className="h-6 w-6" />
-            </Button>
-          </AddShoppingItemDialog>
+        <div className="flex gap-2 items-center">
+          {mode === "mercado" && (
+            <AddShoppingItemDialog>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+                <Plus className="h-6 w-6" />
+              </Button>
+            </AddShoppingItemDialog>
+          )}
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleExpandAll} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleExpandAll}
             className="h-10 w-10 rounded-full bg-primary-suave text-primary"
           >
             {expandedItems.length === categories.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </Button>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
-                  <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Recalcular desde el Plan</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {mode === "plan" && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleSync} disabled={isSyncing} className="h-10 w-10 bg-primary-suave text-primary rounded-full">
+                    <RefreshCcw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Recalcular desde el Plan</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleForceClear} disabled={isSyncing} className="h-10 w-10 bg-destructive/10 text-destructive rounded-full">
+                    <Package className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar lista del plan</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
-          <Button 
-            onClick={handleUpdateStock} 
-            disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock} 
+          <Button
+            onClick={handleUpdateStock}
+            disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock}
             className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-6 gap-2"
           >
             <ArrowUpCircle className="h-4 w-4" />
@@ -214,13 +290,35 @@ export function ComprasTab() {
         </div>
       </header>
 
-      {listaCompras.length > 0 && (
+      {/* Selector de modo */}
+      <div className="flex bg-primary-suave rounded-2xl p-1 gap-1">
+        <button
+          onClick={() => setMode("plan")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
+            mode === "plan" ? "bg-white text-primary shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          <CalendarDays className="h-3.5 w-3.5" /> Plan de Comidas
+        </button>
+        <button
+          onClick={() => setMode("mercado")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
+            mode === "mercado" ? "bg-white text-primary shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          <ShoppingCart className="h-3.5 w-3.5" /> Mercado
+        </button>
+      </div>
+
+      {filteredItems.length > 0 && (
         <Card className="border-none shadow-sm bg-primary-suave/50 rounded-3xl overflow-hidden border-2 border-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="space-y-0.5">
               <p className="text-2xl font-black text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-[10px] font-bold opacity-60 uppercase">Estimado</span></p>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black text-muted-foreground uppercase">{listaCompras.filter(i => !i.isPurchased).length} ítems pendientes</span>
+                <span className="text-[9px] font-black text-muted-foreground uppercase">{filteredItems.filter(i => !i.isPurchased).length} ítems pendientes</span>
                 {itemsSinPrecio > 0 && (
                   <div className="flex items-center gap-1 text-accent font-black text-[9px] uppercase">
                     <AlertTriangle className="h-3 w-3" /> {itemsSinPrecio} sin precio
@@ -235,10 +333,10 @@ export function ComprasTab() {
         </Card>
       )}
 
-      {listaCompras.length > 0 ? (
-        <Accordion 
-          type="multiple" 
-          value={expandedItems} 
+      {filteredItems.length > 0 ? (
+        <Accordion
+          type="multiple"
+          value={expandedItems}
           onValueChange={setExpandedItems}
           className="space-y-2"
         >
@@ -265,7 +363,7 @@ export function ComprasTab() {
                               {item.nombre}
                             </span>
                             {!item.isPurchased && (
-                              <StockFormDialog 
+                              <StockFormDialog
                                 ingredientToEdit={{
                                   id: item.ingredienteId,
                                   nombre: item.nombre,
@@ -281,7 +379,16 @@ export function ComprasTab() {
                               />
                             )}
                           </div>
-                          <span className="text-[9px] font-black text-muted-foreground uppercase">{item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}</span>
+                          <span className="text-[9px] font-black text-muted-foreground uppercase">
+                            {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
+                          </span>
+                          {mode === "plan" && item.justificacion && !item.isPurchased && (
+                            <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
+                              {item.justificacion === "Stock mínimo"
+                                ? "⚠ Stock mínimo configurado"
+                                : `Receta: ${item.justificacion}`}
+                            </span>
+                          )}
                         </div>
                         <div className="text-right shrink-0">
                           {item.precioUnitario > 0 ? (
@@ -301,10 +408,22 @@ export function ComprasTab() {
       ) : (
         <div className="py-24 text-center space-y-4">
           <div className="bg-primary-suave w-24 h-24 rounded-full flex items-center justify-center mx-auto">
-            <Package className="h-12 w-12 text-primary" />
+            {mode === "plan" ? <CalendarDays className="h-12 w-12 text-primary" /> : <ShoppingCart className="h-12 w-12 text-primary" />}
           </div>
-          <h2 className="text-2xl font-black text-primary">¡Lista vacía!</h2>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Planificá una receta para ver qué ingredientes te faltan.</p>
+          <h2 className="text-2xl font-black text-primary">
+            {mode === "plan" ? "Sin pendientes del plan" : "Lista manual vacía"}
+          </h2>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+            {mode === "plan"
+              ? "Sincronizá el plan para ver qué te falta comprar."
+              : "Agregá productos que veas que faltan en el mercado."}
+          </p>
+          {mode === "plan" && (
+            <Button onClick={handleSync} disabled={isSyncing} className="bg-primary text-white rounded-2xl gap-2">
+              <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+              Sincronizar ahora
+            </Button>
+          )}
         </div>
       )}
     </div>

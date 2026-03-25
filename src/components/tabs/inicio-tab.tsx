@@ -83,11 +83,16 @@ export function InicioTab() {
   const { userProfile, macrosHoy, planificacion, macrosSemana, recetas, historialCompras } = useAppStore();
 
   const [formattedDate, setFormattedDate] = React.useState("");
+  const [greeting, setGreeting] = React.useState("");
 
   React.useEffect(() => {
     setMounted(true);
     const now = new Date();
     setFormattedDate(format(now, "EEEE d 'de' MMMM", { locale: es }));
+    const h = now.getHours();
+    if (h < 12) setGreeting("Buenos días");
+    else if (h < 19) setGreeting("Buenas tardes");
+    else setGreeting("Buenas noches");
   }, []);
 
   const todayStr = React.useMemo(() => mounted ? format(new Date(), "yyyy-MM-dd") : "", [mounted]);
@@ -165,17 +170,20 @@ export function InicioTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-primary leading-none uppercase tracking-tighter">
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{greeting}</p>
+          <h1 className="text-3xl font-black text-primary leading-none tracking-tighter">
             {userProfile?.displayName?.split(' ')[0] || 'Chef'}
           </h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-1.5">{formattedDate}</p>
+          <p className="text-[10px] font-bold text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
         </div>
-        <Avatar className="h-10 w-10 ring-4 ring-primary/5">
-          <AvatarFallback className="bg-primary-suave text-primary font-black text-xs">CF</AvatarFallback>
+        <Avatar className="h-12 w-12 ring-4 ring-primary/10 shadow-glow">
+          <AvatarFallback className="bg-primary text-white font-black text-sm">
+            {(userProfile?.displayName || 'CF').slice(0, 2).toUpperCase()}
+          </AvatarFallback>
         </Avatar>
       </header>
 
-      <Card className="border-none shadow-recipe bg-white rounded-3xl cursor-pointer" onClick={() => router.push('/macros')}>
+      <Card className="border border-primary/10 shadow-recipe hover:shadow-card-hover bg-white rounded-3xl cursor-pointer transition-shadow" onClick={() => router.push('/macros')}>
         <CardContent className="p-6 space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-black flex items-center gap-2 uppercase">
@@ -203,25 +211,26 @@ export function InicioTab() {
         </div>
         
         {todayPlansSorted.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x px-1">
+          <div className="flex flex-wrap gap-4 pb-2 px-1">
             {todayPlansSorted.map((plan) => {
               const imageUrl = getSafeImageSource(plan);
               return (
-                <Card key={plan.id} className="min-w-[180px] max-w-[180px] border-none shadow-sm rounded-2xl overflow-hidden snap-start active:scale-95 transition-transform" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
-                  <div className="h-24 w-full relative bg-muted">
+                <Card key={plan.id} className="min-w-[170px] max-w-[170px] border-none shadow-recipe hover:shadow-card-hover rounded-3xl overflow-hidden snap-start active:scale-[0.97] transition-all" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
+                  <div className="h-28 w-full relative bg-muted">
                     {imageUrl ? (
                       <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
                     ) : (
-                      <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
+                      <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} className="rounded-none" />
                     )}
-                    <Badge className="absolute top-2 right-2 bg-white/90 text-[8px] font-black text-primary border-none shadow-sm">{plan.mealType}</Badge>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    <Badge className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[7px] font-black text-primary border-none shadow-sm">{plan.mealType}</Badge>
+                    <div className="absolute bottom-2 left-2.5 right-2.5">
+                      <h4 className="font-black text-[11px] text-white truncate leading-tight drop-shadow-sm">{plan.recipeName}</h4>
+                      <p className="text-[9px] font-bold text-white/80 mt-0.5">
+                        {Math.round(plan.macros?.calorias || 0)} kcal
+                      </p>
+                    </div>
                   </div>
-                  <CardContent className="p-3">
-                    <h4 className="font-bold text-xs truncate leading-tight">{plan.recipeName}</h4>
-                    <p className="text-[9px] font-black text-primary uppercase mt-1">
-                      {Math.round(plan.macros?.calorias || 0)} kcal
-                    </p>
-                  </CardContent>
                 </Card>
               );
             })}

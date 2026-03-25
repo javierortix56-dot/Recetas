@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { 
-  Search, Download, Clock, CheckSquare, 
-  X, Check, Flame, Hash, Plus
+import {
+  Search, Download, Clock, CheckSquare,
+  X, Check, Flame, Hash, Plus, Users
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -75,9 +75,9 @@ export function RecetasTab() {
 
   if (!recetasCargadas && recetas.length === 0) {
     return (
-      <div className="grid grid-cols-3 gap-4">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 w-full rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-44 w-full rounded-3xl" />
         ))}
       </div>
     );
@@ -115,7 +115,7 @@ export function RecetasTab() {
               <Input placeholder="Buscar recetas..." className="pl-10 h-12 bg-white rounded-2xl font-bold shadow-sm border-2 border-primary/5" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 snap-x items-center">
+            <div className="flex flex-wrap gap-2 pb-1 items-center">
               {CATEGORIES.map((cat) => (
                 <Badge key={cat} variant={activeCategory === cat ? "default" : "secondary"} className={cn("px-4 py-2 rounded-full cursor-pointer whitespace-nowrap text-[10px] font-black snap-start transition-all uppercase tracking-widest", activeCategory === cat ? "bg-primary text-white shadow-md" : "bg-primary-suave text-primary border-none")} onClick={() => setActiveCategory(cat)}>{cat}</Badge>
               ))}
@@ -140,9 +140,9 @@ export function RecetasTab() {
       </header>
 
       {filteredRecipes.length > 0 ? (
-        <div className="grid grid-cols-3 gap-4">
-          {filteredRecipes.map((recipe) => (
-            <RecipeListItem key={recipe.id} recipe={recipe} isSelectionMode={isSelectionMode} isSelected={selectedIds.has(recipe.id)} onToggleSelection={() => toggleRecipeSelection(recipe.id)} />
+        <div className="grid grid-cols-2 gap-3">
+          {filteredRecipes.map((recipe, i) => (
+            <RecipeListItem key={recipe.id} recipe={recipe} index={i} isSelectionMode={isSelectionMode} isSelected={selectedIds.has(recipe.id)} onToggleSelection={() => toggleRecipeSelection(recipe.id)} />
           ))}
         </div>
       ) : (
@@ -156,50 +156,72 @@ export function RecetasTab() {
   );
 }
 
-function RecipeListItem({ recipe, isSelectionMode, isSelected, onToggleSelection }: any) {
+function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSelection }: any) {
   const handleClick = (e: React.MouseEvent) => {
     if (isSelectionMode && onToggleSelection) {
       e.preventDefault();
       onToggleSelection();
     }
   };
-  
+
   const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
   const imageSource = getSafeImageSource(recipe);
+  const totalTime = (recipe.tiempoPreparacion || 0) + (recipe.tiempoCoccion || 0);
 
   return (
-    <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe active:scale-[0.98] transition-all rounded-2xl h-full flex flex-col relative", isSelected ? "ring-4 ring-primary" : "bg-white")}>
-      {isSelectionMode && <div className={cn("absolute top-2 right-2 z-20 h-6 w-6 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
-      <div className="relative h-28 w-full pointer-events-none bg-muted">
-        {imageSource ? (
-          <Image 
-            src={imageSource} 
-            alt={recipe.nombre} 
-            fill 
-            className="object-cover" 
-            unoptimized 
-          />
-        ) : (
-          <GradientPlaceholder categoria={primaryCategory} />
-        )}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          <Badge className="bg-white/90 text-[9px] font-black text-primary border-none h-5 px-1.5 uppercase truncate shadow-sm">
-            {primaryCategory}
-          </Badge>
-        </div>
-      </div>
-      <CardContent className="p-3 flex flex-col flex-1 gap-2.5">
-        <h3 className="font-black text-[11px] leading-tight text-foreground min-h-[1.5rem] line-clamp-2">{recipe.nombre}</h3>
-        <div className="space-y-1 mt-auto">
-          <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase">
-            <Clock className="h-3 w-3" /> {(recipe.tiempoPreparacion || 0) + (recipe.tiempoCoccion || 0)}'
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.4) }}
+    >
+      <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe hover:shadow-card-hover active:scale-[0.97] transition-all rounded-3xl h-full flex flex-col relative group", isSelected ? "ring-4 ring-primary" : "bg-white")}>
+        {isSelectionMode && <div className={cn("absolute top-3 right-3 z-20 h-7 w-7 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
+        <div className="relative h-44 w-full pointer-events-none bg-muted">
+          {imageSource ? (
+            <Image
+              src={imageSource}
+              alt={recipe.nombre}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              unoptimized
+            />
+          ) : (
+            <GradientPlaceholder categoria={primaryCategory} className="rounded-none" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
+          <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+            <Badge className="bg-white/90 backdrop-blur-sm text-[8px] font-black text-primary border-none h-5 px-2 uppercase shadow-sm">
+              {primaryCategory}
+            </Badge>
+            {recipe.dificultad && (
+              <div className="flex gap-0.5">
+                {[1, 2, 3].map(d => (
+                  <div key={d} className={cn("h-1.5 w-1.5 rounded-full", d <= (recipe.dificultad === "Fácil" ? 1 : recipe.dificultad === "Media" ? 2 : 3) ? "bg-white" : "bg-white/30")} />
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-black text-primary uppercase">
-            <Flame className="h-3 w-3 fill-current" /> {recipe.macros?.calorias || 0} KCAL
+          <div className="absolute bottom-3 left-3 right-3">
+            <h3 className="font-black text-sm leading-tight text-white drop-shadow-sm line-clamp-2">{recipe.nombre}</h3>
+            <div className="flex items-center gap-2.5 mt-1.5">
+              {totalTime > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold text-white/80">
+                  <Clock className="h-3 w-3" /> {totalTime}'
+                </span>
+              )}
+              <span className="flex items-center gap-1 text-[9px] font-black text-white/90">
+                <Flame className="h-3 w-3" /> {recipe.macros?.calorias || 0} kcal
+              </span>
+              {recipe.porciones > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold text-white/70">
+                  <Users className="h-3 w-3" /> {recipe.porciones}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         {!isSelectionMode && <Link href={`/recetas/${recipe.id}`} className="absolute inset-0 z-10" />}
-      </CardContent>
-    </Card>
+      </Card>
+    </motion.div>
   )
 }

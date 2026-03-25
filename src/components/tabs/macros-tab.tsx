@@ -19,6 +19,8 @@ import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
 import { GradientPlaceholder } from "@/components/gradient-placeholder";
+import { getSafeImageSource } from "@/lib/utils";
+import Image from "next/image";
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 
@@ -54,7 +56,7 @@ function MacroRing({ label, value, target, size = 80 }: { label: string, value: 
 export function MacrosTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { userProfile, macrosHoy, macrosSemana, macrosCargados, planificacion, activeProfile } = useAppStore();
+  const { userProfile, macrosHoy, macrosSemana, macrosCargados, planificacion, activeProfile, recetas } = useAppStore();
   const [mounted, setMounted] = React.useState(false);
   const [selectedDate, setSelectedDate] = React.useState(new Date());
 
@@ -254,21 +256,32 @@ export function MacrosTab() {
                   <h3 className="text-[10px] font-black uppercase text-primary px-4 tracking-[0.2em]">{m}</h3>
                   <div className="space-y-2">
                     {logs?.length > 0 ? (
-                      logs.map(l => (
-                        <MacroLogItem 
-                          key={l.id} 
-                          log={l} 
-                          onClick={() => router.push(`/recetas/${l.recetaId}`)} 
-                          onDelete={() => handleDeleteLog(l)} 
-                        />
-                      ))
+                      logs.map(l => {
+                        const recetaDelLog = recetas.find(r => r.id === l.recetaId);
+                        return (
+                          <MacroLogItem
+                            key={l.id}
+                            log={l}
+                            receta={recetaDelLog}
+                            onClick={() => router.push(`/recetas/${l.recetaId}`)}
+                            onDelete={() => handleDeleteLog(l)}
+                          />
+                        );
+                      })
                     ) : plans.length > 0 ? (
-                      plans.map(p => (
+                      plans.map(p => {
+                        const recetaDelPlan = recetas.find(r => r.id === p.recipeId);
+                        const planImageUrl = getSafeImageSource(p) || getSafeImageSource(recetaDelPlan);
+                        return (
                         <div key={p.id} className="px-4 opacity-60 grayscale-[0.5] pointer-events-none">
                            <Card className="border-none shadow-sm bg-primary-suave/30 rounded-2xl overflow-hidden border-dashed border-2">
                             <CardContent className="p-4 flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
-                                 <GradientPlaceholder categoria={p.recipeCategory || 'Almuerzo'} />
+                              <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                                {planImageUrl ? (
+                                  <Image src={planImageUrl} alt={p.recipeName} fill className="object-cover" unoptimized />
+                                ) : (
+                                  <GradientPlaceholder categoria={p.recipeCategory || 'Almuerzo'} />
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-sm truncate text-foreground">{p.recipeName} (Planeado)</h4>
@@ -279,7 +292,8 @@ export function MacrosTab() {
                             </CardContent>
                           </Card>
                         </div>
-                      ))
+                        );
+                      })
                     ) : !loadingLogs && (
                       <div className="px-4 py-6 border-2 border-dashed border-primary/5 rounded-2xl text-center opacity-30">
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">Sin registros</p>
@@ -330,22 +344,27 @@ export function MacrosTab() {
   );
 }
 
-function MacroLogItem({ log, onClick, onDelete }: { log: any, onClick: () => void, onDelete: () => void }) {
+function MacroLogItem({ log, receta, onClick, onDelete }: { log: any, receta?: any, onClick: () => void, onDelete: () => void }) {
+  const imageUrl = getSafeImageSource(receta);
   return (
     <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative group px-4">
       <div className="absolute inset-0 bg-destructive rounded-2xl flex items-center justify-end px-6 text-white mr-4 ml-4">
         <Trash2 className="h-6 w-6" />
       </div>
-      <motion.div 
-        drag="x" 
-        dragConstraints={{ left: -80, right: 0 }} 
-        onDragEnd={(_, info) => { if (info.offset.x < -50) onDelete(); }} 
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: -80, right: 0 }}
+        onDragEnd={(_, info) => { if (info.offset.x < -50) onDelete(); }}
         className="relative z-10"
       >
         <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer border border-primary/5" onClick={onClick}>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
-               <GradientPlaceholder categoria={log.recetaCategoria || 'Almuerzo'} />
+            <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+              {imageUrl ? (
+                <Image src={imageUrl} alt={log.recetaNombre} fill className="object-cover" unoptimized />
+              ) : (
+                <GradientPlaceholder categoria={log.recetaCategoria || 'Almuerzo'} />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm truncate text-foreground">{log.recetaNombre}</h4>

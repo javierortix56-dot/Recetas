@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "@/hooks/use-toast"
-import { useFirestore, useStorage } from "@/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { useFirestore } from "@/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { compressImageToBase64 } from "@/lib/utils"
 import { USER_ID } from "@/lib/constants"
 import Image from "next/image"
 import { errorEmitter } from "@/firebase/error-emitter"
@@ -23,8 +23,7 @@ const CATEGORIES = ["Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack
 export default function NewRecipePage() {
   const router = useRouter()
   const db = useFirestore()
-  const storage = useStorage()
-  
+
   const [formData, setFormData] = React.useState<any>({
     nombre: "",
     descripcion: "",
@@ -60,11 +59,9 @@ export default function NewRecipePage() {
     let finalFotoURL = null
 
     try {
-      if (imageFile && storage) {
-        const timestamp = Date.now()
-        const storageRef = ref(storage, `users/${USER_ID}/recipes/new_${timestamp}`)
-        const res = await uploadBytes(storageRef, imageFile)
-        finalFotoURL = await getDownloadURL(res.ref)
+      if (imageFile) {
+        toast({ title: "Procesando imagen..." });
+        finalFotoURL = await compressImageToBase64(imageFile);
       }
 
       const ingredientesNormalizados = (formData.ingredientes || []).map((ing: any) => ({
@@ -121,7 +118,27 @@ export default function NewRecipePage() {
       </header>
 
       <div className="p-6 space-y-8 max-w-lg mx-auto w-full">
-        {/* Imagen y Datos básicos omitidos por brevedad pero mantenidos en el estado */}
+        <section className="space-y-4">
+          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Foto del plato</label>
+          <div
+            className="relative h-56 w-full rounded-[2.5rem] border-4 border-dashed border-primary/10 bg-primary-suave/30 overflow-hidden cursor-pointer hover:border-primary/30 transition-all"
+            onClick={() => document.getElementById('image-upload-nueva')?.click()}
+          >
+            {imagePreview ? (
+              <Image src={imagePreview} alt="Preview" fill className="object-cover" unoptimized priority />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-primary/60">
+                <ImageIcon className="h-12 w-12" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Toca para cargar foto</span>
+              </div>
+            )}
+            <input id="image-upload-nueva" type="file" accept="image/*" className="hidden" onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)) }
+            }} />
+          </div>
+        </section>
+
         <section className="space-y-4">
           <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-2">Nombre del plato</label>
           <Input 

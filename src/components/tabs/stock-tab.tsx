@@ -13,10 +13,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc } from "firebase/firestore";
+import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc, addDoc } from "firebase/firestore";
 import { useFirestore } from "@/firebase";
 import { StockFormDialog } from "@/components/stock/stock-form-dialog";
 import { BulkCategoryDialog } from "@/components/stock/bulk-category-dialog";
+import { StockHistorialDialog } from "@/components/stock/stock-historial-dialog";
 import { toast } from "@/hooks/use-toast";
 import { useAppStore } from '@/store/app-store';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -81,8 +82,21 @@ export function StockTab() {
 
   const updateStockDirect = async (id: string, val: number) => {
     if (!db) return;
+    const ing = ingredientes.find(i => i.id === id);
+    if (!ing) return;
+    const newVal = Math.max(0, val);
     try {
-      await updateDoc(doc(db, "users", USER_ID, "ingredients", id), { stockActual: Math.max(0, val), updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "users", USER_ID, "ingredients", id), { stockActual: newVal, updatedAt: serverTimestamp() });
+      addDoc(collection(db, "users", USER_ID, "stock_historial"), {
+        ingredienteId: id,
+        ingredienteNombre: ing.nombre,
+        tipo: 'ajuste',
+        cantidadAntes: ing.stockActual,
+        cantidadDespues: newVal,
+        diferencia: newVal - ing.stockActual,
+        unidad: ing.unidad,
+        fecha: serverTimestamp(),
+      });
     } catch (e) { console.error(e); }
   };
 
@@ -176,6 +190,7 @@ export function StockTab() {
                   </Tooltip>
                 </TooltipProvider>
                 
+                <StockHistorialDialog />
                 <StockFormDialog />
               </>
             )}
@@ -195,7 +210,7 @@ export function StockTab() {
         )}
 
         {isSelectionMode && (
-          <div className="flex gap-2 py-1 overflow-x-auto scrollbar-hide">
+          <div className="flex flex-wrap gap-2 py-1">
             <Button 
               variant="outline" 
               size="sm" 

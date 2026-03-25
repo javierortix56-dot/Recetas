@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "@/hooks/use-toast"
-import { useFirestore, useDoc, useMemoFirebase, useStorage } from "@/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { useFirestore, useDoc, useMemoFirebase } from "@/firebase"
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { compressImageToBase64 } from "@/lib/utils"
 import { USER_ID } from "@/lib/constants"
 import Image from "next/image"
 import { errorEmitter } from "@/firebase/error-emitter"
@@ -21,8 +21,7 @@ import { normalizeIngredientName } from "@/lib/categorizeIngredient"
 export function EditRecipeClient({ recipeId }: { recipeId: string }) {
   const router = useRouter()
   const db = useFirestore()
-  const storage = useStorage()
-  
+
   const recipeRef = useMemoFirebase(() => {
     if (!db || !recipeId) return null
     return doc(db, "users", USER_ID, "recipes", recipeId)
@@ -96,36 +95,13 @@ export function EditRecipeClient({ recipeId }: { recipeId: string }) {
     let finalFotoURL = formData.fotoURL || formData.imageUrl || null
 
     try {
-      if (imageFile && storage) {
-        toast({ title: "Subiendo imagen...", description: "Por favor no cierres la app." });
+      if (imageFile) {
+        toast({ title: "Procesando imagen..." });
         try {
-          const timestamp = Date.now()
-          const storageRef = ref(storage, `users/${USER_ID}/recipes/${recipeId}_${timestamp}`)
-          
-          const uploadPromise = uploadBytes(storageRef, imageFile).then(res => getDownloadURL(res.ref));
-          const timeoutPromise = new Promise((resolve) => 
-            setTimeout(() => resolve(null), 12000)
-          );
-
-          const storageResult = await Promise.race([uploadPromise, timeoutPromise]);
-          
-          if (storageResult) {
-            finalFotoURL = storageResult as string;
-            toast({ title: "¡Imagen lista! ✓" });
-          } else {
-            toast({ 
-              variant: "destructive", 
-              title: "Imagen omitida", 
-              description: "La subida demoró demasiado. Se conservará la anterior si existía." 
-            })
-          }
-        } catch (storageError: any) {
-          console.error("Error subiendo imagen:", storageError)
-          toast({ 
-            variant: "destructive", 
-            title: "Error de servidor", 
-            description: "No se pudo subir la foto. Asegúrate de habilitar Storage en Firebase." 
-          })
+          finalFotoURL = await compressImageToBase64(imageFile);
+        } catch (imgError) {
+          console.error("Error procesando imagen:", imgError);
+          toast({ variant: "destructive", title: "No se pudo procesar la imagen" });
         }
       }
 
@@ -146,7 +122,7 @@ export function EditRecipeClient({ recipeId }: { recipeId: string }) {
 
       const docRef = doc(db, "users", USER_ID, "recipes", recipeId);
       
-      updateDoc(docRef, updatedData)
+      await updateDoc(docRef, updatedData)
         .catch(async (err) => {
           const permissionError = new FirestorePermissionError({
             path: docRef.path,
@@ -156,7 +132,7 @@ export function EditRecipeClient({ recipeId }: { recipeId: string }) {
           errorEmitter.emit('permission-error', permissionError);
         });
 
-      toast({ title: "¡Receta actualizada! 🎉" })
+      toast({ title: "¡Receta actualizada!" })
       router.push(`/recetas/${recipeId}`)
     } catch (e) {
       console.error(e)
