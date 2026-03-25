@@ -259,19 +259,17 @@ export function PlanificacionTab() {
       });
 
       const batch = writeBatch(db);
-      
-      const currentLogsSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("date", "==", dateStr),
-        where("perfil", "==", activeProfile)
-      ));
-      currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${dateStr}_${activeProfile}`);
-      batch.set(summaryRef, {
-        totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      // Delete existing meal_plans and daily_logs for this day before re-planning
+      const [existingPlansSnap, existingLogsSnap] = await Promise.all([
+        getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "==", dateStr), where("perfil", "==", activeProfile))),
+        getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "==", dateStr), where("perfil", "==", activeProfile)))
+      ]);
+      existingPlansSnap.docs.forEach(d => batch.delete(d.ref));
+      existingLogsSnap.docs.forEach(d => batch.delete(d.ref));
+
+      // Accumulate total macros to write summaryRef only once
+      const totalMacros = { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 };
 
       for (const p of result.plans) {
         const fullRecipe = recetas.find(r => r.id === p.recipeId);
@@ -284,6 +282,11 @@ export function PlanificacionTab() {
           carbohidratos: Math.round(Number(m.carbohidratos || 0)),
           grasas: Math.round(Number(m.grasas || 0)),
         };
+
+        totalMacros.calorias += macrosCalculados.calorias;
+        totalMacros.proteinas += macrosCalculados.proteinas;
+        totalMacros.carbohidratos += macrosCalculados.carbohidratos;
+        totalMacros.grasas += macrosCalculados.grasas;
 
         const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
         batch.set(planRef, {
@@ -311,29 +314,30 @@ export function PlanificacionTab() {
           recetaId: p.recipeId,
           recetaNombre: p.recipeName,
           recetaCategoria: fullRecipe.categoria || "Almuerzo",
-          porciones: 1, 
+          porciones: 1,
           macros: macrosCalculados,
           planId: planRef.id,
           createdAt: serverTimestamp()
         });
-
-        batch.set(summaryRef, {
-          totalesDia: {
-            calorias: increment(macrosCalculados.calorias),
-            proteinas: increment(macrosCalculados.proteinas),
-            carbohidratos: increment(macrosCalculados.carbohidratos),
-            grasas: increment(macrosCalculados.grasas)
-          },
-          updatedAt: serverTimestamp()
-        }, { merge: true });
       }
+
+      // Single write to summaryRef with accumulated totals
+      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${dateStr}_${activeProfile}`);
+      batch.set(summaryRef, {
+        date: dateStr,
+        userId: USER_ID,
+        perfil: activeProfile,
+        totalesDia: totalMacros,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
       await batch.commit();
       await syncShoppingList(db, activeProfile);
-      
+
       toast({ title: `Día de ${activeProfile} planeado ✓` });
       setExpandedDay(dateStr);
     } catch (e) {
+      console.error("Error autoPlanDay:", e);
       toast({ variant: "destructive", title: "Error al planear el día" });
     } finally {
       setIsAutoPlanningDay(null);
