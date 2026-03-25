@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart, MoreVertical, Trash2 } from "lucide-react";
+import { Package, ArrowUpCircle, DollarSign, AlertTriangle, RefreshCcw, Tag, ChevronDown, ChevronUp, Plus, ShoppingCart, MoreVertical, Trash2, CheckSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,27 @@ export function ComprasTab() {
   const [isUpdatingStock, setIsUpdatingStock] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const hasSyncedRef = React.useRef(false);
+
+  const manualItems = React.useMemo(
+    () => listaCompras.filter(i => i.source === "manual" || i.reason === "Manual"),
+    [listaCompras]
+  );
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedIds(new Set());
+  };
 
   // Auto-sync al montar en modo Plan para limpiar ítems obsoletos
   React.useEffect(() => {
@@ -197,7 +217,6 @@ export function ComprasTab() {
 
   const handleDeleteAllManual = async () => {
     if (!db) return;
-    const manualItems = listaCompras.filter(i => i.source === "manual" || i.reason === "Manual");
     if (manualItems.length === 0) {
       toast({ title: "No hay ítems manuales" });
       return;
@@ -209,6 +228,19 @@ export function ComprasTab() {
       toast({ title: `${manualItems.length} ítem(s) manuales eliminados ✓` });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al borrar manuales" });
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!db || selectedIds.size === 0) return;
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => batch.delete(doc(db, "users", USER_ID, "shopping_list_items", id)));
+      await batch.commit();
+      toast({ title: `${selectedIds.size} ítem(s) eliminados ✓` });
+      exitSelectionMode();
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al borrar seleccionados" });
     }
   };
 
@@ -242,48 +274,96 @@ export function ComprasTab() {
   return (
     <div className="flex flex-col gap-4 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
-            {purchasedCount} de {totalCount} en el carrito
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <AddShoppingItemDialog>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
-              <Plus className="h-6 w-6" />
-            </Button>
-          </AddShoppingItemDialog>
-
-          <Button
-            onClick={handleUpdateStock}
-            disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock}
-            className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-4 gap-2"
-          >
-            <ArrowUpCircle className="h-4 w-4" />
-            {isUpdatingStock ? "..." : "Terminar"}
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
-                <MoreVertical className="h-5 w-5" />
+        {isSelectionMode ? (
+          <>
+            <div>
+              <h1 className="text-xl font-black text-primary leading-tight">
+                {selectedIds.size === 0 ? "Seleccionar" : `${selectedIds.size} seleccionado${selectedIds.size !== 1 ? "s" : ""}`}
+              </h1>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+                {manualItems.length} ítems manuales
+              </p>
+            </div>
+            <div className="flex gap-2 items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (selectedIds.size === manualItems.length) {
+                    setSelectedIds(new Set());
+                  } else {
+                    setSelectedIds(new Set(manualItems.map(i => i.id)));
+                  }
+                }}
+                className="h-9 rounded-2xl text-[10px] font-black uppercase px-3 bg-primary-suave text-primary"
+              >
+                {selectedIds.size === manualItems.length ? "Desmarcar" : "Todos"}
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-2xl">
-              <DropdownMenuItem onClick={toggleExpandAll} className="gap-3 font-bold">
-                {expandedItems.length === categories.length ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {expandedItems.length === categories.length ? "Contraer todo" : "Expandir todo"}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleSync} disabled={isSyncing} className="gap-3 font-bold">
-                <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> Sincronizar plan
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDeleteAllManual} className="gap-3 font-bold text-destructive focus:text-destructive">
-                <Trash2 className="h-4 w-4" /> Borrar todos manuales
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+              <Button
+                onClick={handleDeleteSelected}
+                disabled={selectedIds.size === 0}
+                className="h-9 rounded-2xl text-[10px] font-black uppercase px-3 bg-destructive text-white gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+              </Button>
+              <Button variant="ghost" size="icon" onClick={exitSelectionMode} className="h-9 w-9 rounded-full bg-primary-suave text-primary">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+                {purchasedCount} de {totalCount} en el carrito
+              </p>
+            </div>
+            <div className="flex gap-2 items-center">
+              <AddShoppingItemDialog>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+                  <Plus className="h-6 w-6" />
+                </Button>
+              </AddShoppingItemDialog>
+
+              <Button
+                onClick={handleUpdateStock}
+                disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock}
+                className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-4 gap-2"
+              >
+                <ArrowUpCircle className="h-4 w-4" />
+                {isUpdatingStock ? "..." : "Terminar"}
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-2xl">
+                  <DropdownMenuItem onClick={toggleExpandAll} className="gap-3 font-bold">
+                    {expandedItems.length === categories.length ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {expandedItems.length === categories.length ? "Contraer todo" : "Expandir todo"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSync} disabled={isSyncing} className="gap-3 font-bold">
+                    <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> Sincronizar plan
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => { setIsSelectionMode(true); setExpandedItems(categories); }}
+                    disabled={manualItems.length === 0}
+                    className="gap-3 font-bold"
+                  >
+                    <CheckSquare className="h-4 w-4" /> Seleccionar manuales
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDeleteAllManual} className="gap-3 font-bold text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4" /> Borrar todos manuales
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </>
+        )}
       </header>
 
       {filteredItems.length > 0 && (
@@ -327,66 +407,96 @@ export function ComprasTab() {
               </AccordionTrigger>
               <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
                 {groupedItems[category].map((item) => (
-                  <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
-                    <div className="p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group">
-                      <Checkbox checked={item.isPurchased} onCheckedChange={() => toggleItem(item.id, item.isPurchased)} className="h-6 w-6 rounded-lg border-2" />
-                      <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
-                              {item.nombre}
+                  {(() => {
+                    const isManual = item.source === "manual" || item.reason === "Manual";
+                    const isSelected = selectedIds.has(item.id);
+                    const row = (
+                      <div
+                        className={cn(
+                          "p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group transition-colors",
+                          isSelectionMode && isManual && isSelected && "bg-accent/5"
+                        )}
+                        onClick={isSelectionMode && isManual ? () => toggleSelection(item.id) : undefined}
+                      >
+                        {isSelectionMode && isManual ? (
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelection(item.id)}
+                            className="h-6 w-6 rounded-lg border-2"
+                          />
+                        ) : (
+                          <Checkbox
+                            checked={item.isPurchased}
+                            onCheckedChange={() => !isSelectionMode && toggleItem(item.id, item.isPurchased)}
+                            disabled={isSelectionMode}
+                            className={cn("h-6 w-6 rounded-lg border-2", isSelectionMode && !isManual && "opacity-30")}
+                          />
+                        )}
+                        <div className={cn("flex-1 min-w-0 flex items-center justify-between gap-3", isSelectionMode && !isManual && "opacity-40")}>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                                {item.nombre}
+                              </span>
+                              {isManual && (
+                                <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
+                              )}
+                              {!item.isPurchased && !isSelectionMode && (
+                                <StockFormDialog
+                                  ingredientToEdit={{
+                                    id: item.ingredienteId,
+                                    nombre: item.nombre,
+                                    categoria: item.categoria,
+                                    unidad: item.unidad,
+                                    precioUnitario: item.precioUnitario
+                                  }}
+                                  trigger={
+                                    <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Tag className="h-3.5 w-3.5" />
+                                    </button>
+                                  }
+                                />
+                              )}
+                            </div>
+                            <span className="text-[9px] font-black text-muted-foreground uppercase">
+                              {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
                             </span>
-                            {(item.source === "manual" || item.reason === "Manual") && (
-                              <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
-                            )}
-                            {!item.isPurchased && (
-                              <StockFormDialog
-                                ingredientToEdit={{
-                                  id: item.ingredienteId,
-                                  nombre: item.nombre,
-                                  categoria: item.categoria,
-                                  unidad: item.unidad,
-                                  precioUnitario: item.precioUnitario
-                                }}
-                                trigger={
-                                  <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Tag className="h-3.5 w-3.5" />
-                                  </button>
-                                }
-                              />
+                            {item.justificacion && !item.isPurchased && item.source === "plan" && (
+                              <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
+                                {item.justificacion === "Stock mínimo"
+                                  ? "⚠ Stock mínimo configurado"
+                                  : `Receta: ${item.justificacion}`}
+                              </span>
                             )}
                           </div>
-                          <span className="text-[9px] font-black text-muted-foreground uppercase">
-                            {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
-                          </span>
-                          {item.justificacion && !item.isPurchased && item.source === "plan" && (
-                            <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
-                              {item.justificacion === "Stock mínimo"
-                                ? "⚠ Stock mínimo configurado"
-                                : `Receta: ${item.justificacion}`}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-right">
-                            {item.precioUnitario > 0 ? (
-                              <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
-                            ) : (
-                              <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right">
+                              {item.precioUnitario > 0 ? (
+                                <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                              ) : (
+                                <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                              )}
+                            </div>
+                            {isManual && !isSelectionMode && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
+                                className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             )}
                           </div>
-                          {(item.source === "manual" || item.reason === "Manual") && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
-                              className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
                         </div>
                       </div>
-                    </div>
-                  </SwipeToDelete>
+                    );
+                    return isSelectionMode ? (
+                      <div key={item.id}>{row}</div>
+                    ) : (
+                      <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
+                        {row}
+                      </SwipeToDelete>
+                    );
+                  })()}
                 ))}
               </AccordionContent>
             </AccordionItem>
