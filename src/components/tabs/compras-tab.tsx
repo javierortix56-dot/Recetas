@@ -406,98 +406,96 @@ export function ComprasTab() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
-                {groupedItems[category].map((item) => (
-                  {(() => {
-                    const isManual = item.source === "manual" || item.reason === "Manual";
-                    const isSelected = selectedIds.has(item.id);
-                    const row = (
-                      <div
-                        className={cn(
-                          "p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group transition-colors",
-                          isSelectionMode && isManual && isSelected && "bg-accent/5"
-                        )}
-                        onClick={isSelectionMode && isManual ? () => toggleSelection(item.id) : undefined}
-                      >
-                        {isSelectionMode && isManual ? (
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelection(item.id)}
-                            className="h-6 w-6 rounded-lg border-2"
-                          />
-                        ) : (
-                          <Checkbox
-                            checked={item.isPurchased}
-                            onCheckedChange={() => !isSelectionMode && toggleItem(item.id, item.isPurchased)}
-                            disabled={isSelectionMode}
-                            className={cn("h-6 w-6 rounded-lg border-2", isSelectionMode && !isManual && "opacity-30")}
-                          />
-                        )}
-                        <div className={cn("flex-1 min-w-0 flex items-center justify-between gap-3", isSelectionMode && !isManual && "opacity-40")}>
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
-                                {item.nombre}
-                              </span>
-                              {isManual && (
-                                <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
-                              )}
-                              {!item.isPurchased && !isSelectionMode && (
-                                <StockFormDialog
-                                  ingredientToEdit={{
-                                    id: item.ingredienteId,
-                                    nombre: item.nombre,
-                                    categoria: item.categoria,
-                                    unidad: item.unidad,
-                                    precioUnitario: item.precioUnitario
-                                  }}
-                                  trigger={
-                                    <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Tag className="h-3.5 w-3.5" />
-                                    </button>
-                                  }
-                                />
-                              )}
-                            </div>
-                            <span className="text-[9px] font-black text-muted-foreground uppercase">
-                              {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
+                {groupedItems[category].map((item) => {
+                  const isManual = item.source === "manual" || item.reason === "Manual";
+                  const isSelected = selectedIds.has(item.id);
+                  const row = (
+                    <div
+                      className={cn(
+                        "p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group transition-colors",
+                        isSelectionMode && isManual && isSelected && "bg-accent/5"
+                      )}
+                      onClick={isSelectionMode && isManual ? () => toggleSelection(item.id) : undefined}
+                    >
+                      {isSelectionMode && isManual ? (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(item.id)}
+                          className="h-6 w-6 rounded-lg border-2"
+                        />
+                      ) : (
+                        <Checkbox
+                          checked={item.isPurchased}
+                          onCheckedChange={() => !isSelectionMode && toggleItem(item.id, item.isPurchased)}
+                          disabled={isSelectionMode}
+                          className={cn("h-6 w-6 rounded-lg border-2", isSelectionMode && !isManual && "opacity-30")}
+                        />
+                      )}
+                      <div className={cn("flex-1 min-w-0 flex items-center justify-between gap-3", isSelectionMode && !isManual && "opacity-40")}>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                              {item.nombre}
                             </span>
-                            {item.justificacion && !item.isPurchased && item.source === "plan" && (
-                              <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
-                                {item.justificacion === "Stock mínimo"
-                                  ? "⚠ Stock mínimo configurado"
-                                  : `Receta: ${item.justificacion}`}
-                              </span>
+                            {isManual && (
+                              <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
+                            )}
+                            {!item.isPurchased && !isSelectionMode && (
+                              <StockFormDialog
+                                ingredientToEdit={{
+                                  id: item.ingredienteId,
+                                  nombre: item.nombre,
+                                  categoria: item.categoria,
+                                  unidad: item.unidad,
+                                  precioUnitario: item.precioUnitario
+                                }}
+                                trigger={
+                                  <button className="p-1.5 rounded-lg bg-primary-suave text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Tag className="h-3.5 w-3.5" />
+                                  </button>
+                                }
+                              />
                             )}
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="text-right">
-                              {item.precioUnitario > 0 ? (
-                                <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
-                              ) : (
-                                <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
-                              )}
-                            </div>
-                            {isManual && !isSelectionMode && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
-                                className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                          <span className="text-[9px] font-black text-muted-foreground uppercase">
+                            {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
+                          </span>
+                          {item.justificacion && !item.isPurchased && item.source === "plan" && (
+                            <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
+                              {item.justificacion === "Stock mínimo"
+                                ? "⚠ Stock mínimo configurado"
+                                : `Receta: ${item.justificacion}`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            {item.precioUnitario > 0 ? (
+                              <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                            ) : (
+                              <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
                             )}
                           </div>
+                          {isManual && !isSelectionMode && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
+                              className="p-1.5 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
-                    );
-                    return isSelectionMode ? (
-                      <div key={item.id}>{row}</div>
-                    ) : (
-                      <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
-                        {row}
-                      </SwipeToDelete>
-                    );
-                  })()}
-                ))}
+                    </div>
+                  );
+                  return isSelectionMode ? (
+                    <div key={item.id}>{row}</div>
+                  ) : (
+                    <SwipeToDelete key={item.id} onDelete={() => handleDeleteItem(item.id)}>
+                      {row}
+                    </SwipeToDelete>
+                  );
+                })}
               </AccordionContent>
             </AccordionItem>
           ))}
