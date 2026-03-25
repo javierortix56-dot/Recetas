@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestore } from '@/firebase';
-import { writeBatch, doc } from 'firebase/firestore';
+import { writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
@@ -67,7 +67,10 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
       ingredientes.forEach(ing => {
         const newCat = renames[ing.categoria || 'Otros'];
         if (newCat) {
-          batch.update(doc(db, 'users', USER_ID, 'ingredients', ing.id), { categoria: newCat });
+          batch.update(doc(db, 'users', USER_ID, 'ingredients', ing.id), {
+            categoria: newCat,
+            updatedAt: serverTimestamp(),
+          });
           count++;
         }
       });
@@ -75,6 +78,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
       toast({ title: `${count} ingrediente(s) actualizados ✓` });
       setRenames({});
     } catch (e) {
+      console.error('handleApplyRenames:', e);
       toast({ variant: 'destructive', title: 'Error al actualizar categorías' });
     } finally {
       setIsSaving(false);
@@ -88,9 +92,13 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
       const batch = writeBatch(db);
       let count = 0;
       ingredientes.forEach(ing => {
-        const normalized = normalizeCategoria(ing.categoria || 'Otros');
-        if (normalized !== (ing.categoria || 'Otros')) {
-          batch.update(doc(db, 'users', USER_ID, 'ingredients', ing.id), { categoria: normalized });
+        const current = ing.categoria || 'Otros';
+        const normalized = normalizeCategoria(current);
+        if (normalized !== current) {
+          batch.update(doc(db, 'users', USER_ID, 'ingredients', ing.id), {
+            categoria: normalized,
+            updatedAt: serverTimestamp(),
+          });
           count++;
         }
       });
@@ -98,6 +106,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
       toast({ title: count > 0 ? `${count} ingrediente(s) normalizados ✓` : 'Todo ya está normalizado ✓' });
       setRenames({});
     } catch (e) {
+      console.error('handleNormalizeAll:', e);
       toast({ variant: 'destructive', title: 'Error al normalizar' });
     } finally {
       setIsSaving(false);
