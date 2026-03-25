@@ -112,6 +112,15 @@ export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpe
   const [isImporting, setIsImporting] = React.useState(false)
   const [importCount, setImportCount] = React.useState(0)
 
+  React.useEffect(() => {
+    if (!open) {
+      setJsonText("")
+      setIsValid(null)
+      setErrors([])
+      setImportCount(0)
+    }
+  }, [open])
+
   const validateJson = (text: string) => {
     setJsonText(text)
     if (!text.trim()) {

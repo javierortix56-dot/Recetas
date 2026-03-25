@@ -3,13 +3,19 @@
 import * as React from 'react';
 import {
   Search, Download, Clock, CheckSquare,
-  X, Check, Flame, Hash, Plus, Users
+  X, Check, Flame, Hash, Plus, Users, MoreVertical, Bot
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -75,9 +81,9 @@ export function RecetasTab() {
 
   if (!recetasCargadas && recetas.length === 0) {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-44 w-full rounded-3xl" />
+          <Skeleton key={i} className="h-36 w-full rounded-3xl" />
         ))}
       </div>
     );
@@ -91,18 +97,31 @@ export function RecetasTab() {
             {isSelectionMode ? `(${selectedIds.size})` : 'Recetas'}
           </h1>
           <div className="flex gap-2">
-            <Button size="icon" variant="ghost" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }} className={cn("rounded-full", isSelectionMode ? "bg-primary text-white" : "bg-primary-suave text-primary")}>
-              {isSelectionMode ? <X className="h-5 w-5" /> : <CheckSquare className="h-5 w-5" />}
-            </Button>
-            {!isSelectionMode && (
+            {isSelectionMode ? (
+              <Button size="icon" variant="ghost" onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="rounded-full bg-primary text-white">
+                <X className="h-5 w-5" />
+              </Button>
+            ) : (
               <>
                 <Button size="icon" variant="ghost" onClick={() => router.push("/recetas/nueva")} className="rounded-full bg-primary text-white shadow-md">
                   <Plus className="h-6 w-6" />
                 </Button>
-                <RecipePromptSheet onOpenImport={() => setIsImportOpen(true)} />
-                <Button size="icon" variant="ghost" onClick={() => setIsImportOpen(true)} className="rounded-full bg-primary-suave text-primary">
-                  <Download className="h-6 w-6" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" className="rounded-full bg-primary-suave text-primary">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-2xl">
+                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-bold">
+                      <CheckSquare className="h-4 w-4" /> Seleccionar
+                    </DropdownMenuItem>
+                    <RecipePromptSheet onOpenImport={() => setIsImportOpen(true)} asMenuItem />
+                    <DropdownMenuItem onClick={() => setIsImportOpen(true)} className="gap-3 font-bold">
+                      <Download className="h-4 w-4" /> Importar JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
@@ -140,7 +159,7 @@ export function RecetasTab() {
       </header>
 
       {filteredRecipes.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {filteredRecipes.map((recipe, i) => (
             <RecipeListItem key={recipe.id} recipe={recipe} index={i} isSelectionMode={isSelectionMode} isSelected={selectedIds.has(recipe.id)} onToggleSelection={() => toggleRecipeSelection(recipe.id)} />
           ))}
@@ -176,7 +195,7 @@ function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSe
     >
       <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe hover:shadow-card-hover active:scale-[0.97] transition-all rounded-3xl h-full flex flex-col relative group", isSelected ? "ring-4 ring-primary" : "bg-white")}>
         {isSelectionMode && <div className={cn("absolute top-3 right-3 z-20 h-7 w-7 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
-        <div className="relative h-44 w-full pointer-events-none bg-muted">
+        <div className="relative h-24 w-full pointer-events-none bg-muted">
           {imageSource ? (
             <Image
               src={imageSource}
@@ -188,37 +207,16 @@ function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSe
           ) : (
             <GradientPlaceholder categoria={primaryCategory} className="rounded-none" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
-          <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-            <Badge className="bg-white/90 backdrop-blur-sm text-[8px] font-black text-primary border-none h-5 px-2 uppercase shadow-sm">
-              {primaryCategory}
-            </Badge>
-            {recipe.dificultad && (
-              <div className="flex gap-0.5">
-                {[1, 2, 3].map(d => (
-                  <div key={d} className={cn("h-1.5 w-1.5 rounded-full", d <= (recipe.dificultad === "Fácil" ? 1 : recipe.dificultad === "Media" ? 2 : 3) ? "bg-white" : "bg-white/30")} />
-                ))}
-              </div>
-            )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+          <div className="absolute bottom-2 left-2 right-2">
+            <h3 className="font-black text-[11px] leading-tight text-white drop-shadow-sm line-clamp-2">{recipe.nombre}</h3>
+            <span className="flex items-center gap-0.5 text-[9px] font-black text-white/80 mt-0.5">
+              <Flame className="h-2.5 w-2.5" /> {recipe.macros?.calorias || 0}
+            </span>
           </div>
-          <div className="absolute bottom-3 left-3 right-3">
-            <h3 className="font-black text-sm leading-tight text-white drop-shadow-sm line-clamp-2">{recipe.nombre}</h3>
-            <div className="flex items-center gap-2.5 mt-1.5">
-              {totalTime > 0 && (
-                <span className="flex items-center gap-1 text-[9px] font-bold text-white/80">
-                  <Clock className="h-3 w-3" /> {totalTime}'
-                </span>
-              )}
-              <span className="flex items-center gap-1 text-[9px] font-black text-white/90">
-                <Flame className="h-3 w-3" /> {recipe.macros?.calorias || 0} kcal
-              </span>
-              {recipe.porciones > 0 && (
-                <span className="flex items-center gap-1 text-[9px] font-bold text-white/70">
-                  <Users className="h-3 w-3" /> {recipe.porciones}
-                </span>
-              )}
-            </div>
-          </div>
+          <Badge className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-sm text-[7px] font-black text-primary border-none h-4 px-1.5 uppercase shadow-sm">
+            {primaryCategory}
+          </Badge>
         </div>
         {!isSelectionMode && <Link href={`/recetas/${recipe.id}`} className="absolute inset-0 z-10" />}
       </Card>

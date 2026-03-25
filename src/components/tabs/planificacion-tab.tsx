@@ -1,13 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Trash2, 
-  Eye, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Eye,
   Plus,
-  MoreVertical,
   Sparkles,
   Loader2,
   CalendarX,
@@ -15,14 +14,14 @@ import {
   Beef,
   Wheat,
   Droplets,
-  Activity
+  Activity,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -31,9 +30,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format, addDays, startOfWeek, subWeeks, addWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { collection, writeBatch, doc, serverTimestamp, getDocs, query, where, increment } from "firebase/firestore";
@@ -97,6 +100,7 @@ export function PlanificacionTab() {
   const [isAutoPlanning, setIsAutoPlanning] = React.useState(false);
   const [isAutoPlanningDay, setIsAutoPlanningDay] = React.useState<string | null>(null);
   const [isClearing, setIsClearing] = React.useState(false);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = React.useState(false);
 
   const startDate = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
@@ -435,168 +439,206 @@ export function PlanificacionTab() {
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
+      {/* Header compacto con dropdown de acciones */}
       <header className="flex items-center justify-between pt-2">
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-black text-primary">Planificación</h1>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Semana de {activeProfile}</p>
+        <div>
+          <h1 className="text-2xl font-black text-primary leading-none">Plan</h1>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{activeProfile}</p>
         </div>
         <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <AlertDialog>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={isClearing} className="h-10 w-10 bg-destructive/10 text-destructive rounded-full border border-destructive/20">
-                      {isClearing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CalendarX className="h-5 w-5" />}
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <AlertDialogContent className="rounded-[2rem]">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="font-black text-primary text-xl">¿Desplanificar tu semana?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-sm font-medium">Se quitarán tus comidas de esta semana.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleUnplanWeek} className="bg-destructive text-white rounded-xl font-black">Sí, vaciar mi plan</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              <TooltipContent>Vaciar tu plan semanal</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleAutoPlan} disabled={isAutoPlanning} className="h-10 w-10 bg-accent/10 text-accent rounded-full border border-accent/20">
-                  {isAutoPlanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Planear tu semana con IA</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <div className="flex items-center gap-1 bg-white border rounded-full p-1 shadow-sm">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-8 w-8 rounded-full"><ChevronLeft className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-8 w-8 rounded-full"><ChevronRight className="h-5 w-5" /></Button>
+          <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-[10px] font-black px-2 tabular-nums">
+              {format(startDate, "d MMM", { locale: es })} – {format(addDays(startDate, 6), "d MMM", { locale: es })}
+            </span>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 bg-primary-suave text-primary rounded-full">
+                {isAutoPlanning || isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onClick={handleAutoPlan} disabled={isAutoPlanning} className="gap-3 font-bold">
+                <Sparkles className="h-4 w-4 text-accent" /> Planear semana con IA
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} className="gap-3 font-bold text-destructive focus:text-destructive">
+                <CalendarX className="h-4 w-4" /> Vaciar semana
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
-      <Card className="border-none shadow-recipe bg-white rounded-[2.5rem] overflow-hidden border-2 border-primary/5">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest">Cumplimiento del Plan Semanal</h3>
-            </div>
-            <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-[8px] px-2 font-black uppercase">En Tiempo Real</Badge>
-          </div>
-          
+      {/* Macro rings compactos */}
+      <Card className="border-none shadow-sm bg-white rounded-3xl overflow-hidden border border-primary/5">
+        <CardContent className="p-4">
           <div className="flex justify-around items-center">
-            <WeeklyMacroRing label="Calorías" value={weeklyTotals.calorias} target={weeklyGoals.calorias} size={85} strokeWidth={7} icon={Flame} />
-            <WeeklyMacroRing label="Prots" value={weeklyTotals.proteinas} target={weeklyGoals.proteinas} icon={Beef} />
-            <WeeklyMacroRing label="Carbos" value={weeklyTotals.carbohidratos} target={weeklyGoals.carbohidratos} icon={Wheat} />
-            <WeeklyMacroRing label="Grasas" value={weeklyTotals.grasas} target={weeklyGoals.grasas} icon={Droplets} />
+            <WeeklyMacroRing label="Kcal" value={weeklyTotals.calorias} target={weeklyGoals.calorias} size={72} strokeWidth={6} icon={Flame} />
+            <WeeklyMacroRing label="Prot" value={weeklyTotals.proteinas} target={weeklyGoals.proteinas} size={56} strokeWidth={5} icon={Beef} />
+            <WeeklyMacroRing label="Carbs" value={weeklyTotals.carbohidratos} target={weeklyGoals.carbohidratos} size={56} strokeWidth={5} icon={Wheat} />
+            <WeeklyMacroRing label="Grasas" value={weeklyTotals.grasas} target={weeklyGoals.grasas} size={56} strokeWidth={5} icon={Droplets} />
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
+      {/* Calendar strip horizontal */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {weekDays.map((day) => {
           const dayStr = format(day, "yyyy-MM-dd");
-          const isExpanded = expandedDay === dayStr;
+          const isSelected = expandedDay === dayStr;
+          const isToday = dayStr === format(new Date(), "yyyy-MM-dd");
+          const dayPlansCount = planificacion.filter(p => p.date === dayStr).length;
+
+          return (
+            <button
+              key={dayStr}
+              onClick={() => setExpandedDay(isSelected ? null : dayStr)}
+              className={cn(
+                "flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-2xl transition-all shrink-0 min-w-[52px]",
+                isSelected
+                  ? "bg-primary text-white shadow-md"
+                  : isToday
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "bg-white text-foreground border border-border"
+              )}
+            >
+              <span className="text-[9px] font-black uppercase tracking-widest opacity-80">
+                {format(day, "EEE", { locale: es })}
+              </span>
+              <span className="text-lg font-black leading-none">{format(day, "d")}</span>
+              <div className="flex gap-0.5 h-1.5 items-center">
+                {dayPlansCount > 0
+                  ? Array.from({ length: Math.min(dayPlansCount, 4) }).map((_, i) => (
+                      <div key={i} className={cn("h-1 w-1 rounded-full", isSelected ? "bg-white/70" : "bg-primary")} />
+                    ))
+                  : <div className={cn("h-1 w-1 rounded-full", isSelected ? "bg-white/30" : "bg-border")} />}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Vista del día seleccionado */}
+      <AnimatePresence mode="wait">
+        {expandedDay && (() => {
+          const day = weekDays.find(d => format(d, "yyyy-MM-dd") === expandedDay);
+          if (!day) return null;
+          const dayStr = expandedDay;
           const plans = planificacion.filter(p => p.date === dayStr);
           const isLoadingThisDay = isAutoPlanningDay === dayStr;
 
           return (
-            <div key={dayStr} className={cn("rounded-3xl border border-border overflow-hidden bg-white", isExpanded && "shadow-md ring-2 ring-primary/10")}>
-              <div className="p-5 flex items-center justify-between cursor-pointer" onClick={() => setExpandedDay(isExpanded ? null : dayStr)}>
-                <div className="flex items-center gap-3">
-                  <span className="text-base font-black capitalize">{format(day, "EEEE d", { locale: es })}</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-accent/5 text-accent rounded-full hover:bg-accent/10" onClick={(e) => { e.stopPropagation(); handleAutoPlanDay(day); }} disabled={!!isAutoPlanningDay}>
-                          {isLoadingThisDay ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Planear tu día</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <ChevronLeft className={cn("h-5 w-5 transition-transform", isExpanded ? "-rotate-90" : "")} />
+            <motion.div
+              key={expandedDay}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="space-y-2.5"
+            >
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-black text-primary capitalize">
+                  {format(day, "EEEE d 'de' MMMM", { locale: es })}
+                </span>
+                <Button
+                  variant="ghost" size="icon"
+                  className="h-8 w-8 bg-accent/8 text-accent rounded-full hover:bg-accent/15"
+                  onClick={() => handleAutoPlanDay(day)}
+                  disabled={!!isAutoPlanningDay}
+                >
+                  {isLoadingThisDay ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                </Button>
               </div>
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden bg-background/30 border-t">
-                    <div className="p-4 space-y-4">
-                      {MOMENTOS.map((m) => {
-                        const plan = plans.find(p => p.mealType === m);
-                        const recipe = plan ? recetas.find(r => r.id === plan.recipeId) : null;
-                        const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
 
-                        return (
-                          <div key={m} className="flex items-start gap-4">
-                            <span className="w-20 text-[10px] font-black text-muted-foreground uppercase pt-3 shrink-0">{m}</span>
-                            {plan ? (
-                              <div className="flex-1 flex items-center gap-3 bg-white p-2 rounded-2xl relative shadow-sm border">
-                                <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative bg-muted">
-                                  {imageUrl ? (
-                                    <Image 
-                                      src={imageUrl} 
-                                      alt={plan.recipeName} 
-                                      fill 
-                                      className="object-cover" 
-                                      unoptimized
-                                    />
-                                  ) : (
-                                    <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0 pr-8">
-                                  <h4 className="font-bold text-sm truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>{plan.recipeName}</h4>
-                                  <div className="flex items-center gap-3 mt-1">
-                                    <div className="flex items-center gap-1.5">
-                                      <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-5 w-5 bg-background rounded shadow-sm flex items-center justify-center font-bold">-</button>
-                                      <span className="text-[10px] font-black">{plan.plannedPortions || 3}p</span>
-                                      <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-5 w-5 bg-background rounded shadow-sm flex items-center justify-center font-bold">+</button>
-                                    </div>
-                                    <div className="flex items-center gap-1 text-[10px] font-black text-primary uppercase">
-                                      <Flame className="h-3 w-3 fill-current" />
-                                      {plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal
-                                    </div>
-                                  </div>
-                                </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setSelectedPlan(plan)}><MoreVertical className="h-4 w-4" /></Button>
-                              </div>
-                            ) : (
-                              <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
-                                <button className="flex-1 h-14 border-2 border-dashed border-border rounded-2xl flex items-center justify-center gap-2 text-muted-foreground hover:bg-primary/5 transition-colors">
-                                  <Plus className="h-4 w-4" /><span className="text-[10px] font-black uppercase">Planificar</span>
-                                </button>
-                              </AddMealPlanDialog>
-                            )}
+              {MOMENTOS.map((m) => {
+                const plan = plans.find(p => p.mealType === m);
+                const recipe = plan ? recetas.find(r => r.id === plan.recipeId) : null;
+                const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
+
+                return (
+                  <div key={m} className="flex items-center gap-3">
+                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right">{m}</span>
+                    {plan ? (
+                      <div className="flex-1 flex items-center gap-2.5 bg-white p-2 rounded-2xl relative shadow-sm border border-border/60">
+                        <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                          {imageUrl ? (
+                            <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
+                          ) : (
+                            <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 pr-16">
+                          <h4 className="font-bold text-xs truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
+                            {plan.recipeName}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">-</button>
+                              <span className="text-[9px] font-black tabular-nums">{plan.plannedPortions || 3}p</span>
+                              <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">+</button>
+                            </div>
+                            <span className="text-[9px] font-black text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )
-        })}
-      </div>
+                        </div>
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => router.push(`/recetas/${plan.recipeId}`)}><Eye className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setSelectedPlan(plan)}><Trash2 className="h-3 w-3" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
+                        <button className="flex-1 h-10 border border-dashed border-border rounded-2xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors">
+                          <Plus className="h-3.5 w-3.5" /><span className="text-[9px] font-black uppercase">Agregar</span>
+                        </button>
+                      </AddMealPlanDialog>
+                    )}
+                  </div>
+                );
+              })}
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
-      <Sheet open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
-        <SheetContent side="bottom" className="rounded-t-[2rem] p-6 pb-12">
-          <SheetHeader className="mb-6"><SheetTitle className="text-left font-black text-primary text-xl">Gestionar Comida</SheetTitle></SheetHeader>
-          <div className="grid gap-2">
-            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4" onClick={() => { router.push(`/recetas/${selectedPlan.recipeId}`); setSelectedPlan(null); }}><Eye className="h-6 w-6 text-primary" /><span className="font-bold">Ver Receta completa</span></Button>
-            <Button variant="ghost" className="h-14 rounded-2xl justify-start gap-4 text-destructive" onClick={handleDeleteFromPlan} disabled={isDeleting}><Trash2 className="h-6 w-6" /><span className="font-bold">Eliminar de tu plan</span></Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Confirm vaciar semana */}
+      <AlertDialog open={isConfirmClearOpen} onOpenChange={setIsConfirmClearOpen}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black text-primary text-xl">¿Vaciar tu semana?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">Se quitarán todas las comidas de esta semana.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setIsConfirmClearOpen(false); handleUnplanWeek(); }} className="bg-destructive text-white rounded-xl font-black">
+              {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Vaciar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm eliminar receta del plan */}
+      <AlertDialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black text-primary text-xl">¿Eliminar del plan?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              Se quitará <span className="font-bold text-foreground">{selectedPlan?.recipeName}</span> de tu plan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFromPlan} disabled={isDeleting} className="bg-destructive text-white rounded-xl font-black">
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

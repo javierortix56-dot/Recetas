@@ -47,8 +47,16 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
 
   const filteredRecipes = React.useMemo(() => {
     if (!recipes) return []
-    return recipes.filter(r => (r.nombre || "").toLowerCase().includes(search.toLowerCase()))
-  }, [recipes, search])
+    const bySearch = recipes.filter(r => (r.nombre || "").toLowerCase().includes(search.toLowerCase()))
+    // Sort: recipes matching the current momento category appear first
+    return bySearch.sort((a, b) => {
+      const catsA = Array.isArray(a.categorias) ? a.categorias : (a.categoria ? [a.categoria] : [])
+      const catsB = Array.isArray(b.categorias) ? b.categorias : (b.categoria ? [b.categoria] : [])
+      const matchA = catsA.includes(momento) ? 0 : 1
+      const matchB = catsB.includes(momento) ? 0 : 1
+      return matchA - matchB
+    })
+  }, [recipes, search, momento])
 
   const handleSelectRecipe = async (recipe: any) => {
     if (!db) return
@@ -164,8 +172,10 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
             {filteredRecipes.map((recipe) => {
               const imageSource = getSafeImageSource(recipe);
+              const cats = Array.isArray(recipe.categorias) ? recipe.categorias : (recipe.categoria ? [recipe.categoria] : [])
+              const matchesMomento = cats.includes(momento)
               return (
-                <Card key={recipe.id} className="border-none shadow-sm bg-background/50 hover:bg-primary/5 cursor-pointer transition-colors rounded-2xl" onClick={() => handleSelectRecipe(recipe)}>
+                <Card key={recipe.id} className={`border-none shadow-sm cursor-pointer transition-colors rounded-2xl ${matchesMomento ? 'bg-primary-suave border border-primary/10' : 'bg-background/50 hover:bg-primary/5'}`} onClick={() => handleSelectRecipe(recipe)}>
                   <CardContent className="p-3 flex items-center gap-3">
                     <div className="h-12 w-12 rounded-xl overflow-hidden shrink-0 relative bg-muted">
                       {imageSource ? (
@@ -178,6 +188,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
                       <h4 className="font-bold text-sm truncate">{recipe.nombre}</h4>
                       <p className="text-[10px] font-bold text-muted-foreground uppercase">{recipe.macros?.calorias || 0} kcal / porc</p>
                     </div>
+                    {matchesMomento && <Badge className="bg-primary text-white border-none text-[8px] font-black uppercase shrink-0">Ideal</Badge>}
                   </CardContent>
                 </Card>
               );
