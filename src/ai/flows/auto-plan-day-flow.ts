@@ -53,6 +53,7 @@ const autoPlanDayFlow = ai.defineFlow(
       5. Devuelve un JSON con el array "plans" y un "summary" motivador.`,
       output: { schema: AutoPlanDayOutputSchema }
     });
-    return output!;
+    if (!output) throw new Error('El modelo no devolvió un plan válido');
+    return output;
   }
 );

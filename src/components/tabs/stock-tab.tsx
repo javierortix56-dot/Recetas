@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   Search, Plus, Minus, Package,
   AlertCircle, RotateCcw, X, Check,
-  ChevronDown, ChevronUp, MoreVertical, History
+  ChevronDown, ChevronUp, MoreVertical, History, CalendarDays
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,35 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function StockTab() {
   const searchParams = useSearchParams();
   const db = useFirestore();
-  const { ingredientes, ingredientesCargadas } = useAppStore();
+  const { ingredientes, ingredientesCargadas, planificacion } = useAppStore();
   
   const [search, setSearch] = React.useState("");
   const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
+  const [showPlannedOnly, setShowPlannedOnly] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
+
+  // Normaliza categorías viejas/inconsistentes a las canónicas
+  const normalizeCategoria = (cat: string): string => {
+    const c = (cat || "Otros").toLowerCase().trim();
+    if (c === "frutas" || c === "verduras" || c === "frutas y verduras" || c === "frutas&verduras") return "Frutas y Verduras";
+    if (c === "lacteos" || c === "lácteos" || c === "lacteos y huevos" || c === "huevos") return "Lácteos y Huevos";
+    if (c === "carnes" || c === "aves" || c === "carnes y aves") return "Carnes y Aves";
+    if (c === "pescados" || c === "mariscos" || c === "pescados y mariscos") return "Pescados y Mariscos";
+    if (c === "especias" || c === "condimentos" || c === "especias y condimentos") return "Especias y Condimentos";
+    if (c === "almacen" || c === "almacén") return "Almacén";
+    return cat.charAt(0).toUpperCase() + cat.slice(1);
+  };
+
+  // Ingredientes que aparecen en el plan de la semana
+  const plannedIngredientNames = React.useMemo(() => {
+    const names = new Set<string>();
+    planificacion.forEach(plan => {
+      (plan.ingredientes || []).forEach((ing: any) => {
+        if (ing.nombre) names.add(ing.nombre.toLowerCase().trim());
+      });
+    });
+    return names;
+  }, [planificacion]);
   
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -110,16 +134,26 @@ export function StockTab() {
     return ingredientes.filter(item => {
       const matchesSearch = (item.nombre || "").toLowerCase().includes(search.toLowerCase());
       const isLow = item.stockActual <= (item.stockMinimo || 0);
-      return matchesSearch && (!showLowStockOnly || isLow);
+      const isPlanned = plannedIngredientNames.has((item.nombre || "").toLowerCase().trim());
+      return matchesSearch && (!showLowStockOnly || isLow) && (!showPlannedOnly || isPlanned);
     });
-  }, [ingredientes, search, showLowStockOnly]);
+  }, [ingredientes, search, showLowStockOnly, showPlannedOnly, plannedIngredientNames]);
 
   const grouped = React.useMemo(() => {
     const groups: Record<string, any[]> = {};
     filteredIngredients.forEach(item => {
-      const cat = item.categoria || "Otros";
+      const cat = normalizeCategoria(item.categoria || "Otros");
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(item);
+    });
+    // Sort within each category: with stock A-Z first, then without stock A-Z
+    Object.keys(groups).forEach(cat => {
+      groups[cat].sort((a, b) => {
+        const aHas = (a.stockActual || 0) > 0 ? 0 : 1;
+        const bHas = (b.stockActual || 0) > 0 ? 0 : 1;
+        if (aHas !== bHas) return aHas - bHas;
+        return (a.nombre || "").localeCompare(b.nombre || "", "es");
+      });
     });
     return groups;
   }, [filteredIngredients]);
@@ -195,9 +229,15 @@ export function StockTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border-2 border-primary/5 font-bold text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
-              {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
-            </Badge>
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
+                {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
+              </Badge>
+              <Badge variant={showPlannedOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/10 text-primary border-none")} onClick={() => setShowPlannedOnly(!showPlannedOnly)}>
+                <CalendarDays className="h-3 w-3" />
+                {showPlannedOnly ? "Viendo Planificado" : "Filtrar Planificado"}
+              </Badge>
+            </div>
           </>
         )}
 

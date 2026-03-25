@@ -143,7 +143,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent className="max-w-md rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary">Planificar {momento}</DialogTitle>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Para el {format(date, "d 'de' MMMM", { locale: es })} · {activeProfile}</p>
