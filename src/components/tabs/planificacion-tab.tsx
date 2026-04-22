@@ -450,27 +450,27 @@ export function PlanificacionTab() {
           <h1 className="text-2xl font-black text-primary leading-none">Plan</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{activeProfile}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm min-w-0 shrink">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full shrink-0">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-[10px] font-black px-2 tabular-nums">
+            <span className="text-[10px] font-black px-1 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">
               {format(startDate, "d MMM", { locale: es })} – {format(addDays(startDate, 6), "d MMM", { locale: es })}
             </span>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full shrink-0">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 bg-primary-suave text-primary rounded-full">
+              <Button variant="ghost" size="icon" className="h-9 w-9 bg-primary-suave text-primary rounded-full shrink-0">
                 {isAutoPlanning || isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
               <DropdownMenuItem onClick={handleAutoPlan} disabled={isAutoPlanning} className="gap-3 font-bold">
-                <Sparkles className="h-4 w-4 text-accent" /> Planear semana con IA
+                <Sparkles className="h-4 w-4 text-accent" /> Planear semana
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} className="gap-3 font-bold text-destructive focus:text-destructive">
                 <CalendarX className="h-4 w-4" /> Vaciar semana
