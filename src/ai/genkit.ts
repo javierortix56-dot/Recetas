@@ -3,5 +3,9 @@ import {googleAI} from '@genkit-ai/google-genai';
 
 export const ai = genkit({
   plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-2.0-flash',
 });
+
+export function isAIConfigured(): boolean {
+  return !!(process.env.GOOGLE_GENAI_API_KEY || process.env.GOOGLE_API_KEY);
+}

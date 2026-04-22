@@ -234,9 +234,12 @@ export function PlanificacionTab() {
       await batch.commit();
       await syncShoppingList(db, activeProfile);
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast({ variant: "destructive", title: "Error al generar plan semanal" });
+      const msg = e?.message?.includes('GOOGLE_GENAI_API_KEY')
+        ? 'Falta la API key de Google AI. Configurala en Vercel → Settings → Environment Variables.'
+        : 'Error al generar el plan. Intentá de nuevo.';
+      toast({ variant: "destructive", title: "Error IA", description: msg });
     } finally {
       setIsAutoPlanning(false);
     }
@@ -337,9 +340,12 @@ export function PlanificacionTab() {
 
       toast({ title: `Día de ${activeProfile} planeado ✓` });
       setExpandedDay(dateStr);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error autoPlanDay:", e);
-      toast({ variant: "destructive", title: "Error al planear el día" });
+      const msg = e?.message?.includes('GOOGLE_GENAI_API_KEY')
+        ? 'Falta la API key de Google AI. Configurala en Vercel → Settings → Environment Variables.'
+        : 'Error al planear el día. Intentá de nuevo.';
+      toast({ variant: "destructive", title: "Error IA", description: msg });
     } finally {
       setIsAutoPlanningDay(null);
     }

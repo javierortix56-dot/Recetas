@@ -1,9 +1,6 @@
 'use server';
-/**
- * @fileOverview Flow de Genkit para planificar automáticamente la semana.
- */
 
-import { ai } from '@/ai/genkit';
+import { ai, isAIConfigured } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AutoPlanWeekInputSchema = z.object({
@@ -29,6 +26,9 @@ const AutoPlanWeekOutputSchema = z.object({
 });
 
 export async function autoPlanWeek(input: z.infer<typeof AutoPlanWeekInputSchema>) {
+  if (!isAIConfigured()) {
+    throw new Error('GOOGLE_GENAI_API_KEY no está configurada. Agregala en las variables de entorno de Vercel.');
+  }
   return autoPlanWeekFlow(input);
 }
 

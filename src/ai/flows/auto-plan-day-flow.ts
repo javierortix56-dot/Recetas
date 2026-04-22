@@ -1,9 +1,6 @@
 'use server';
-/**
- * @fileOverview Flow de Genkit para planificar automáticamente un día específico.
- */
 
-import { ai } from '@/ai/genkit';
+import { ai, isAIConfigured } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AutoPlanDayInputSchema = z.object({
@@ -28,6 +25,9 @@ const AutoPlanDayOutputSchema = z.object({
 });
 
 export async function autoPlanDay(input: z.infer<typeof AutoPlanDayInputSchema>) {
+  if (!isAIConfigured()) {
+    throw new Error('GOOGLE_GENAI_API_KEY no está configurada. Agregala en las variables de entorno de Vercel.');
+  }
   return autoPlanDayFlow(input);
 }
 
