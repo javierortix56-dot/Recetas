@@ -49,8 +49,6 @@ import { USER_ID } from '@/lib/constants';
 import { cn, getSafeImageSource } from '@/lib/utils';
 import { GradientPlaceholder } from '@/components/gradient-placeholder';
 import { motion, AnimatePresence } from 'framer-motion';
-import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
-import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
 import Image from "next/image";
 import { syncShoppingList } from '@/lib/sync-logic';
 
@@ -134,20 +132,31 @@ export function PlanificacionTab() {
     }
   }, [planificacionCargada, expandedDay]);
 
+  // Selecciona recetas sin API: prioriza categoría del momento, evita repetidos en la semana
+  const pickRecipesForPlan = (dates: string[], momentos: string[]) => {
+    const used = new Set<string>();
+    const plans: { date: string; mealType: string; recipeId: string; recipeName: string }[] = [];
+    for (const date of dates) {
+      for (const momento of momentos) {
+        const cats = (r: any) => Array.isArray(r.categorias) ? r.categorias : (r.categoria ? [r.categoria] : []);
+        const matching = recetas.filter(r => cats(r).includes(momento) && !used.has(r.id));
+        const fallback = recetas.filter(r => !used.has(r.id));
+        const pool = matching.length > 0 ? matching : fallback.length > 0 ? fallback : recetas;
+        const recipe = pool[Math.floor(Math.random() * pool.length)];
+        if (recipe) {
+          used.add(recipe.id);
+          plans.push({ date, mealType: momento, recipeId: recipe.id, recipeName: recipe.nombre });
+        }
+      }
+    }
+    return plans;
+  };
+
   const handleAutoPlan = async () => {
     if (!db || recetas.length === 0) return;
     setIsAutoPlanning(true);
     try {
-      const result = await autoPlanWeek({
-        recipes: recetas.map(r => ({
-          id: r.id,
-          nombre: r.nombre,
-          categorias: r.categorias,
-          categoria: r.categoria,
-          tags: r.tags
-        })),
-        startDate: format(startDate, "yyyy-MM-dd")
-      });
+      const result = { plans: pickRecipesForPlan(weekDays.map(d => format(d, "yyyy-MM-dd")), MOMENTOS) };
 
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
@@ -236,10 +245,7 @@ export function PlanificacionTab() {
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
     } catch (e: any) {
       console.error(e);
-      const msg = e?.message?.includes('GOOGLE_GENAI_API_KEY')
-        ? 'Falta la API key de Google AI. Configurala en Vercel → Settings → Environment Variables.'
-        : 'Error al generar el plan. Intentá de nuevo.';
-      toast({ variant: "destructive", title: "Error IA", description: msg });
+      toast({ variant: "destructive", title: "Error al generar el plan" });
     } finally {
       setIsAutoPlanning(false);
     }
@@ -251,16 +257,7 @@ export function PlanificacionTab() {
     const dateStr = format(date, "yyyy-MM-dd");
     setIsAutoPlanningDay(dateStr);
     try {
-      const result = await autoPlanDay({
-        recipes: recetas.map(r => ({
-          id: r.id,
-          nombre: r.nombre,
-          categorias: r.categorias,
-          categoria: r.categoria,
-          tags: r.tags
-        })),
-        date: dateStr
-      });
+      const result = { plans: pickRecipesForPlan([dateStr], MOMENTOS) };
 
       const batch = writeBatch(db);
 
@@ -342,10 +339,7 @@ export function PlanificacionTab() {
       setExpandedDay(dateStr);
     } catch (e: any) {
       console.error("Error autoPlanDay:", e);
-      const msg = e?.message?.includes('GOOGLE_GENAI_API_KEY')
-        ? 'Falta la API key de Google AI. Configurala en Vercel → Settings → Environment Variables.'
-        : 'Error al planear el día. Intentá de nuevo.';
-      toast({ variant: "destructive", title: "Error IA", description: msg });
+      toast({ variant: "destructive", title: "Error al planear el día" });
     } finally {
       setIsAutoPlanningDay(null);
     }
