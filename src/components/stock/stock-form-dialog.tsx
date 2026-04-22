@@ -133,7 +133,7 @@ export function StockFormDialog({ ingredientToEdit, trigger }: { ingredientToEdi
           </Button>
         ))}
       </DialogTrigger>
-      <DialogContent className="max-w-md rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
+      <DialogContent className="max-w-md rounded-3xl p-6 overflow-y-auto max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary flex items-center gap-2">
             <Tag className="h-6 w-6" /> {ingredientToEdit ? "Editar" : "Nuevo"} Alimento

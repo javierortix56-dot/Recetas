@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, serverTimestamp, query, orderBy, doc, writeBatch, increment } from "firebase/firestore"
+import { useFirestore } from "@/firebase"
+import { collection, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -32,22 +32,14 @@ const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"]
 export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, children, onSave }: AddMealPlanDialogProps) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
-  const activeProfile = useAppStore(s => s.activeProfile)
+  const { activeProfile, recetas } = useAppStore(s => ({ activeProfile: s.activeProfile, recetas: s.recetas }))
   const [search, setSearch] = React.useState("")
   const [momento, setMomento] = React.useState(defaultMomento)
   const [portions, setPortions] = React.useState(3)
   const [isSaving, setIsSaving] = React.useState(false)
 
-  const recipesQuery = useMemoFirebase(() => {
-    if (!db) return null
-    return query(collection(db, "users", USER_ID, "recipes"), orderBy("nombre", "asc"))
-  }, [db])
-
-  const { data: recipes } = useCollection(recipesQuery)
-
   const filteredRecipes = React.useMemo(() => {
-    if (!recipes) return []
-    const bySearch = recipes.filter(r => (r.nombre || "").toLowerCase().includes(search.toLowerCase()))
+    const bySearch = recetas.filter(r => (r.nombre || "").toLowerCase().includes(search.toLowerCase()))
     // Sort: recipes matching the current momento category appear first
     return bySearch.sort((a, b) => {
       const catsA = Array.isArray(a.categorias) ? a.categorias : (a.categoria ? [a.categoria] : [])
@@ -143,7 +135,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-md rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-black text-primary">Planificar {momento}</DialogTitle>
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Para el {format(date, "d 'de' MMMM", { locale: es })} · {activeProfile}</p>

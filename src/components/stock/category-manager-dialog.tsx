@@ -128,7 +128,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSelectedIds(new Set()); setRenamingCat(null); setMoveTo(''); } }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-sm rounded-3xl p-0 flex flex-col max-h-[88vh] overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-sm rounded-3xl p-0 flex flex-col max-h-[88vh] overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/50">
           <DialogTitle className="text-xl font-black text-primary">Categorías</DialogTitle>
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">

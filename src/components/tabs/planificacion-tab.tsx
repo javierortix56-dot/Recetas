@@ -132,16 +132,37 @@ export function PlanificacionTab() {
     }
   }, [planificacionCargada, expandedDay]);
 
-  // Selecciona recetas sin API: prioriza categoría del momento, evita repetidos en la semana
+  // Selecciona recetas priorizando categoría del momento; fallbacks evitan cruzar Desayuno/Merienda con Almuerzo/Cena
   const pickRecipesForPlan = (dates: string[], momentos: string[]) => {
     const used = new Set<string>();
     const plans: { date: string; mealType: string; recipeId: string; recipeName: string }[] = [];
+    const cats = (r: any): string[] => Array.isArray(r.categorias) ? r.categorias : (r.categoria ? [r.categoria] : []);
+    const LIGHT = ["Desayuno", "Merienda"];
+    const HEAVY = ["Almuerzo", "Cena"];
+
     for (const date of dates) {
       for (const momento of momentos) {
-        const cats = (r: any) => Array.isArray(r.categorias) ? r.categorias : (r.categoria ? [r.categoria] : []);
-        const matching = recetas.filter(r => cats(r).includes(momento) && !used.has(r.id));
-        const fallback = recetas.filter(r => !used.has(r.id));
-        const pool = matching.length > 0 ? matching : fallback.length > 0 ? fallback : recetas;
+        // 1. Coincidencia exacta de categoría
+        let pool = recetas.filter(r => cats(r).includes(momento) && !used.has(r.id));
+
+        if (pool.length === 0) {
+          // 2. Sin categoría asignada (sirven para cualquier momento)
+          pool = recetas.filter(r => cats(r).length === 0 && !used.has(r.id));
+        }
+
+        if (pool.length === 0) {
+          // 3. Evitar cruzar liviano/fuerte: si el slot es liviano, excluir recetas de Almuerzo/Cena y viceversa
+          const incompatible = LIGHT.includes(momento) ? HEAVY : HEAVY.includes(momento) ? LIGHT : [];
+          pool = recetas.filter(r => !used.has(r.id) && !cats(r).some(c => incompatible.includes(c)));
+        }
+
+        if (pool.length === 0) {
+          // 4. Cualquier receta no usada
+          pool = recetas.filter(r => !used.has(r.id));
+        }
+
+        if (pool.length === 0) pool = recetas; // última instancia: repetir
+
         const recipe = pool[Math.floor(Math.random() * pool.length)];
         if (recipe) {
           used.add(recipe.id);
