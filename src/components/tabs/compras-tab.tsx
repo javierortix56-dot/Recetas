@@ -11,7 +11,7 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc, getDocs, query, where } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, addDoc } from "firebase/firestore";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -48,7 +48,11 @@ export function ComprasTab() {
     setSelectedIds(new Set());
   };
 
-  // Auto-sync al montar en modo Plan para limpiar ítems obsoletos
+  React.useEffect(() => {
+    if (!db) return;
+    hasSyncedRef.current = false;
+  }, [activeProfile]);
+
   React.useEffect(() => {
     if (!db || hasSyncedRef.current) return;
     hasSyncedRef.current = true;
@@ -56,7 +60,7 @@ export function ComprasTab() {
     syncShoppingList(db, activeProfile)
       .catch(() => {})
       .finally(() => setIsSyncing(false));
-  }, [db]);
+  }, [db, activeProfile]);
 
   // Mostrar todos los ítems juntos (plan + manuales)
   const filteredItems = listaCompras;
@@ -99,31 +103,6 @@ export function ComprasTab() {
       toast({ title: "Sincronizado con el plan ✓" });
     } catch (e) {
       toast({ variant: "destructive", title: "Error al sincronizar" });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Limpieza forzada: borra todos los ítems del plan directo en Firestore y luego resincroniza
-  const handleForceClear = async () => {
-    if (!db) return;
-    setIsSyncing(true);
-    try {
-      const snap = await getDocs(query(
-        collection(db, "users", USER_ID, "shopping_list_items"),
-        where("source", "==", "plan")
-      ));
-      if (snap.empty) {
-        toast({ title: "La lista del plan ya está vacía" });
-        return;
-      }
-      const batch = writeBatch(db);
-      snap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      await syncShoppingList(db, activeProfile);
-      toast({ title: `${snap.size} ítem(s) eliminados ✓` });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error al limpiar" });
     } finally {
       setIsSyncing(false);
     }

@@ -90,8 +90,8 @@ export function RecetasTab() {
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-32">
-      <header className="flex flex-col gap-4 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4">
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+      <header className="flex flex-col gap-4 sticky -top-px bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4 pt-1">
         <div className="flex items-center justify-between pt-2">
           <h1 className="text-3xl font-black tracking-tight text-primary">
             {isSelectionMode ? `(${selectedIds.size})` : 'Recetas'}

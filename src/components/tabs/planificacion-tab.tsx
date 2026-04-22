@@ -166,13 +166,9 @@ export function PlanificacionTab() {
       ));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
 
-      for (const date of weekStr) {
-        const summaryId = `${date}_${activeProfile}`
-        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
-          totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
+      // Accumulate macros per day, then write each summaryRef only once
+      const dayMacros: Record<string, { calorias: number, proteinas: number, carbohidratos: number, grasas: number }> = {};
+      weekStr.forEach(d => { dayMacros[d] = { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 }; });
 
       for (const p of result.plans) {
         const fullRecipe = recetas.find(r => r.id === p.recipeId);
@@ -185,6 +181,13 @@ export function PlanificacionTab() {
           carbohidratos: Math.round(Number(m.carbohidratos || 0)),
           grasas: Math.round(Number(m.grasas || 0)),
         };
+
+        if (dayMacros[p.date]) {
+          dayMacros[p.date].calorias += macrosCalculados.calorias;
+          dayMacros[p.date].proteinas += macrosCalculados.proteinas;
+          dayMacros[p.date].carbohidratos += macrosCalculados.carbohidratos;
+          dayMacros[p.date].grasas += macrosCalculados.grasas;
+        }
 
         const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
         batch.set(planRef, {
@@ -212,20 +215,18 @@ export function PlanificacionTab() {
           recetaId: p.recipeId,
           recetaNombre: p.recipeName,
           recetaCategoria: fullRecipe.categoria || "Almuerzo",
-          porciones: 1, 
+          porciones: 1,
           macros: macrosCalculados,
           planId: planRef.id,
           createdAt: serverTimestamp()
         });
+      }
 
-        const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${p.date}_${activeProfile}`);
-        batch.set(summaryRef, {
-          totalesDia: {
-            calorias: increment(macrosCalculados.calorias),
-            proteinas: increment(macrosCalculados.proteinas),
-            carbohidratos: increment(macrosCalculados.carbohidratos),
-            grasas: increment(macrosCalculados.grasas)
-          },
+      // Write accumulated macros once per day
+      for (const date of weekStr) {
+        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", `${date}_${activeProfile}`), {
+          date, userId: USER_ID, perfil: activeProfile,
+          totalesDia: dayMacros[date],
           updatedAt: serverTimestamp()
         }, { merge: true });
       }

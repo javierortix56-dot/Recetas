@@ -161,8 +161,8 @@ export function StockTab() {
   const allSelected = selectedIds.size > 0 && selectedIds.size === filteredIngredients.length;
 
   return (
-    <div className="flex flex-col gap-3 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col gap-2.5 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5">
+    <div className="flex flex-col gap-3 animate-in fade-in duration-500">
+      <header className="flex flex-col gap-2.5 sticky -top-px bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5 pt-1">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-black tracking-tight text-primary">
             {isSelectionMode ? `(${selectedIds.size})` : 'Despensa'}
@@ -258,49 +258,49 @@ export function StockTab() {
         >
           {Object.keys(grouped).sort().map(category => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-0.5 transition-all">
-                <div className="flex items-center gap-3">
-                  <Package className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
-                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-[9px] h-5 px-1.5">{grouped[category].length}</Badge>
+              <AccordionTrigger className="flex hover:no-underline bg-white px-3 py-1.5 rounded-xl border border-border shadow-sm mb-0.5 transition-all">
+                <div className="flex items-center gap-2">
+                  <Package className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[10px] font-black uppercase text-primary tracking-tight">{category}</span>
+                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-[8px] h-4 px-1">{grouped[category].length}</Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-0.5 space-y-1 px-1">
+              <AccordionContent className="pt-0.5 space-y-px px-0.5">
                 {grouped[category].map((item) => (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     onClick={() => isSelectionMode && toggleSelection(item.id)}
                     className={cn(
-                      "bg-white py-2 px-3 rounded-xl border border-border/50 flex items-center justify-between gap-3 transition-all",
-                      isSelectionMode && "active:scale-[0.98] cursor-pointer",
+                      "bg-white py-1.5 px-3 rounded-lg border border-border/40 flex items-center justify-between gap-2 transition-all",
+                      isSelectionMode && "active:scale-[0.99] cursor-pointer",
                       selectedIds.has(item.id) && "ring-2 ring-primary bg-primary/5 border-primary/20"
                     )}
                   >
                     {isSelectionMode && (
                       <div className={cn(
-                        "h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                        "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
                         selectedIds.has(item.id) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
                       )}>
-                        {selectedIds.has(item.id) && <Check className="h-3.5 w-3.5 stroke-[4]" />}
+                        {selectedIds.has(item.id) && <Check className="h-2.5 w-2.5 stroke-[4]" />}
                       </div>
                     )}
 
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo ? (
-                          <span className="text-[8px] font-black text-destructive uppercase flex items-center gap-0.5">
-                            <AlertCircle className="h-2.5 w-2.5" /> Bajo
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <p className="font-bold text-xs truncate leading-tight flex-1">{item.nombre}</p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && (
+                          <span className="text-[7px] font-black text-destructive uppercase flex items-center gap-0.5">
+                            <AlertCircle className="h-2 w-2" /> Bajo
                           </span>
-                        ) : null}
+                        )}
                         <span className={cn("text-[9px] font-black tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
                           {item.stockActual} {item.unidad}
                         </span>
                         {item.stockMinimo > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground">mín {item.stockMinimo}</span>
+                          <span className="text-[8px] font-bold text-muted-foreground/60">mín {item.stockMinimo}</span>
                         )}
                         {item.precioUnitario > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground opacity-60">
+                          <span className="text-[8px] font-bold text-muted-foreground/50">
                             {formatPrecio(item.precioUnitario)}/{item.unidad}
                           </span>
                         )}
@@ -308,27 +308,25 @@ export function StockTab() {
                     </div>
 
                     {!isSelectionMode && (
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <StockFormDialog ingredientToEdit={item} />
-                        <div className="flex items-center gap-0.5 bg-background p-0.5 rounded-xl border border-border/50">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
+                        <div className="flex items-center gap-0 bg-background rounded-lg border border-border/50">
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-6 w-6 text-primary hover:bg-white active:scale-90 transition-transform rounded-l-lg rounded-r-none"
                             onClick={(e) => { e.stopPropagation(); updateStockDirect(item.id, item.stockActual - 1); }}
                           >
-                            <Minus className="h-3.5 w-3.5" />
+                            <Minus className="h-3 w-3" />
                           </Button>
-                          <div className="w-6 text-center font-black text-xs text-primary tabular-nums">
+                          <div className="w-5 text-center font-black text-[10px] text-primary tabular-nums">
                             {item.stockActual}
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
+                          <Button
+                            variant="ghost" size="icon"
+                            className="h-6 w-6 text-primary hover:bg-white active:scale-90 transition-transform rounded-r-lg rounded-l-none"
                             onClick={(e) => { e.stopPropagation(); updateStockDirect(item.id, item.stockActual + 1); }}
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
