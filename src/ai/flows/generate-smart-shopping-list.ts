@@ -106,4 +106,27 @@ const generateSmartShoppingListFlow = ai.defineFlow(
     const aggregatedRequiredIngredients: Record<string, { name: string; quantity: number; unit: string }> = {};
     plannedMeals.forEach(meal => {
       meal.recipe.ingredients.forEach(ing => {
-        // Normalize key for consistent aggregation (e.g., 
+        const key = ing.name.toLowerCase().trim();
+        if (aggregatedRequiredIngredients[key]) {
+          aggregatedRequiredIngredients[key].quantity += ing.quantity;
+        } else {
+          aggregatedRequiredIngredients[key] = { name: ing.name, quantity: ing.quantity, unit: ing.unit };
+        }
+      });
+    });
+
+    const stockMap: Record<string, number> = {};
+    currentStock.forEach(s => { stockMap[s.name.toLowerCase().trim()] = s.quantity; });
+
+    const requiredItemsForPrompt = Object.values(aggregatedRequiredIngredients);
+    const stockItemsForPrompt = currentStock;
+
+    const { output } = await prompt({ plannedMeals, currentStock, additionalNotes, requiredItemsForPrompt, stockItemsForPrompt } as any);
+    if (!output) throw new Error('El modelo no devolvió una lista válida');
+    return output;
+  }
+);
+
+export async function generateSmartShoppingList(input: GenerateSmartShoppingListInput): Promise<GenerateSmartShoppingListOutput> {
+  return generateSmartShoppingListFlow(input);
+}
