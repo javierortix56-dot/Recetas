@@ -18,7 +18,8 @@ export const metadata: Metadata = {
     title: 'Cocina Familiar',
   },
   icons: {
-    apple: 'https://picsum.photos/seed/hamburger/180/180',
+    icon: '/icon.svg',
+    apple: '/icon.svg',
   },
 };
 

@@ -48,7 +48,7 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
       const matchB = catsB.includes(momento) ? 0 : 1
       return matchA - matchB
     })
-  }, [recipes, search, momento])
+  }, [recetas, search, momento])
 
   const handleSelectRecipe = async (recipe: any) => {
     if (!db) return
