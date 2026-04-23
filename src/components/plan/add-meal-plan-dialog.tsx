@@ -32,7 +32,8 @@ const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"]
 export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, children, onSave }: AddMealPlanDialogProps) {
   const [open, setOpen] = React.useState(false)
   const db = useFirestore()
-  const { activeProfile, recetas } = useAppStore(s => ({ activeProfile: s.activeProfile, recetas: s.recetas }))
+  const activeProfile = useAppStore(s => s.activeProfile)
+  const recetas = useAppStore(s => s.recetas)
   const [search, setSearch] = React.useState("")
   const [momento, setMomento] = React.useState(defaultMomento)
   const [portions, setPortions] = React.useState(3)
