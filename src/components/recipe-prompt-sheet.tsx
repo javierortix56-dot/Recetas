@@ -44,24 +44,43 @@ REGLAS ESTRICTAS — seguir sin excepción:
 - "nombre": sustantivo genérico en singular y minúsculas (ej: "cebolla", "pechuga de pollo", "sal fina"). NUNCA incluir cantidad, tamaño o marca en el nombre.
 - "cantidad": número > 0. Puede ser decimal (ej: 0.5).
 - "unidad": OBLIGATORIO usar una de estas EXACTAS: "g" | "kg" | "ml" | "l" | "unidad" | "cucharada" | "cucharadita" | "taza" | "docena"
-- "preparacion": cómo preparar el ingrediente antes de usarlo (ej: "picada en cubos", "rallado", "en juliana", "a temperatura ambiente"). Dejar "" si se usa tal cual.
+- "preparacion": cómo preparar el ingrediente ANTES de usarlo. Especificar el corte exacto: brunoise (cubos 3-5mm), juliana (tiras 3mm × 5cm), pluma (media luna fina), rodajas (grosor en mm), chiffonade, rallado grueso/fino. Dejar "" si se usa sin preparación previa.
 - "categoria": EXACTAMENTE una de:
   "Lácteos y Huevos" | "Carnes y Aves" | "Pescados y Mariscos" | "Frutas y Verduras" | "Almacén" | "Especias y Condimentos" | "Bebidas" | "Otros"
 
 ━━━ UTENSILIOS ━━━
-- Inferir de las técnicas usadas en los pasos. Incluir todos los necesarios.
-- Ejemplos: "Sartén antiadherente", "Cuchillo de chef", "Tabla de picar", "Horno", "Batidora eléctrica".
+- Ser EXHAUSTIVO. Incluir absolutamente todos los elementos necesarios:
+  tabla de picar, tipo exacto de cuchillo (de chef 20cm, de sierra, pelador), tipo y tamaño de sartén/olla (ej: "Sartén antiadherente 28cm", "Olla 4 litros"), bowls, coladores, espátulas, pinzas, fuentes para horno, papel aluminio, papel manteca, batidores, moldes, etc.
+- Mínimo 5 utensilios por receta. No omitir ninguno aunque parezca obvio.
+- Ejemplos: "Cuchillo de chef 20cm", "Tabla de picar grande", "Sartén antiadherente 28cm", "Olla mediana 3L", "Espátula de silicona", "Bowl grande", "Colador", "Papel aluminio".
 
-━━━ PASOS ━━━
-- Cada paso debe ser ejecutable por alguien que nunca cocinó. Ser explícito con temperaturas, tiempos y señales visuales ("hasta que dore", "cuando burbujee").
-- Mínimo de pasos según dificultad: Fácil = 3, Media = 5, Difícil = 7. No agrupar acciones distintas en un solo paso.
+━━━ PASOS — REGLAS CRÍTICAS ━━━
+NUNCA omitir pasos intermedios aunque parezcan obvios. Cada acción es un paso o sub-acción detallada.
+
+CORTES: En todo paso donde se use un cuchillo, indicar el corte exacto con medida aproximada (ej: "cortá la cebolla en brunoise: cubos de 3-4mm"; "laminar el ajo en rodajas de 1-2mm de espesor").
+
+ORDEN DE INGREDIENTES: Cuando se agregan varios ingredientes a una sartén/olla, explicar SIEMPRE cuál va primero y por qué (ej: "primero la cebolla porque necesita más tiempo para ablandarse; 3 minutos después el ajo, que se quema más rápido").
+
+SAL Y CONDIMENTOS: Especificar EXACTAMENTE en qué momento se agrega la sal y cada condimento. Si se sala en varias etapas (agua de cocción, durante el salteo, al final), detallar cada instancia con la cantidad aproximada.
+
+SEÑALES VISUALES Y SENSORIALES: Describir cómo debe verse, oler o sonar el ingrediente en cada etapa (ej: "la cebolla estará lista cuando esté translúcida y ligeramente dorada en los bordes, unos 8-10 minutos"; "el ajo está listo cuando empieza a largar aroma sin tomar color dorado").
+
+UTENSILIOS EN CADA PASO: Mencionar el utensilio específico en cada paso (ej: "con la espátula de silicona", "usando el cuchillo de chef sobre la tabla de picar").
+
+TEMPERATURA: Siempre indicar nivel de fuego (bajo, medio-bajo, medio, medio-alto, alto) y temperatura en °C cuando aplica al horno.
+
+- Mínimo de pasos según dificultad: Fácil = 6, Media = 9, Difícil = 14. NO agrupar acciones distintas en un solo paso.
 - "orden": número secuencial empezando en 1.
-- "titulo": resumen corto de la acción (ej: "Preparar la masa", "Sellar la carne").
-- "descripcion": instrucción detallada. Mencionar utensilios, fuego (bajo/medio/alto), y qué resultado esperar.
+- "titulo": resumen corto de la acción (ej: "Cortar la cebolla en brunoise", "Sellar la carne a fuego alto").
+- "descripcion": instrucción detallada con todo lo anterior. Mínimo 2-3 oraciones por paso.
 - "timerSegundos": EN SEGUNDOS. Ej: 5 minutos = 300, 1 hora = 3600. Usar null si el paso es acción activa sin espera.
 
 ━━━ TIPS DEL CHEF ━━━
-- 2-4 consejos prácticos: sustituciones, cómo potenciar sabor, métodos de conservación, errores comunes a evitar.
+- Exactamente 4 consejos, uno de cada tipo:
+  1. TÉCNICA: un truco o secreto para mejorar la ejecución del plato.
+  2. SABOR: cómo potenciar el sabor, un sustituto válido de ingrediente o una variación recomendada.
+  3. ERROR COMÚN: el error más frecuente al preparar este plato y cómo evitarlo.
+  4. CONSERVACIÓN: cómo guardar el plato o los ingredientes sobrantes (temperatura, recipiente, días máximos).
 
 ━━━ MACROS (por porción individual) ━━━
 - Calcular con precisión nutricional real considerando las cantidades EXACTAS de todos los ingredientes (incluido aceite, manteca, sal).
@@ -93,7 +112,7 @@ REGLAS ESTRICTAS — seguir sin excepción:
   "pasos": [
     {"orden": 1, "titulo": "", "descripcion": "", "timerSegundos": null}
   ],
-  "tips": [""],
+  "tips": ["", "", "", ""],
   "macros": {"calorias": 0, "proteinas": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0, "azucar": 0, "sodio": 0, "pesoPorPorcion": 0},
   "tags": [""]
 }`
@@ -170,8 +189,8 @@ export function RecipePromptSheet({ onOpenImport, asMenuItem }: { onOpenImport: 
 
           <div className="flex items-start gap-3 bg-primary-suave p-4 rounded-2xl border border-primary/10">
             <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-[10px] font-bold text-primary/80 leading-relaxed uppercase tracking-wider">
-              NUEVO: Ahora las recetas incluyen utensilios y tips. Se prohíbe el uso de "c/n" o "a gusto" para máxima precisión en macros.
+            <p className="text-[10px] font-medium text-primary/80 leading-relaxed">
+              El prompt exige: cortes exactos (brunoise, juliana…), orden de vegetales con justificación, cuándo y cuánto salar, señales visuales en cada paso, utensilios con tamaño, y 4 consejos del chef obligatorios.
             </p>
           </div>
         </div>
