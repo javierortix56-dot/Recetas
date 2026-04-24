@@ -19,7 +19,8 @@ export function BottomNav() {
   const pathname = usePathname()
   const { activeTab, setActiveTab } = useAppStore()
 
-  if (pathname === "/login" || pathname.startsWith("/recetas/cooking")) return null
+  // Hide nav on all recipe sub-pages (detail, nueva, edit, cooking)
+  if (pathname === "/login" || pathname.startsWith("/recetas/")) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-3 safe-area-pb pointer-events-none">

@@ -247,6 +247,14 @@ export function PlanificacionTab() {
     const dateStr = format(date, "yyyy-MM-dd");
     setIsAutoPlanningDay(dateStr);
     try {
+      // Collect recipe IDs used the day before to avoid consecutive repeats
+      const prevDate = new Date(date.getTime() - 86400000);
+      const prevDateStr = format(prevDate, "yyyy-MM-dd");
+      const recentlyUsedRecipeIds = planificacion
+        .filter(p => p.date === prevDateStr)
+        .map((p: any) => p.recipeId)
+        .filter(Boolean);
+
       const result = await autoPlanDay({
         recipes: recetas.map(r => ({
           id: r.id,
@@ -255,7 +263,8 @@ export function PlanificacionTab() {
           categoria: r.categoria,
           tags: r.tags
         })),
-        date: dateStr
+        date: dateStr,
+        recentlyUsedRecipeIds,
       });
 
       const batch = writeBatch(db);
@@ -446,8 +455,8 @@ export function PlanificacionTab() {
       {/* Header compacto con dropdown de acciones */}
       <header className="flex items-center justify-between pt-2">
         <div>
-          <h1 className="text-2xl font-black text-primary leading-none">Plan</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{activeProfile}</p>
+          <h1 className="text-xl font-semibold text-foreground leading-none">Plan</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 capitalize">{activeProfile}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm">
@@ -512,10 +521,10 @@ export function PlanificacionTab() {
                   : "bg-white text-foreground border border-border"
               )}
             >
-              <span className="text-[9px] font-black uppercase tracking-widest opacity-80">
+              <span className="text-[9px] font-medium uppercase opacity-70">
                 {format(day, "EEE", { locale: es })}
               </span>
-              <span className="text-lg font-black leading-none">{format(day, "d")}</span>
+              <span className="text-base font-semibold leading-none">{format(day, "d")}</span>
               <div className="flex gap-0.5 h-1.5 items-center">
                 {dayPlansCount > 0
                   ? Array.from({ length: Math.min(dayPlansCount, 4) }).map((_, i) => (
@@ -547,7 +556,7 @@ export function PlanificacionTab() {
               className="space-y-2.5"
             >
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-black text-primary capitalize">
+                <span className="text-sm font-medium text-foreground/80 capitalize">
                   {format(day, "EEEE d 'de' MMMM", { locale: es })}
                 </span>
                 <Button
@@ -565,7 +574,7 @@ export function PlanificacionTab() {
 
                 return (
                   <div key={m} className="flex gap-3 items-start">
-                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right pt-3">{m}</span>
+                    <span className="w-16 text-[9px] font-medium text-muted-foreground uppercase shrink-0 text-right pt-3">{m}</span>
                     <div className="flex-1 space-y-1.5 min-w-0">
                       {mealPlans.map((plan) => {
                         const recipe = recetas.find(r => r.id === plan.recipeId);

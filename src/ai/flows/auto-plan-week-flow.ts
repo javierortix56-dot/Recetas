@@ -1,7 +1,4 @@
 'use server';
-/**
- * @fileOverview Flow de Genkit para planificar automáticamente la semana.
- */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
@@ -40,18 +37,35 @@ const autoPlanWeekFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await ai.generate({
-      prompt: `Eres un experto chef y nutricionista de "Cocina Familiar". 
-      Tu tarea es organizar un menú semanal (7 días) empezando el ${input.startDate}.
-      
-      RECETAS DISPONIBLES:
-      ${JSON.stringify(input.recipes)}
-      
-      REGLAS:
-      1. Genera 4 comidas por día: Desayuno, Almuerzo, Merienda, Cena.
-      2. Usa SOLO las recetas de la lista proporcionada.
-      3. Intenta que el menú sea variado. No repitas el mismo plato principal dos días seguidos.
-      4. Respeta las categorías (ej. no pongas una receta de "Desayuno" en la "Cena" a menos que no haya otra opción).
-      5. Devuelve un JSON con el array "plans" y un "summary" motivador.`,
+      prompt: `Eres un experto chef y nutricionista de "Cocina Familiar".
+Tu tarea es organizar un menú semanal de 7 días comenzando el ${input.startDate}.
+
+RECETAS DISPONIBLES (id, nombre, categorias, tags, macros):
+${JSON.stringify(input.recipes, null, 2)}
+
+REGLAS ESTRICTAS — NO ignorar ninguna:
+
+1. ESTRUCTURA: Genera 4 comidas por día × 7 días = 28 planes en total.
+   Momentos por día: "Desayuno", "Almuerzo", "Merienda", "Cena".
+
+2. ASIGNACIÓN POR CATEGORÍAS (OBLIGATORIO):
+   - Para "Desayuno": elige SOLO recetas cuyo campo "categorias" incluya "Desayuno".
+   - Para "Almuerzo": elige SOLO recetas cuyo campo "categorias" incluya "Almuerzo".
+   - Para "Cena": elige SOLO recetas cuyo campo "categorias" incluya "Cena".
+   - Para "Merienda": elige recetas cuyo campo "categorias" incluya "Merienda" o "Snack".
+   - Si no hay suficientes recetas para un momento, permite usar "Almuerzo"↔"Cena". NUNCA uses un Desayuno en la Cena.
+
+3. SIN REPETICIÓN EN DÍAS CONSECUTIVOS: Si usaste el recipeId X el lunes en Almuerzo, NO lo uses el martes. Puede volver a aparecer después de 2 días de pausa.
+
+4. VARIEDAD SEMANAL: No repitas el mismo recipeId más de 2 veces en toda la semana. Prioriza que todos los días tengan platos distintos.
+
+5. USA TAGS para diversificar: mezcla tags como "rapido", "light", "proteico", "vegetariano", "comfort-food" a lo largo de la semana para mayor variedad nutricional.
+
+6. MACROS: Si las recetas tienen macros, intenta balancear calorías diarias (no hagas días con todas las recetas calóricas juntas).
+
+7. USA SOLO los recipeId e recipeName exactamente como aparecen en la lista proporcionada. NO inventes IDs ni nombres.
+
+8. FORMATO: Devuelve JSON con "plans" (array de 28 elementos) y un "summary" motivador de 2-3 oraciones.`,
       output: { schema: AutoPlanWeekOutputSchema }
     });
     return output!;

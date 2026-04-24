@@ -48,7 +48,7 @@ function MacroRing({ label, value, target, size = 80 }: { label: string, value: 
           <span className="text-xs font-black">{Math.round(rawPercentage)}%</span>
         </div>
       </div>
-      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{label}</span>
+      <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -195,16 +195,16 @@ export function MacrosTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-primary leading-tight">Nutrición</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
-              <ChevronLeft className="h-4 w-4" />
+          <h1 className="text-xl font-semibold text-foreground leading-tight">Nutrición</h1>
+          <div className="flex items-center gap-1.5 mt-1">
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-muted/60" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest min-w-[120px] text-center">
+            <span className="text-xs text-muted-foreground min-w-[120px] text-center capitalize">
               {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
             </span>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-muted/60" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -223,9 +223,9 @@ export function MacrosTab() {
       </header>
 
       <Tabs defaultValue="dia" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-primary-suave p-1 rounded-2xl h-14 mb-6">
-          <TabsTrigger value="dia" className="rounded-xl font-black uppercase text-xs data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Día</TabsTrigger>
-          <TabsTrigger value="semana" className="rounded-xl font-black uppercase text-xs data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Semana</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-muted/60 p-1 rounded-xl h-11 mb-5">
+          <TabsTrigger value="dia" className="rounded-lg font-medium text-xs data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm">Día</TabsTrigger>
+          <TabsTrigger value="semana" className="rounded-lg font-medium text-xs data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm">Semana</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dia" className="space-y-8">

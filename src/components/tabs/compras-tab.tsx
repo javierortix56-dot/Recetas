@@ -314,8 +314,8 @@ export function ComprasTab() {
         ) : (
           <>
             <div>
-              <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+              <h1 className="text-xl font-semibold text-foreground leading-tight">Compras</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {purchasedCount} de {totalCount} en el carrito
               </p>
             </div>
@@ -370,11 +370,11 @@ export function ComprasTab() {
         <Card className="border-none shadow-sm bg-primary-suave/50 rounded-3xl overflow-hidden border-2 border-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="space-y-0.5">
-              <p className="text-2xl font-black text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-[10px] font-bold opacity-60 uppercase">Estimado</span></p>
+              <p className="text-xl font-semibold text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-xs font-normal text-muted-foreground ml-1">estimado</span></p>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black text-muted-foreground uppercase">{filteredItems.filter(i => !i.isPurchased).length} ítems pendientes</span>
+                <span className="text-xs text-muted-foreground">{filteredItems.filter(i => !i.isPurchased).length} pendientes</span>
                 {itemsSinPrecio > 0 && (
-                  <div className="flex items-center gap-1 text-accent font-black text-[9px] uppercase">
+                  <div className="flex items-center gap-1 text-accent text-xs">
                     <AlertTriangle className="h-3 w-3" /> {itemsSinPrecio} sin precio
                   </div>
                 )}
@@ -396,23 +396,21 @@ export function ComprasTab() {
         >
           {categories.map((category) => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-1 transition-all">
-                <div className="flex items-center gap-3">
-                  <Package className="h-4 w-4 text-primary" />
-                  <div className="flex flex-col items-start">
-                    <span className="text-xs font-black uppercase text-primary tracking-tight">{category}</span>
-                    <span className="text-[8px] font-black text-muted-foreground uppercase">{groupedItems[category].length} productos</span>
-                  </div>
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-xl border border-border/50 shadow-sm mb-1 transition-all">
+                <div className="flex items-center gap-2.5">
+                  <Package className="h-3.5 w-3.5 text-primary/70" />
+                  <span className="text-xs font-semibold text-foreground/80">{category}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{groupedItems[category].length}</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-0 space-y-0.5 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
+              <AccordionContent className="pt-0 space-y-0 px-0 bg-background/50 rounded-b-2xl overflow-hidden border-x border-b">
                 {groupedItems[category].map((item) => {
                   const isManual = item.source === "manual" || item.reason === "Manual";
                   const isSelected = selectedIds.has(item.id);
                   const row = (
                     <div
                       className={cn(
-                        "p-3 px-4 flex items-center gap-4 bg-white border-b border-border/50 group transition-colors",
+                        "py-2 px-3 flex items-center gap-3 bg-white border-b border-border/40 group transition-colors",
                         isSelectionMode && isManual && isSelected && "bg-accent/5"
                       )}
                       onClick={isSelectionMode && isManual ? () => toggleSelection(item.id) : undefined}
@@ -434,7 +432,7 @@ export function ComprasTab() {
                       <div className={cn("flex-1 min-w-0 flex items-center justify-between gap-3", isSelectionMode && !isManual && "opacity-40")}>
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                            <span className={`font-medium text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
                               {item.nombre}
                             </span>
                             {isManual && (
@@ -457,7 +455,7 @@ export function ComprasTab() {
                               />
                             )}
                           </div>
-                          <span className="text-[9px] font-black text-muted-foreground uppercase">
+                          <span className="text-[10px] text-muted-foreground">
                             {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
                           </span>
                           {item.justificacion && !item.isPurchased && item.source === "plan" && (
@@ -471,9 +469,9 @@ export function ComprasTab() {
                         <div className="flex items-center gap-2 shrink-0">
                           <div className="text-right">
                             {item.precioUnitario > 0 ? (
-                              <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                              <p className="text-xs font-semibold text-primary">{formatPrecio(item.subtotal)}</p>
                             ) : (
-                              <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                              <p className="text-[10px] text-muted-foreground/40">$ —</p>
                             )}
                           </div>
                           {isManual && !isSelectionMode && (

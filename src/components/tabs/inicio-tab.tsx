@@ -170,11 +170,11 @@ export function InicioTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{greeting}</p>
-          <h1 className="text-3xl font-black text-primary leading-none tracking-tighter">
+          <p className="text-xs text-muted-foreground mb-0.5">{greeting}</p>
+          <h1 className="text-2xl font-bold text-foreground leading-none">
             {userProfile?.displayName?.split(' ')[0] || 'Chef'}
           </h1>
-          <p className="text-[10px] font-bold text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
+          <p className="text-xs text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
         </div>
         <Avatar className="h-12 w-12 ring-4 ring-primary/10 shadow-glow">
           <AvatarFallback className="bg-primary text-white font-black text-sm">
@@ -186,8 +186,8 @@ export function InicioTab() {
       <Card className="border border-primary/10 shadow-recipe hover:shadow-card-hover bg-white rounded-3xl cursor-pointer transition-shadow" onClick={() => router.push('/macros')}>
         <CardContent className="p-6 space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-base font-black flex items-center gap-2 uppercase">
-              <Activity className="h-5 w-5 text-primary" /> Nutrición de hoy
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" /> Nutrición de hoy
             </h3>
             <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-[10px] px-3">En vivo</Badge>
           </div>
@@ -202,10 +202,10 @@ export function InicioTab() {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-base font-black flex items-center gap-2 uppercase">
-            <Calendar className="h-5 w-5 text-primary" /> Mi Plan de hoy
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" /> Mi plan de hoy
           </h3>
-          <Button variant="link" className="text-primary font-black text-[10px] p-0" onClick={() => router.push('/planificacion')}>
+          <Button variant="link" className="text-primary font-medium text-xs p-0" onClick={() => router.push('/planificacion')}>
             Ver calendario <ChevronRight className="h-3 w-3 ml-1" />
           </Button>
         </div>

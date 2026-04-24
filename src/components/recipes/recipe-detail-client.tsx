@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFirestore } from "@/firebase"
-import { doc, collection, query, where, getDocs, writeBatch, serverTimestamp, deleteDoc } from "firebase/firestore"
+import { doc, collection, getDocs, writeBatch, serverTimestamp, deleteDoc, query, where } from "firebase/firestore"
 import { GradientPlaceholder } from "@/components/gradient-placeholder"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
@@ -59,26 +59,29 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const [isDeleting, setIsDeleting] = React.useState(false)
 
   React.useEffect(() => {
-    const checkStockAndPrices = async () => {
-      if (!db || !receta?.ingredientes) return
+    const checkStock = async () => {
+      if (!db || !receta?.ingredientes?.length) return
       const status: Record<string, 'green' | 'yellow' | 'red' | 'gray'> = {}
-      const ingredientsCol = collection(db, "users", USER_ID, "ingredients")
 
-      await Promise.all(receta.ingredientes.map(async (ing: any) => {
-        const q = query(ingredientsCol, where("nombre", "==", ing.nombre))
-        const snap = await getDocs(q)
-        if (snap.empty) status[ing.nombre] = 'gray'
-        else {
-          const data = snap.docs[0].data()
-          if (data.stockActual > data.stockMinimo) status[ing.nombre] = 'green'
-          else if (data.stockActual > 0) status[ing.nombre] = 'yellow'
-          else status[ing.nombre] = 'red'
-        }
-      }))
+      // Single batch read instead of N individual queries
+      const snap = await getDocs(collection(db, "users", USER_ID, "ingredients"))
+      const stockMap: Record<string, any> = {}
+      snap.docs.forEach(d => {
+        const data = d.data()
+        if (data.nombre) stockMap[data.nombre] = data
+      })
+
+      receta.ingredientes.forEach((ing: any) => {
+        const data = stockMap[ing.nombre]
+        if (!data) status[ing.nombre] = 'gray'
+        else if (data.stockActual > data.stockMinimo) status[ing.nombre] = 'green'
+        else if (data.stockActual > 0) status[ing.nombre] = 'yellow'
+        else status[ing.nombre] = 'red'
+      })
       setStockStatus(status)
     }
-    checkStockAndPrices()
-  }, [receta, db])
+    checkStock()
+  }, [receta?.id, db])
 
   React.useEffect(() => {
     if (receta?.porciones) {

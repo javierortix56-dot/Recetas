@@ -164,8 +164,8 @@ export function StockTab() {
     <div className="flex flex-col gap-3 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col gap-2.5 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-black tracking-tight text-primary">
-            {isSelectionMode ? `(${selectedIds.size})` : 'Despensa'}
+          <h1 className="text-xl font-semibold text-foreground">
+            {isSelectionMode ? `${selectedIds.size} seleccionados` : 'Despensa'}
           </h1>
           <div className="flex gap-2">
             {isSelectionMode ? (
@@ -218,16 +218,16 @@ export function StockTab() {
           <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border-2 border-primary/5 font-bold text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border border-border/50 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
-                {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
-              </Badge>
-              <Badge variant={showPlannedOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/10 text-primary border-none")} onClick={() => setShowPlannedOnly(!showPlannedOnly)}>
+              <button onClick={() => setShowLowStockOnly(!showLowStockOnly)} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-all", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive")}>
+                {showLowStockOnly ? "Viendo stock bajo" : "⚠ Stock bajo"}
+              </button>
+              <button onClick={() => setShowPlannedOnly(!showPlannedOnly)} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/8 text-primary")}>
                 <CalendarDays className="h-3 w-3" />
-                {showPlannedOnly ? "Viendo Planificado" : "Filtrar Planificado"}
-              </Badge>
+                {showPlannedOnly ? "Planificado" : "Planificado"}
+              </button>
             </div>
           </>
         )}
@@ -258,14 +258,14 @@ export function StockTab() {
         >
           {Object.keys(grouped).sort().map(category => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-0.5 transition-all">
-                <div className="flex items-center gap-3">
-                  <Package className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
-                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-[9px] h-5 px-1.5">{grouped[category].length}</Badge>
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-xl border border-border/50 shadow-sm mb-0.5 transition-all">
+                <div className="flex items-center gap-2.5">
+                  <Package className="h-3.5 w-3.5 text-primary/70" />
+                  <span className="text-xs font-semibold text-foreground/80">{category}</span>
+                  <span className="ml-1 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{grouped[category].length}</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pt-0.5 space-y-1 px-1">
+              <AccordionContent className="pt-0.5 space-y-0.5 px-1">
                 {grouped[category].map((item) => (
                   <div 
                     key={item.id} 
@@ -286,21 +286,21 @@ export function StockTab() {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
+                      <p className="font-medium text-sm truncate leading-tight">{item.nombre}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo ? (
-                          <span className="text-[8px] font-black text-destructive uppercase flex items-center gap-0.5">
+                          <span className="text-[9px] text-destructive flex items-center gap-0.5">
                             <AlertCircle className="h-2.5 w-2.5" /> Bajo
                           </span>
                         ) : null}
-                        <span className={cn("text-[9px] font-black tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
+                        <span className={cn("text-xs font-semibold tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
                           {item.stockActual} {item.unidad}
                         </span>
                         {item.stockMinimo > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground">mín {item.stockMinimo}</span>
+                          <span className="text-[10px] text-muted-foreground">mín {item.stockMinimo}</span>
                         )}
                         {item.precioUnitario > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground opacity-60">
+                          <span className="text-[10px] text-muted-foreground/60">
                             {formatPrecio(item.precioUnitario)}/{item.unidad}
                           </span>
                         )}
@@ -319,7 +319,7 @@ export function StockTab() {
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <div className="w-6 text-center font-black text-xs text-primary tabular-nums">
+                          <div className="w-6 text-center font-semibold text-xs text-primary tabular-nums">
                             {item.stockActual}
                           </div>
                           <Button 
