@@ -180,7 +180,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const imageSource = getSafeImageSource(receta);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background pb-32">
+    <div className="flex flex-col min-h-screen bg-background pb-52">
       {/* Hero */}
       <div className="relative h-[260px] w-full bg-muted">
         {imageSource ? (
@@ -447,8 +447,8 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
         </Tabs>
       </div>
 
-      {/* Bar flotante de acciones */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 safe-area-pb pointer-events-none">
+      {/* Bar flotante de acciones — positioned above BottomNav (~70px) */}
+      <div className="fixed bottom-[78px] left-0 right-0 z-[49] px-4 pointer-events-none">
         <div className="bg-white/85 backdrop-blur-2xl border border-white/50 shadow-nav rounded-[1.75rem] p-2 flex gap-2 pointer-events-auto max-w-lg mx-auto">
           <AddMealPlanDialog date={new Date()} momento="Almuerzo" recipeToLog={receta}>
             <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl shrink-0 border border-border/50">

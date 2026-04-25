@@ -38,36 +38,33 @@ const autoPlanDayFlow = ai.defineFlow(
   async (input) => {
     const recentIds = input.recentlyUsedRecipeIds || [];
 
+    // Normalize: merge `categoria` (string) into `categorias` (array) for consistent matching
+    const normalizedRecipes = input.recipes.map(r => ({
+      ...r,
+      categorias: r.categorias?.length
+        ? r.categorias
+        : r.categoria
+        ? [r.categoria]
+        : [],
+    }));
+
     const { output } = await ai.generate({
-      prompt: `Eres un experto chef y nutricionista de "Cocina Familiar".
-Tu tarea es organizar el menú del día ${input.date} con exactamente 4 comidas.
+      prompt: `Eres un asistente de planificación de menús. Genera el plan del día ${input.date}.
 
-RECETAS DISPONIBLES (id, nombre, categorias, tags):
-${JSON.stringify(input.recipes, null, 2)}
+RECETAS DISPONIBLES:
+${JSON.stringify(normalizedRecipes, null, 2)}
 
-${recentIds.length > 0 ? `RECETAS USADAS AYER (evitar repetir estos IDs si hay alternativas):
-${JSON.stringify(recentIds)}
+${recentIds.length > 0 ? `IDs a evitar si hay alternativas (usados ayer): ${JSON.stringify(recentIds)}\n` : ''}
 
-` : ''}REGLAS ESTRICTAS — NO ignorar ninguna:
-
-1. MOMENTOS: Genera exactamente 4 planes con mealType: "Desayuno", "Almuerzo", "Merienda", "Cena".
-
-2. ASIGNACIÓN POR CATEGORÍAS (OBLIGATORIO):
-   - Para "Desayuno": elige SOLO recetas cuyo campo "categorias" incluya "Desayuno".
-   - Para "Almuerzo": elige SOLO recetas cuyo campo "categorias" incluya "Almuerzo".
-   - Para "Cena": elige SOLO recetas cuyo campo "categorias" incluya "Cena".
-   - Para "Merienda": elige recetas cuyo campo "categorias" incluya "Merienda" o "Snack".
-   - Si no hay recetas suficientes para un momento, permite usar recetas de categoría "Almuerzo" para la "Cena" o viceversa. NUNCA pongas un Desayuno en la Cena.
-
-3. TAGS para priorizar: prefiere recetas variadas en tags. Si hay recetas con "rapido" para el Desayuno, úsalas. Si hay "vegetariano" o "light" para la Merienda, úsalas.
-
-4. NO REPETIR: No uses el mismo recipeId dos veces en el mismo día.
-
-5. EVITAR recetas del día anterior (listadas en recentlyUsedRecipeIds) si hay alternativas disponibles.
-
-6. USA SOLO los recipeId e recipeName exactamente como aparecen en la lista proporcionada. NO inventes IDs ni nombres.
-
-7. Devuelve JSON con "plans" (array de 4 elementos) y un "summary" motivador de 1-2 oraciones.`,
+INSTRUCCIONES:
+1. Devuelve exactamente 4 planes con mealType: "Desayuno", "Almuerzo", "Merienda", "Cena".
+2. Para cada mealType, elige preferentemente una receta cuyo campo "categorias" contenga ese mealType.
+   - "Merienda" puede usar recetas con "Merienda" o "Snack" en categorias.
+   - Si no hay receta con la categoría exacta, usa cualquier receta disponible. NUNCA dejes un mealType sin asignar.
+3. No uses el mismo id dos veces en el mismo día.
+4. Evita los IDs del día anterior si hay alternativas.
+5. Usa SOLO los id y nombre exactamente como aparecen en la lista. No inventes valores.
+6. El campo "summary" debe ser 1-2 oraciones motivadoras sobre el menú del día.`,
       output: { schema: AutoPlanDayOutputSchema }
     });
     if (!output) throw new Error('El modelo no devolvió un plan válido');
