@@ -231,8 +231,8 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db, activeProfile);
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
+      syncShoppingList(db, activeProfile).catch(console.error);
     } catch (e) {
       console.error(e);
       toast({ variant: "destructive", title: "Error al generar plan semanal" });
@@ -341,9 +341,8 @@ export function PlanificacionTab() {
       }, { merge: true });
 
       await batch.commit();
-      await syncShoppingList(db, activeProfile);
-
       toast({ title: `Día de ${activeProfile} planeado ✓` });
+      syncShoppingList(db, activeProfile).catch(console.error);
       setExpandedDay(dateStr);
     } catch (e) {
       console.error("Error autoPlanDay:", e);
@@ -359,22 +358,15 @@ export function PlanificacionTab() {
     try {
       const batch = writeBatch(db);
       const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
-      
-      const currentPlansSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "meal_plans"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      
-      const currentLogsSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      
+
+      const [currentPlansSnap, currentLogsSnap] = await Promise.all([
+        getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "in", weekStr), where("perfil", "==", activeProfile))),
+        getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "in", weekStr), where("perfil", "==", activeProfile))),
+      ]);
+
       currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
       currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
-      
+
       for (const date of weekStr) {
         const summaryId = `${date}_${activeProfile}`
         batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
@@ -384,8 +376,8 @@ export function PlanificacionTab() {
       }
 
       await batch.commit();
-      await syncShoppingList(db, activeProfile);
       toast({ title: `Semana desplanificada` });
+      syncShoppingList(db, activeProfile).catch(console.error);
     } catch (e) {
       toast({ variant: "destructive", title: "Error al limpiar plan" });
     } finally {
@@ -432,9 +424,8 @@ export function PlanificacionTab() {
       }, { merge: true });
 
       await batch.commit();
-      await syncShoppingList(db, activeProfile);
-      
       toast({ title: "Comida eliminada" });
+      syncShoppingList(db, activeProfile).catch(console.error);
       setSelectedPlan(null);
     } catch (e) { 
       toast({ variant: "destructive", title: "Error al borrar" }); 
