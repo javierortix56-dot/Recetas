@@ -98,8 +98,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MacrosTab />
       </div>
 
-      {/* Contenido dinámico (Subpáginas) */}
-      <div className={cn("relative w-full min-h-screen", isCoreTab ? 'hidden' : 'block')}>
+      {/* Contenido dinámico (Subpáginas) — scroll container matches tab panels */}
+      <div className={cn("absolute inset-0 overflow-y-auto overscroll-none", isCoreTab ? 'hidden' : 'block')}>
         {!isCoreTab && children}
       </div>
     </div>
