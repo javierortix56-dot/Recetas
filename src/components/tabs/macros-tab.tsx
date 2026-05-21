@@ -45,10 +45,10 @@ function MacroRing({ label, value, target, size = 80 }: { label: string, value: 
           <circle cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke={ringColor} strokeWidth="6" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-500 ease-out" />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-black">{Math.round(rawPercentage)}%</span>
+          <span className="text-xs font-semibold">{Math.round(rawPercentage)}%</span>
         </div>
       </div>
-      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -185,7 +185,7 @@ export function MacrosTab() {
   if (!mounted || (!macrosCargados && dayLogs.length === 0 && macrosSemana.length === 0)) {
     return (
       <div className="p-4 space-y-4">
-        <Skeleton className="h-64 w-full rounded-[2rem]" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
         <Skeleton className="h-20 w-full rounded-2xl" />
       </div>
     );
@@ -195,12 +195,12 @@ export function MacrosTab() {
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-primary leading-tight">Nutrición</h1>
+          <h1 className="text-2xl font-bold text-foreground leading-tight">Nutrición</h1>
           <div className="flex items-center gap-2 mt-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(subDays(selectedDate, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest min-w-[120px] text-center">
+            <span className="text-xs font-medium text-muted-foreground capitalize min-w-[120px] text-center">
               {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
             </span>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-primary-suave/50" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
@@ -210,37 +210,37 @@ export function MacrosTab() {
         </div>
         <div className="flex items-center gap-2">
            <AddMealLogDialog date={dateStr}>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-sm">
                 <Plus className="h-6 w-6" />
               </Button>
            </AddMealLogDialog>
            <div className="text-right hidden sm:block">
-              <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest leading-none">Editando perfil</p>
-              <p className="text-[10px] font-black uppercase text-primary leading-none mt-1">{activeProfile}</p>
+              <p className="text-[11px] font-medium text-muted-foreground leading-none">Editando perfil</p>
+              <p className="text-xs font-semibold text-foreground leading-none mt-1">{activeProfile}</p>
            </div>
            <GoalSettingsSheet currentGoals={goals} />
         </div>
       </header>
 
       <Tabs defaultValue="dia" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-primary-suave p-1 rounded-2xl h-14 mb-6">
-          <TabsTrigger value="dia" className="rounded-xl font-black uppercase text-xs data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Día</TabsTrigger>
-          <TabsTrigger value="semana" className="rounded-xl font-black uppercase text-xs data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Semana</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-primary-suave p-1 rounded-xl h-12 mb-6">
+          <TabsTrigger value="dia" className="rounded-lg font-medium text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Día</TabsTrigger>
+          <TabsTrigger value="semana" className="rounded-lg font-medium text-sm data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">Semana</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dia" className="space-y-8">
-          <Card className="border-none shadow-recipe bg-white rounded-[2.5rem] overflow-hidden border-2 border-primary/5">
-            <CardContent className="p-8">
+          <Card className="border border-border shadow-recipe bg-white rounded-2xl overflow-hidden">
+            <CardContent className="p-6">
               <div className="flex justify-around items-center">
                 <MacroRing label="Kcal" value={currentMacros.calorias} target={goals.calorias} size={100} />
                 <MacroRing label="Prot" value={currentMacros.proteinas} target={goals.proteinas} />
                 <MacroRing label="Carbs" value={currentMacros.carbohidratos} target={goals.carbohidratos} />
                 <MacroRing label="Grasas" value={currentMacros.grasas} target={goals.grasas} />
               </div>
-              <div className="mt-6 pt-6 border-t border-primary/5 flex justify-center items-center gap-4">
+              <div className="mt-6 pt-6 border-t border-border flex justify-center items-center gap-4">
                  <div className="flex items-center gap-2">
-                    <Target className="h-3 w-3 text-primary/40" />
-                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Tus metas: {goals.calorias} kcal · {goals.proteinas}p · {goals.carbohidratos}c · {goals.grasas}g</span>
+                    <Target className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">Tus metas: {goals.calorias} kcal · {goals.proteinas}p · {goals.carbohidratos}c · {goals.grasas}g</span>
                  </div>
               </div>
             </CardContent>
@@ -253,7 +253,7 @@ export function MacrosTab() {
               
               return (
                 <section key={m} className="space-y-3">
-                  <h3 className="text-[10px] font-black uppercase text-primary px-4 tracking-[0.2em]">{m}</h3>
+                  <h3 className="text-xs font-semibold text-foreground px-4">{m}</h3>
                   <div className="space-y-2">
                     {logs?.length > 0 ? (
                       logs.map(l => {
@@ -274,9 +274,9 @@ export function MacrosTab() {
                         const planImageUrl = getSafeImageSource(p) || getSafeImageSource(recetaDelPlan);
                         return (
                         <div key={p.id} className="px-4 opacity-60 grayscale-[0.5] pointer-events-none">
-                           <Card className="border-none shadow-sm bg-primary-suave/30 rounded-2xl overflow-hidden border-dashed border-2">
-                            <CardContent className="p-4 flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                           <Card className="border border-dashed border-border shadow-none bg-primary-suave/30 rounded-xl overflow-hidden">
+                            <CardContent className="p-3.5 flex items-center gap-3.5">
+                              <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 relative bg-muted">
                                 {planImageUrl ? (
                                   <Image src={planImageUrl} alt={p.recipeName} fill className="object-cover" unoptimized />
                                 ) : (
@@ -284,8 +284,8 @@ export function MacrosTab() {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-sm truncate text-foreground">{p.recipeName} (Planeado)</h4>
-                                <p className="text-[10px] font-black text-primary uppercase mt-1 tracking-tight">
+                                <h4 className="font-medium text-sm truncate text-foreground">{p.recipeName} (Planeado)</h4>
+                                <p className="text-xs font-medium text-primary mt-0.5">
                                   {Math.round(p.macros?.calorias || 0)} kcal
                                 </p>
                               </div>
@@ -295,8 +295,8 @@ export function MacrosTab() {
                         );
                       })
                     ) : !loadingLogs && (
-                      <div className="px-4 py-6 border-2 border-dashed border-primary/5 rounded-2xl text-center opacity-30">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">Sin registros</p>
+                      <div className="px-4 py-5 border border-dashed border-border rounded-xl text-center opacity-40">
+                        <p className="text-xs font-medium text-muted-foreground">Sin registros</p>
                       </div>
                     )}
                   </div>
@@ -307,34 +307,34 @@ export function MacrosTab() {
         </TabsContent>
 
         <TabsContent value="semana" className="space-y-6">
-          <Card className="border-none shadow-recipe bg-white rounded-[2rem] p-6">
-             <div className="flex items-center gap-2 mb-6">
-                <Zap className="h-5 w-5 text-primary" />
-                <h3 className="text-xs font-black text-primary uppercase tracking-widest">Evolución Calorías</h3>
+          <Card className="border border-border shadow-recipe bg-white rounded-2xl p-5">
+             <div className="flex items-center gap-2 mb-5">
+                <Zap className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Evolución calorías</h3>
              </div>
              <EvolutionChart data={chartData} dataKey="calorias" target={goals.calorias} color="#2D9A6B" unit="kcal" />
           </Card>
 
-          <Card className="border-none shadow-recipe bg-white rounded-[2rem] p-6">
-             <div className="flex items-center gap-2 mb-6">
-                <Beef className="h-5 w-5 text-red-500" />
-                <h3 className="text-xs font-black text-red-500 uppercase tracking-widest">Evolución Proteínas</h3>
+          <Card className="border border-border shadow-recipe bg-white rounded-2xl p-5">
+             <div className="flex items-center gap-2 mb-5">
+                <Beef className="h-4 w-4 text-red-500" />
+                <h3 className="text-sm font-semibold text-foreground">Evolución proteínas</h3>
              </div>
              <EvolutionChart data={chartData} dataKey="proteinas" target={goals.proteinas} color="#ef4444" unit="g" />
           </Card>
 
-          <Card className="border-none shadow-recipe bg-white rounded-[2rem] p-6">
-             <div className="flex items-center gap-2 mb-6">
-                <Wheat className="h-5 w-5 text-amber-500" />
-                <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Evolución Carbos</h3>
+          <Card className="border border-border shadow-recipe bg-white rounded-2xl p-5">
+             <div className="flex items-center gap-2 mb-5">
+                <Wheat className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-foreground">Evolución carbos</h3>
              </div>
              <EvolutionChart data={chartData} dataKey="carbohidratos" target={goals.carbohidratos} color="#f59e0b" unit="g" />
           </Card>
 
-          <Card className="border-none shadow-recipe bg-white rounded-[2rem] p-6">
-             <div className="flex items-center gap-2 mb-6">
-                <Droplets className="h-5 w-5 text-blue-500" />
-                <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest">Evolución Grasas</h3>
+          <Card className="border border-border shadow-recipe bg-white rounded-2xl p-5">
+             <div className="flex items-center gap-2 mb-5">
+                <Droplets className="h-4 w-4 text-blue-500" />
+                <h3 className="text-sm font-semibold text-foreground">Evolución grasas</h3>
              </div>
              <EvolutionChart data={chartData} dataKey="grasas" target={goals.grasas} color="#3b82f6" unit="g" />
           </Card>
@@ -357,9 +357,9 @@ function MacroLogItem({ log, receta, onClick, onDelete }: { log: any, receta?: a
         onDragEnd={(_, info) => { if (info.offset.x < -50) onDelete(); }}
         className="relative z-10"
       >
-        <Card className="border-none shadow-sm bg-white rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer border border-primary/5" onClick={onClick}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+        <Card className="border border-border shadow-sm bg-white rounded-xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer" onClick={onClick}>
+          <CardContent className="p-3.5 flex items-center gap-3.5">
+            <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 relative bg-muted">
               {imageUrl ? (
                 <Image src={imageUrl} alt={log.recetaNombre} fill className="object-cover" unoptimized />
               ) : (
@@ -367,8 +367,8 @@ function MacroLogItem({ log, receta, onClick, onDelete }: { log: any, receta?: a
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-sm truncate text-foreground">{log.recetaNombre}</h4>
-              <p className="text-[10px] font-black text-primary uppercase mt-1 tracking-tight">
+              <h4 className="font-medium text-sm truncate text-foreground">{log.recetaNombre}</h4>
+              <p className="text-xs font-medium text-primary mt-0.5">
                 {log.porciones} porc · {Math.round(log.macros?.calorias || 0)} kcal
               </p>
             </div>
@@ -409,8 +409,8 @@ function EvolutionChart({ data, dataKey, target, color, unit }: { data: any[], d
               if (active && payload && payload.length) {
                 return (
                   <div className="bg-white p-2 rounded-lg border shadow-sm">
-                    <p className="text-[10px] font-black text-primary uppercase">{payload[0].payload.name}</p>
-                    <p className="text-sm font-bold">{payload[0].value} {unit}</p>
+                    <p className="text-xs font-medium text-primary">{payload[0].payload.name}</p>
+                    <p className="text-sm font-semibold">{payload[0].value} {unit}</p>
                   </div>
                 );
               }
@@ -436,8 +436,8 @@ function EvolutionChart({ data, dataKey, target, color, unit }: { data: any[], d
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex justify-between items-center px-2 mt-4 border-t border-border/50 pt-2">
-        <span className="text-[10px] font-black text-muted-foreground uppercase">Meta: {target} {unit}</span>
-        <span className="text-[10px] font-black text-muted-foreground uppercase">Promedio: {average} {unit}</span>
+        <span className="text-xs font-medium text-muted-foreground">Meta: {target} {unit}</span>
+        <span className="text-xs font-medium text-muted-foreground">Promedio: {average} {unit}</span>
       </div>
     </div>
   );

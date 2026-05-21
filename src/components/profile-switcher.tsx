@@ -14,7 +14,7 @@ export function ProfileSwitcher() {
   ]
 
   return (
-    <div className="flex bg-primary-suave p-1 rounded-2xl border border-primary/10 w-fit">
+    <div className="flex bg-primary-suave p-1 rounded-full border border-primary/10 w-fit">
       {profiles.map((p) => {
         const isActive = activeProfile === p.id
         return (
@@ -22,14 +22,14 @@ export function ProfileSwitcher() {
             key={p.id}
             onClick={() => setActiveProfile(p.id)}
             className={cn(
-              "relative px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+              "relative px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-2",
               isActive ? "text-white" : "text-primary/60"
             )}
           >
             {isActive && (
               <motion.div
                 layoutId="activeProfileBg"
-                className={cn("absolute inset-0 rounded-xl shadow-sm", p.color)}
+                className={cn("absolute inset-0 rounded-full shadow-sm", p.color)}
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}

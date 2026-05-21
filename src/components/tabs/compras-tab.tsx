@@ -262,7 +262,7 @@ export function ComprasTab() {
     return (
       <div className="space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-3xl" />
+          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
         ))}
       </div>
     );
@@ -277,10 +277,10 @@ export function ComprasTab() {
         {isSelectionMode ? (
           <>
             <div>
-              <h1 className="text-xl font-black text-primary leading-tight">
+              <h1 className="text-xl font-bold text-foreground leading-tight">
                 {selectedIds.size === 0 ? "Seleccionar" : `${selectedIds.size} seleccionado${selectedIds.size !== 1 ? "s" : ""}`}
               </h1>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+              <p className="text-xs font-medium text-muted-foreground mt-0.5">
                 {manualItems.length} ítems manuales
               </p>
             </div>
@@ -295,14 +295,14 @@ export function ComprasTab() {
                     setSelectedIds(new Set(manualItems.map(i => i.id)));
                   }
                 }}
-                className="h-9 rounded-2xl text-[10px] font-black uppercase px-3 bg-primary-suave text-primary"
+                className="h-9 rounded-xl text-xs font-medium px-3 bg-primary-suave text-primary"
               >
                 {selectedIds.size === manualItems.length ? "Desmarcar" : "Todos"}
               </Button>
               <Button
                 onClick={handleDeleteSelected}
                 disabled={selectedIds.size === 0}
-                className="h-9 rounded-2xl text-[10px] font-black uppercase px-3 bg-destructive text-white gap-1.5"
+                className="h-9 rounded-xl text-xs font-medium px-3 bg-destructive text-white gap-1.5"
               >
                 <Trash2 className="h-3.5 w-3.5" /> Eliminar
               </Button>
@@ -314,14 +314,14 @@ export function ComprasTab() {
         ) : (
           <>
             <div>
-              <h1 className="text-3xl font-black text-primary leading-tight">Compras</h1>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
+              <h1 className="text-2xl font-bold text-foreground leading-tight">Compras</h1>
+              <p className="text-xs font-medium text-muted-foreground mt-0.5">
                 {purchasedCount} de {totalCount} en el carrito
               </p>
             </div>
             <div className="flex gap-2 items-center">
               <AddShoppingItemDialog>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-md">
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary text-white shadow-sm">
                   <Plus className="h-6 w-6" />
                 </Button>
               </AddShoppingItemDialog>
@@ -329,7 +329,7 @@ export function ComprasTab() {
               <Button
                 onClick={handleUpdateStock}
                 disabled={!listaCompras.some(i => i.isPurchased) || isUpdatingStock}
-                className="bg-primary text-white rounded-2xl h-10 font-black uppercase text-[10px] px-4 gap-2"
+                className="bg-primary text-white rounded-xl h-10 font-medium text-xs px-4 gap-2"
               >
                 <ArrowUpCircle className="h-4 w-4" />
                 {isUpdatingStock ? "..." : "Terminar"}
@@ -342,21 +342,21 @@ export function ComprasTab() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-2xl">
-                  <DropdownMenuItem onClick={toggleExpandAll} className="gap-3 font-bold">
+                  <DropdownMenuItem onClick={toggleExpandAll} className="gap-3 font-medium">
                     {expandedItems.length === categories.length ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     {expandedItems.length === categories.length ? "Contraer todo" : "Expandir todo"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleSync} disabled={isSyncing} className="gap-3 font-bold">
+                  <DropdownMenuItem onClick={handleSync} disabled={isSyncing} className="gap-3 font-medium">
                     <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} /> Sincronizar plan
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => { setIsSelectionMode(true); setExpandedItems(categories); }}
                     disabled={manualItems.length === 0}
-                    className="gap-3 font-bold"
+                    className="gap-3 font-medium"
                   >
                     <CheckSquare className="h-4 w-4" /> Seleccionar manuales
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDeleteAllManual} className="gap-3 font-bold text-destructive focus:text-destructive">
+                  <DropdownMenuItem onClick={handleDeleteAllManual} className="gap-3 font-medium text-destructive focus:text-destructive">
                     <Trash2 className="h-4 w-4" /> Borrar todos manuales
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -367,20 +367,20 @@ export function ComprasTab() {
       </header>
 
       {filteredItems.length > 0 && (
-        <Card className="border-none shadow-sm bg-primary-suave/50 rounded-3xl overflow-hidden border-2 border-primary/5">
+        <Card className="border border-border shadow-sm bg-primary-suave/50 rounded-2xl overflow-hidden">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="space-y-0.5">
-              <p className="text-2xl font-black text-primary leading-none">{formatPrecio(totalEstimado)} <span className="text-[10px] font-bold opacity-60 uppercase">Estimado</span></p>
+              <p className="text-2xl font-bold text-foreground leading-none">{formatPrecio(totalEstimado)} <span className="text-xs font-medium opacity-60">estimado</span></p>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-black text-muted-foreground uppercase">{filteredItems.filter(i => !i.isPurchased).length} ítems pendientes</span>
+                <span className="text-xs font-medium text-muted-foreground">{filteredItems.filter(i => !i.isPurchased).length} ítems pendientes</span>
                 {itemsSinPrecio > 0 && (
-                  <div className="flex items-center gap-1 text-accent font-black text-[9px] uppercase">
+                  <div className="flex items-center gap-1 text-accent font-medium text-xs">
                     <AlertTriangle className="h-3 w-3" /> {itemsSinPrecio} sin precio
                   </div>
                 )}
               </div>
             </div>
-            <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+            <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
               <DollarSign className="h-5 w-5 text-primary" />
             </div>
           </CardContent>
@@ -396,12 +396,12 @@ export function ComprasTab() {
         >
           {categories.map((category) => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-1 transition-all">
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2.5 rounded-xl border border-border shadow-sm mb-1 transition-all">
                 <div className="flex items-center gap-3">
                   <Package className="h-4 w-4 text-primary" />
                   <div className="flex flex-col items-start">
-                    <span className="text-xs font-black uppercase text-primary tracking-tight">{category}</span>
-                    <span className="text-[8px] font-black text-muted-foreground uppercase">{groupedItems[category].length} productos</span>
+                    <span className="text-sm font-semibold text-foreground capitalize">{category.toLowerCase()}</span>
+                    <span className="text-xs font-medium text-muted-foreground">{groupedItems[category].length} productos</span>
                   </div>
                 </div>
               </AccordionTrigger>
@@ -434,11 +434,11 @@ export function ComprasTab() {
                       <div className={cn("flex-1 min-w-0 flex items-center justify-between gap-3", isSelectionMode && !isManual && "opacity-40")}>
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-bold text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
+                            <span className={`font-medium text-sm truncate ${item.isPurchased ? 'line-through text-muted-foreground' : ''}`}>
                               {item.nombre}
                             </span>
                             {isManual && (
-                              <span className="text-[8px] font-black bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md uppercase shrink-0">Manual</span>
+                              <span className="text-[10px] font-medium bg-accent/10 text-accent border border-accent/20 px-1.5 py-0.5 rounded-md shrink-0">Manual</span>
                             )}
                             {!item.isPurchased && !isSelectionMode && (
                               <StockFormDialog
@@ -457,11 +457,11 @@ export function ComprasTab() {
                               />
                             )}
                           </div>
-                          <span className="text-[9px] font-black text-muted-foreground uppercase">
+                          <span className="text-xs font-medium text-muted-foreground">
                             {item.cantidad.toLocaleString('es-ES', { maximumFractionDigits: 2 })} {item.unidad}
                           </span>
                           {item.justificacion && !item.isPurchased && item.source === "plan" && (
-                            <span className="text-[8px] font-bold text-primary/60 mt-0.5 truncate">
+                            <span className="text-[11px] font-medium text-primary/60 mt-0.5 truncate">
                               {item.justificacion === "Stock mínimo"
                                 ? "⚠ Stock mínimo configurado"
                                 : `Receta: ${item.justificacion}`}
@@ -471,9 +471,9 @@ export function ComprasTab() {
                         <div className="flex items-center gap-2 shrink-0">
                           <div className="text-right">
                             {item.precioUnitario > 0 ? (
-                              <p className="text-xs font-black text-primary">{formatPrecio(item.subtotal)}</p>
+                              <p className="text-sm font-semibold text-primary">{formatPrecio(item.subtotal)}</p>
                             ) : (
-                              <p className="text-[9px] font-bold text-muted-foreground opacity-40">$ —</p>
+                              <p className="text-xs font-medium text-muted-foreground opacity-40">$ —</p>
                             )}
                           </div>
                           {isManual && !isSelectionMode && (
@@ -502,14 +502,14 @@ export function ComprasTab() {
         </Accordion>
       ) : (
         <div className="py-24 text-center space-y-4">
-          <div className="bg-primary-suave w-24 h-24 rounded-full flex items-center justify-center mx-auto">
-            <ShoppingCart className="h-12 w-12 text-primary" />
+          <div className="bg-primary-suave w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+            <ShoppingCart className="h-10 w-10 text-primary" />
           </div>
-          <h2 className="text-2xl font-black text-primary">Lista vacía</h2>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+          <h2 className="text-xl font-bold text-foreground">Lista vacía</h2>
+          <p className="text-sm font-medium text-muted-foreground">
             Sincronizá el plan o agregá productos manualmente.
           </p>
-          <Button onClick={handleSync} disabled={isSyncing} className="bg-primary text-white rounded-2xl gap-2">
+          <Button onClick={handleSync} disabled={isSyncing} className="bg-primary text-white rounded-xl gap-2">
             <RefreshCcw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
             Sincronizar ahora
           </Button>

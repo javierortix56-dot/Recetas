@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
           <div className="mt-14 mx-4 bg-destructive/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg pointer-events-auto">
             <WifiOff className="h-3 w-3" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sin conexión · Modo local</span>
+            <span className="text-xs font-medium">Sin conexión · Modo local</span>
           </div>
         </div>
       )}

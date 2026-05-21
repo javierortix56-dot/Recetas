@@ -80,10 +80,10 @@ function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, ico
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {Icon && <Icon className={cn("h-3 w-3 mb-0.5", ringColor)} />}
-          <span className="text-[10px] font-black leading-none">{Math.round(rawPercentage)}%</span>
+          <span className="text-xs font-semibold leading-none">{Math.round(rawPercentage)}%</span>
         </div>
       </div>
-      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">{label}</span>
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -446,15 +446,15 @@ export function PlanificacionTab() {
       {/* Header compacto con dropdown de acciones */}
       <header className="flex items-center justify-between pt-2">
         <div>
-          <h1 className="text-2xl font-black text-primary leading-none">Plan</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{activeProfile}</p>
+          <h1 className="text-2xl font-bold text-foreground leading-none">Plan</h1>
+          <p className="text-xs font-medium text-muted-foreground mt-0.5">{activeProfile}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm">
             <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-[10px] font-black px-2 tabular-nums">
+            <span className="text-xs font-semibold px-2 tabular-nums">
               {format(startDate, "d MMM", { locale: es })} – {format(addDays(startDate, 6), "d MMM", { locale: es })}
             </span>
             <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
@@ -468,10 +468,10 @@ export function PlanificacionTab() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
-              <DropdownMenuItem onClick={handleAutoPlan} disabled={isAutoPlanning} className="gap-3 font-bold">
+              <DropdownMenuItem onClick={handleAutoPlan} disabled={isAutoPlanning} className="gap-3 font-medium">
                 <Sparkles className="h-4 w-4 text-accent" /> Planear semana con IA
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} className="gap-3 font-bold text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} className="gap-3 font-medium text-destructive focus:text-destructive">
                 <CalendarX className="h-4 w-4" /> Vaciar semana
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -480,7 +480,7 @@ export function PlanificacionTab() {
       </header>
 
       {/* Macro rings compactos */}
-      <Card className="border-none shadow-sm bg-white rounded-3xl overflow-hidden border border-primary/5">
+      <Card className="border border-border shadow-sm bg-white rounded-2xl overflow-hidden">
         <CardContent className="p-4">
           <div className="flex justify-around items-center">
             <WeeklyMacroRing label="Kcal" value={weeklyTotals.calorias} target={weeklyGoals.calorias} size={72} strokeWidth={6} icon={Flame} />
@@ -512,10 +512,10 @@ export function PlanificacionTab() {
                   : "bg-white text-foreground border border-border"
               )}
             >
-              <span className="text-[9px] font-black uppercase tracking-widest opacity-80">
+              <span className="text-[11px] font-medium capitalize opacity-80">
                 {format(day, "EEE", { locale: es })}
               </span>
-              <span className="text-lg font-black leading-none">{format(day, "d")}</span>
+              <span className="text-lg font-semibold leading-none">{format(day, "d")}</span>
               <div className="flex gap-0.5 h-1.5 items-center">
                 {dayPlansCount > 0
                   ? Array.from({ length: Math.min(dayPlansCount, 4) }).map((_, i) => (
@@ -547,7 +547,7 @@ export function PlanificacionTab() {
               className="space-y-2.5"
             >
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-black text-primary capitalize">
+                <span className="text-sm font-semibold text-foreground capitalize">
                   {format(day, "EEEE d 'de' MMMM", { locale: es })}
                 </span>
                 <Button
@@ -565,14 +565,14 @@ export function PlanificacionTab() {
 
                 return (
                   <div key={m} className="flex gap-3 items-start">
-                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right pt-3">{m}</span>
+                    <span className="w-16 text-[11px] font-medium text-muted-foreground shrink-0 text-right pt-3">{m}</span>
                     <div className="flex-1 space-y-1.5 min-w-0">
                       {mealPlans.map((plan) => {
                         const recipe = recetas.find(r => r.id === plan.recipeId);
                         const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
                         return (
-                          <div key={plan.id} className="flex items-center gap-2.5 bg-white p-2 rounded-2xl relative shadow-sm border border-border/60">
-                            <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                          <div key={plan.id} className="flex items-center gap-2.5 bg-white p-2 rounded-xl relative shadow-sm border border-border">
+                            <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 relative bg-muted">
                               {imageUrl ? (
                                 <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
                               ) : (
@@ -580,16 +580,16 @@ export function PlanificacionTab() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0 pr-14">
-                              <h4 className="font-bold text-xs truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
+                              <h4 className="font-medium text-sm truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
                                 {plan.recipeName}
                               </h4>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <div className="flex items-center gap-1">
-                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">-</button>
-                                  <span className="text-[9px] font-black tabular-nums">{plan.plannedPortions || 3}p</span>
-                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">+</button>
+                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-medium flex items-center justify-center">-</button>
+                                  <span className="text-[11px] font-medium tabular-nums">{plan.plannedPortions || 3}p</span>
+                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-medium flex items-center justify-center">+</button>
                                 </div>
-                                <span className="text-[9px] font-black text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
+                                <span className="text-[11px] font-medium text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
                               </div>
                             </div>
                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
@@ -601,11 +601,11 @@ export function PlanificacionTab() {
                       })}
                       <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
                         <button className={cn(
-                          "w-full border border-dashed border-border rounded-2xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors",
-                          mealPlans.length === 0 ? "h-10" : "h-7 rounded-xl border-border/50"
+                          "w-full border border-dashed border-border rounded-xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors",
+                          mealPlans.length === 0 ? "h-10" : "h-7 border-border/50"
                         )}>
                           <Plus className="h-3 w-3" />
-                          {mealPlans.length === 0 && <span className="text-[9px] font-black uppercase">Agregar</span>}
+                          {mealPlans.length === 0 && <span className="text-xs font-medium">Agregar</span>}
                         </button>
                       </AddMealPlanDialog>
                     </div>
@@ -619,14 +619,14 @@ export function PlanificacionTab() {
 
       {/* Confirm vaciar semana */}
       <AlertDialog open={isConfirmClearOpen} onOpenChange={setIsConfirmClearOpen}>
-        <AlertDialogContent className="rounded-[2rem]">
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-black text-primary text-xl">¿Vaciar tu semana?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">Se quitarán todas las comidas de esta semana.</AlertDialogDescription>
+            <AlertDialogTitle className="font-semibold text-foreground text-lg">¿Vaciar tu semana?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-normal">Se quitarán todas las comidas de esta semana.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setIsConfirmClearOpen(false); handleUnplanWeek(); }} className="bg-destructive text-white rounded-xl font-black">
+            <AlertDialogCancel className="rounded-xl font-medium">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setIsConfirmClearOpen(false); handleUnplanWeek(); }} className="bg-destructive text-white rounded-xl font-medium">
               {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Vaciar"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -635,16 +635,16 @@ export function PlanificacionTab() {
 
       {/* Confirm eliminar receta del plan */}
       <AlertDialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
-        <AlertDialogContent className="rounded-[2rem]">
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-black text-primary text-xl">¿Eliminar del plan?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">
-              Se quitará <span className="font-bold text-foreground">{selectedPlan?.recipeName}</span> de tu plan.
+            <AlertDialogTitle className="font-semibold text-foreground text-lg">¿Eliminar del plan?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-normal">
+              Se quitará <span className="font-semibold text-foreground">{selectedPlan?.recipeName}</span> de tu plan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteFromPlan} disabled={isDeleting} className="bg-destructive text-white rounded-xl font-black">
+            <AlertDialogCancel className="rounded-xl font-medium">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFromPlan} disabled={isDeleting} className="bg-destructive text-white rounded-xl font-medium">
               {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>

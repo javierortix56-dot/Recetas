@@ -30,21 +30,21 @@ function MacroRing({ label, value, target, size = 60, strokeWidth = 6 }: { label
   else if (rawPercentage > 100) ringColor = "text-accent";
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1.5">
       <div className="relative" style={{ width: size, height: size }}>
         <svg className="w-full h-full transform -rotate-90">
           <circle cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" strokeWidth={strokeWidth} className="text-primary-suave" />
-          <circle 
-            cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" 
-            strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} 
-            strokeLinecap="round" className={`${ringColor} transition-all duration-500`} 
+          <circle
+            cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor"
+            strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset}
+            strokeLinecap="round" className={`${ringColor} transition-all duration-500`}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[10px] font-black">{Math.round(rawPercentage)}%</span>
+          <span className="text-xs font-semibold">{Math.round(rawPercentage)}%</span>
         </div>
       </div>
-      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight">{label}</span>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -163,35 +163,35 @@ export function InicioTab() {
   }, [historialCompras, mounted]);
 
   if (!mounted) {
-    return <div className="space-y-6 p-4"><Skeleton className="h-48 w-full rounded-[2rem]" /></div>;
+    return <div className="space-y-6 p-4"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
   }
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{greeting}</p>
-          <h1 className="text-3xl font-black text-primary leading-none tracking-tighter">
+          <p className="text-xs font-medium text-muted-foreground mb-0.5">{greeting}</p>
+          <h1 className="text-2xl font-bold text-foreground leading-none tracking-tight">
             {userProfile?.displayName?.split(' ')[0] || 'Chef'}
           </h1>
-          <p className="text-[10px] font-bold text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
+          <p className="text-xs text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
         </div>
-        <Avatar className="h-12 w-12 ring-4 ring-primary/10 shadow-glow">
-          <AvatarFallback className="bg-primary text-white font-black text-sm">
+        <Avatar className="h-11 w-11 ring-1 ring-border">
+          <AvatarFallback className="bg-primary text-white font-semibold text-sm">
             {(userProfile?.displayName || 'CF').slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       </header>
 
-      <Card className="border border-primary/10 shadow-recipe hover:shadow-card-hover bg-white rounded-3xl cursor-pointer transition-shadow" onClick={() => router.push('/macros')}>
-        <CardContent className="p-6 space-y-6">
+      <Card className="border border-border shadow-recipe hover:shadow-card-hover bg-white rounded-2xl cursor-pointer transition-shadow" onClick={() => router.push('/macros')}>
+        <CardContent className="p-5 space-y-5">
           <div className="flex justify-between items-center">
-            <h3 className="text-base font-black flex items-center gap-2 uppercase">
-              <Activity className="h-5 w-5 text-primary" /> Nutrición de hoy
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <Activity className="h-4 w-4 text-primary" /> Nutrición de hoy
             </h3>
-            <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-[10px] px-3">En vivo</Badge>
+            <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-xs font-medium px-2.5">En vivo</Badge>
           </div>
-          <div className="flex justify-around items-center pt-2">
+          <div className="flex justify-around items-center pt-1">
             <MacroRing label="Kcal" value={currentMacros.calorias} target={goals.calorias} size={85} />
             <MacroRing label="Prot" value={currentMacros.proteinas} target={goals.proteinas} />
             <MacroRing label="Carbs" value={currentMacros.carbohidratos} target={goals.carbohidratos} />
@@ -202,10 +202,10 @@ export function InicioTab() {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-base font-black flex items-center gap-2 uppercase">
-            <Calendar className="h-5 w-5 text-primary" /> Mi Plan de hoy
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+            <Calendar className="h-4 w-4 text-primary" /> Mi plan de hoy
           </h3>
-          <Button variant="link" className="text-primary font-black text-[10px] p-0" onClick={() => router.push('/planificacion')}>
+          <Button variant="link" className="text-primary font-medium text-xs p-0" onClick={() => router.push('/planificacion')}>
             Ver calendario <ChevronRight className="h-3 w-3 ml-1" />
           </Button>
         </div>
@@ -215,18 +215,18 @@ export function InicioTab() {
             {todayPlansSorted.map((plan) => {
               const imageUrl = getSafeImageSource(plan);
               return (
-                <Card key={plan.id} className="min-w-[170px] max-w-[170px] border-none shadow-recipe hover:shadow-card-hover rounded-3xl overflow-hidden snap-start active:scale-[0.97] transition-all" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
+                <Card key={plan.id} className="min-w-[170px] max-w-[170px] border border-border shadow-recipe hover:shadow-card-hover rounded-2xl overflow-hidden snap-start active:scale-[0.97] transition-all" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
                   <div className="h-28 w-full relative bg-muted">
                     {imageUrl ? (
                       <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
                     ) : (
                       <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} className="rounded-none" />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <Badge className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[7px] font-black text-primary border-none shadow-sm">{plan.mealType}</Badge>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+                    <Badge className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[10px] font-medium text-primary border-none shadow-sm">{plan.mealType}</Badge>
                     <div className="absolute bottom-2 left-2.5 right-2.5">
-                      <h4 className="font-black text-[11px] text-white truncate leading-tight drop-shadow-sm">{plan.recipeName}</h4>
-                      <p className="text-[9px] font-bold text-white/80 mt-0.5">
+                      <h4 className="font-semibold text-xs text-white truncate leading-tight drop-shadow-sm">{plan.recipeName}</h4>
+                      <p className="text-[11px] text-white/80 mt-0.5">
                         {Math.round(plan.macros?.calorias || 0)} kcal
                       </p>
                     </div>
@@ -236,31 +236,31 @@ export function InicioTab() {
             })}
           </div>
         ) : (
-          <div className="bg-primary/5 border-2 border-dashed border-primary/20 rounded-[2rem] p-8 text-center cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => router.push('/planificacion')}>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nada planeado para hoy. ¡Empezá a cocinar!</p>
+          <div className="bg-primary/5 border border-dashed border-primary/20 rounded-2xl p-6 text-center cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => router.push('/planificacion')}>
+            <p className="text-sm font-medium text-muted-foreground">Nada planeado para hoy. ¡Empezá a cocinar!</p>
           </div>
         )}
       </section>
 
       <div className="grid grid-cols-1 gap-6">
-        <Card className="border-none shadow-recipe bg-white rounded-3xl">
-          <CardContent className="p-6 space-y-4">
-            <h3 className="text-base font-black flex items-center gap-2 uppercase">
-              <Activity className="h-5 w-5 text-primary" /> Progreso de Calorías
+        <Card className="border border-border shadow-recipe bg-white rounded-2xl">
+          <CardContent className="p-5 space-y-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <Activity className="h-4 w-4 text-primary" /> Progreso de calorías
             </h3>
             <WeeklyEvolutionChart data={weeklyData} target={goals.calorias} />
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-recipe bg-white rounded-3xl overflow-hidden" onClick={() => router.push('/compras')}>
-          <CardContent className="p-6 space-y-6">
+        <Card className="border border-border shadow-recipe bg-white rounded-2xl overflow-hidden" onClick={() => router.push('/compras')}>
+          <CardContent className="p-5 space-y-5">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-black flex items-center gap-2 uppercase">
-                <DollarSign className="h-5 w-5 text-primary" /> Gasto Semanal
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <DollarSign className="h-4 w-4 text-primary" /> Gasto semanal
               </h3>
               {spendingStats && (
                 <div className={cn(
-                  "flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase",
+                  "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium",
                   spendingStats.diffPercent > 0 ? "bg-destructive/10 text-destructive" : spendingStats.diffPercent < 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 )}>
                   {spendingStats.diffPercent > 0 ? <TrendingUp className="h-3 w-3" /> : spendingStats.diffPercent < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
@@ -271,12 +271,12 @@ export function InicioTab() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Esta semana</p>
-                <p className="text-2xl font-black text-primary leading-tight">{formatPrecio(spendingStats?.current || 0)}</p>
+                <p className="text-xs font-medium text-muted-foreground">Esta semana</p>
+                <p className="text-2xl font-bold text-foreground leading-tight">{formatPrecio(spendingStats?.current || 0)}</p>
               </div>
               <div className="space-y-1 text-right">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">La anterior</p>
-                <p className="text-xl font-bold text-muted-foreground leading-tight">{formatPrecio(spendingStats?.previous || 0)}</p>
+                <p className="text-xs font-medium text-muted-foreground">La anterior</p>
+                <p className="text-xl font-semibold text-muted-foreground leading-tight">{formatPrecio(spendingStats?.previous || 0)}</p>
               </div>
             </div>
           </CardContent>

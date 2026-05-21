@@ -164,7 +164,7 @@ export function StockTab() {
     <div className="flex flex-col gap-3 animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col gap-2.5 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-black tracking-tight text-primary">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {isSelectionMode ? `(${selectedIds.size})` : 'Despensa'}
           </h1>
           <div className="flex gap-2">
@@ -185,25 +185,25 @@ export function StockTab() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="rounded-2xl">
-                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-bold">
+                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-medium">
                       <Check className="h-4 w-4" /> Seleccionar
                     </DropdownMenuItem>
                     <StockHistorialDialog asMenuItem />
                     <CategoryManagerDialog asMenuItem />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-3 font-bold text-accent focus:text-accent">
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-3 font-medium text-accent focus:text-accent">
                           <RotateCcw className="h-4 w-4" /> Resetear mínimos a 0
                         </DropdownMenuItem>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2rem]">
+                      <AlertDialogContent className="rounded-2xl">
                         <AlertDialogHeader>
-                          <AlertDialogTitle className="font-black text-primary">¿Poner todos los mínimos en 0?</AlertDialogTitle>
+                          <AlertDialogTitle className="font-semibold text-foreground">¿Poner todos los mínimos en 0?</AlertDialogTitle>
                           <AlertDialogDescription>Nada aparecerá automáticamente en la lista de compras salvo que lo planees.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="gap-2">
-                          <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-                          <AlertDialogAction className="bg-accent text-white rounded-xl font-black" onClick={handleResetAllMinStock}>Sí, poner en 0</AlertDialogAction>
+                          <AlertDialogCancel className="rounded-xl font-medium">Cancelar</AlertDialogCancel>
+                          <AlertDialogAction className="bg-accent text-white rounded-xl font-medium" onClick={handleResetAllMinStock}>Sí, poner en 0</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -218,15 +218,16 @@ export function StockTab() {
           <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border-2 border-primary/5 font-bold text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border border-border font-medium text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
-                {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
+              <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-medium text-xs w-fit flex items-center gap-1", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
+                <AlertCircle className="h-3 w-3" />
+                {showLowStockOnly ? "Viendo stock bajo" : "Filtrar stock bajo"}
               </Badge>
-              <Badge variant={showPlannedOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/10 text-primary border-none")} onClick={() => setShowPlannedOnly(!showPlannedOnly)}>
+              <Badge variant={showPlannedOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-medium text-xs w-fit flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/10 text-primary border-none")} onClick={() => setShowPlannedOnly(!showPlannedOnly)}>
                 <CalendarDays className="h-3 w-3" />
-                {showPlannedOnly ? "Viendo Planificado" : "Filtrar Planificado"}
+                {showPlannedOnly ? "Viendo planificado" : "Filtrar planificado"}
               </Badge>
             </div>
           </>
@@ -234,10 +235,10 @@ export function StockTab() {
 
         {isSelectionMode && (
           <div className="flex flex-wrap gap-2 py-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="rounded-xl h-8 px-3 text-[10px] font-black uppercase"
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl h-8 px-3 text-xs font-medium"
               onClick={() => {
                 if (allSelected) setSelectedIds(new Set());
                 else setSelectedIds(new Set(filteredIngredients.map(i => i.id)));
@@ -258,11 +259,11 @@ export function StockTab() {
         >
           {Object.keys(grouped).sort().map(category => (
             <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-0.5 transition-all">
+              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2.5 rounded-xl border border-border shadow-sm mb-0.5 transition-all">
                 <div className="flex items-center gap-3">
                   <Package className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
-                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-[9px] h-5 px-1.5">{grouped[category].length}</Badge>
+                  <span className="text-sm font-semibold text-foreground capitalize">{category.toLowerCase()}</span>
+                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-xs h-5 px-1.5">{grouped[category].length}</Badge>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-0.5 space-y-1 px-1">
@@ -286,21 +287,21 @@ export function StockTab() {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
+                      <p className="font-medium text-sm truncate leading-tight">{item.nombre}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo ? (
-                          <span className="text-[8px] font-black text-destructive uppercase flex items-center gap-0.5">
+                          <span className="text-[11px] font-medium text-destructive flex items-center gap-0.5">
                             <AlertCircle className="h-2.5 w-2.5" /> Bajo
                           </span>
                         ) : null}
-                        <span className={cn("text-[9px] font-black tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
+                        <span className={cn("text-xs font-medium tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
                           {item.stockActual} {item.unidad}
                         </span>
                         {item.stockMinimo > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground">mín {item.stockMinimo}</span>
+                          <span className="text-[11px] font-normal text-muted-foreground">mín {item.stockMinimo}</span>
                         )}
                         {item.precioUnitario > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground opacity-60">
+                          <span className="text-[11px] font-normal text-muted-foreground opacity-60">
                             {formatPrecio(item.precioUnitario)}/{item.unidad}
                           </span>
                         )}
@@ -319,7 +320,7 @@ export function StockTab() {
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <div className="w-6 text-center font-black text-xs text-primary tabular-nums">
+                          <div className="w-6 text-center font-semibold text-xs text-primary tabular-nums">
                             {item.stockActual}
                           </div>
                           <Button 
@@ -341,8 +342,8 @@ export function StockTab() {
         </Accordion>
       ) : (
         <div className="py-20 text-center opacity-40">
-          <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-xs font-black uppercase">Sin resultados en la despensa</p>
+          <Package className="h-14 w-14 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Sin resultados en la despensa</p>
         </div>
       )}
 
@@ -354,20 +355,20 @@ export function StockTab() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-20 left-4 right-4 z-[60] max-w-lg mx-auto"
           >
-            <div className="bg-primary shadow-2xl rounded-3xl p-4 flex items-center justify-between border-2 border-white/20">
-              <span className="text-white font-black text-sm">{selectedIds.size} seleccionados</span>
+            <div className="bg-primary shadow-2xl rounded-2xl p-4 flex items-center justify-between border border-white/20">
+              <span className="text-white font-semibold text-sm">{selectedIds.size} seleccionados</span>
               <div className="flex gap-2">
-                <BulkCategoryDialog 
-                  selectedIds={Array.from(selectedIds)} 
+                <BulkCategoryDialog
+                  selectedIds={Array.from(selectedIds)}
                   onSuccess={() => {
                     setSelectedIds(new Set());
                     setIsSelectionMode(false);
                   }}
                 />
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }}
-                  className="bg-white/10 text-white rounded-2xl h-12 px-4 font-black uppercase text-[10px]"
+                  className="bg-white/10 text-white rounded-xl h-12 px-4 font-medium text-xs"
                 >
                   Cancelar
                 </Button>
