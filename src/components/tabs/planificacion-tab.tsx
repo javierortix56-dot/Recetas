@@ -56,6 +56,17 @@ import { syncShoppingList } from '@/lib/sync-logic';
 
 const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
 
+function describePlanError(e: any): string {
+  const msg = String(e?.message || e || "");
+  if (/api[_ ]?key|GEMINI|permission|PERMISSION_DENIED|api key/i.test(msg)) {
+    return "Falta configurar la clave de IA (GEMINI_API_KEY) en el servidor.";
+  }
+  if (/index|FAILED_PRECONDITION/i.test(msg)) {
+    return "Falta un índice de Firestore. Revisá la consola para crearlo.";
+  }
+  return msg ? msg.slice(0, 140) : "Ocurrió un error inesperado.";
+}
+
 function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, icon: Icon }: { label: string, value: number, target: number, size?: number, strokeWidth?: number, icon?: any }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -135,7 +146,11 @@ export function PlanificacionTab() {
   }, [planificacionCargada, expandedDay]);
 
   const handleAutoPlan = async () => {
-    if (!db || recetas.length === 0) return;
+    if (!db) return;
+    if (recetas.length === 0) {
+      toast({ variant: "destructive", title: "No hay recetas", description: "Agregá al menos una receta antes de planear." });
+      return;
+    }
     setIsAutoPlanning(true);
     try {
       const result = await autoPlanWeek({
@@ -235,14 +250,18 @@ export function PlanificacionTab() {
       toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "Error al generar plan semanal" });
+      toast({ variant: "destructive", title: "Error al generar plan semanal", description: describePlanError(e) });
     } finally {
       setIsAutoPlanning(false);
     }
   };
 
   const handleAutoPlanDay = async (date: Date) => {
-    if (!db || recetas.length === 0) return;
+    if (!db) return;
+    if (recetas.length === 0) {
+      toast({ variant: "destructive", title: "No hay recetas", description: "Agregá al menos una receta antes de planear." });
+      return;
+    }
 
     const dateStr = format(date, "yyyy-MM-dd");
     setIsAutoPlanningDay(dateStr);
@@ -338,7 +357,7 @@ export function PlanificacionTab() {
       setExpandedDay(dateStr);
     } catch (e) {
       console.error("Error autoPlanDay:", e);
-      toast({ variant: "destructive", title: "Error al planear el día" });
+      toast({ variant: "destructive", title: "Error al planear el día", description: describePlanError(e) });
     } finally {
       setIsAutoPlanningDay(null);
     }
