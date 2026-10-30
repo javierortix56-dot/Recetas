@@ -87,9 +87,18 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 - Requiere `GEMINI_API_KEY` en Vercel (Production y Preview). La generación de imágenes puede requerir facturación activa en Google AI Studio (el nivel gratuito de la API no siempre la incluye). Si falla, la receta se guarda igual sin foto.
 - `maxDuration = 60` en el layout para que las llamadas no corten por tiempo.
 
-## 6. Propuestas (no implementadas)
+## 6. Fotos en Vercel Blob
 
-1. **Fotos en Firebase Storage** en vez de base64 dentro del documento: es la mejora de velocidad más grande que queda (cada receta pesa hoy decenas de KB por la foto).
+- Las fotos ya no se guardan como base64 dentro del documento de la receta: se suben a Vercel Blob (tienda `recetas-fotos`, pública, región iad1) y en `fotoURL` queda solo la URL. El listener de recetas deja de descargar todas las fotos en cada arranque.
+- `src/app/actions/recipe-images.ts`: server actions `uploadRecipeImage` (valida tipo JPEG/PNG/WebP y máx. 1,5 MB) y `deleteRecipeImage` (ignora URLs que no son de la tienda).
+- Se sube desde: formulario de receta, "Crear con IA" y "Generar foto con IA". Al reemplazar una foto o borrar una receta (individual o en lote) se borra la anterior.
+- Recetas existentes: **Recetas › ⋯ › Mover N fotos a la nube** sube las que siguen en base64 y quita las copias que los planes viejos guardaban de esas fotos. Es idempotente y no toca nada si una subida falla.
+- Requiere `BLOB_READ_WRITE_TOKEN` (la agrega Vercel al conectar la tienda al proyecto). Las URLs son públicas pero con sufijo aleatorio imposible de adivinar.
+- Sin conexión: la app ya no tiene las fotos dentro de los datos cacheados; el navegador las cachea por su cuenta (cabecera de caché de 1 año).
+
+## 7. Propuestas (no implementadas)
+
+1. ~~Fotos fuera de las recetas~~ → hecho, ver sección 6.
 2. **Reglas de Firestore**: hoy no hay autenticación (usuario fijo `usuario-local`); conviene Auth + reglas por familia.
 3. **Migrar a Neon (Postgres)**: pendiente por decisión. Implica perder la sincronización en vivo y el modo sin conexión de Firestore, y mover las fotos a un almacenamiento de archivos (p. ej. Vercel Blob).
 4. **Deshacer** al borrar (como en Finanzas) en vez de diálogos de confirmación.

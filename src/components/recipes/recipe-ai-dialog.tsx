@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast"
 import { useAppStore } from "@/store/app-store"
 import { USER_ID } from "@/lib/constants"
 import { compressImageSrc } from "@/lib/utils"
+import { uploadRecipeImage } from "@/app/actions/recipe-images"
 import { categorizeIngredient, normalizeIngredientName } from "@/lib/categorizeIngredient"
 import { generateRecipe, generateRecipeImage, type GeneratedRecipe } from "@/ai/flows/generate-recipe-flow"
 
@@ -77,7 +78,12 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const handleSave = async () => {
     if (!db || !recipe) return
     setStage("saving")
+    let fotoURL: string | null = null
     try {
+      // La foto va a Blob y en la receta solo queda su URL
+      if (image) {
+        try { fotoURL = await uploadRecipeImage(image) } catch (e) { console.error(e) }
+      }
       const batch = writeBatch(db)
       const ingredientes = recipe.ingredientes.map(ing => {
         const nombre = normalizeIngredientName(ing.nombre)
@@ -90,7 +96,7 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         ingredientes,
         pasos: recipe.pasos.map((p, i) => ({ ...p, orden: i + 1, timerSegundos: p.timerSegundos || 0 })),
         tags: recipe.tags.map(t => t.toLowerCase().trim()),
-        fotoURL: image,
+        fotoURL,
         generadaConIA: true,
         userId: USER_ID,
         createdAt: serverTimestamp(),

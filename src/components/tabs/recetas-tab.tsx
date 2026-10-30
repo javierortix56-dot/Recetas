@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Sparkles, CheckSquare, X, Check, Flame, Pencil, MoreHorizontal, Trash2, Clock, ChefHat } from "lucide-react";
+import { Search, Sparkles, CheckSquare, X, Check, Flame, Pencil, MoreHorizontal, Trash2, Clock, ChefHat, CloudUpload, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,8 @@ import { easeOut, spring, stagger } from '@/components/ui/motion';
 import { GradientPlaceholder } from "@/components/gradient-placeholder";
 import { RecipeAIDialog } from "@/components/recipes/recipe-ai-dialog";
 import { useAppStore } from '@/store/app-store';
+import { deleteRecipeImage } from '@/app/actions/recipe-images';
+import { migrateInlinePhotos, recipesWithInlinePhoto } from '@/lib/migrate-photos';
 import { useFirestore } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 import { USER_ID } from '@/lib/constants';
@@ -42,6 +44,27 @@ export function RecetasTab() {
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [migrating, setMigrating] = React.useState<null | { done: number; total: number }>(null);
+  const inlinePhotos = React.useMemo(() => recipesWithInlinePhoto(recetas).length, [recetas]);
+
+  const handleMigratePhotos = async () => {
+    if (!db || migrating) return;
+    setMigrating({ done: 0, total: inlinePhotos });
+    toast({ title: `Moviendo ${inlinePhotos} fotos…`, description: "Puede tardar un minuto. Dejá la app abierta." });
+    try {
+      const { moved, failed, plansCleaned } = await migrateInlinePhotos(db, recetas, (done, total) => setMigrating({ done, total }));
+      toast({
+        variant: failed > 0 ? "destructive" : "default",
+        title: failed > 0 ? `Se movieron ${moved} fotos, ${failed} fallaron` : "Fotos movidas ✓",
+        description: failed > 0 ? "Volvé a intentarlo desde el menú." : `${moved} recetas${plansCleaned ? ` y ${plansCleaned} planes limpiados` : ""}.`,
+      });
+    } catch (e) {
+      console.error(e);
+      toast({ variant: "destructive", title: "No se pudieron mover las fotos" });
+    } finally {
+      setMigrating(null);
+    }
+  };
 
   const tagsSorted = React.useMemo(() => {
     const counts: Record<string, number> = {};
@@ -78,8 +101,10 @@ export function RecetasTab() {
     if (!db || selectedIds.size === 0) return;
     try {
       const batch = writeBatch(db);
+      const urls = recetas.filter(r => selectedIds.has(r.id)).map(r => r.fotoURL || r.imageUrl);
       selectedIds.forEach(id => batch.delete(doc(db, "users", USER_ID, "recipes", id)));
       await batch.commit();
+      urls.forEach(u => deleteRecipeImage(u));
       toast({ title: `${selectedIds.size} ${selectedIds.size === 1 ? "receta eliminada" : "recetas eliminadas"}` });
       exitSelection();
     } catch {
@@ -110,6 +135,12 @@ export function RecetasTab() {
                 <DropdownMenuItem onClick={() => setIsSelectionMode(true)} disabled={recetas.length === 0}>
                   <CheckSquare /> Seleccionar varias
                 </DropdownMenuItem>
+                {inlinePhotos > 0 && (
+                  <DropdownMenuItem onClick={handleMigratePhotos} disabled={!!migrating}>
+                    {migrating ? <Loader2 className="animate-spin" /> : <CloudUpload />}
+                    {migrating ? `Moviendo ${migrating.done}/${migrating.total}…` : `Mover ${inlinePhotos} fotos a la nube`}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             <HeaderButton primary label="Crear receta con IA" onClick={() => setIsAIOpen(true)} className="px-3.5"><Sparkles /> Crear con IA</HeaderButton>
