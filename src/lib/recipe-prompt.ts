@@ -1,7 +1,9 @@
-/** Prompt para pedirle recetas en JSON a una IA externa (lo valida RecipeImportModal) */
-export const PROMPT_TEMPLATE = `Generame recetas en formato JSON. Una sola receta = objeto {}. Varias = array [{}, {}].
-
-REGLAS ESTRICTAS — seguir sin excepción:
+/**
+ * Reglas de cocina para que Gemini arme recetas consistentes con la app
+ * (unidades, categorías de despensa, macros por porción, pasos detallados).
+ * El formato de salida lo fija el esquema del flow, no el texto.
+ */
+export const RECIPE_RULES = `REGLAS ESTRICTAS — seguir sin excepción:
 
 ━━━ NOMBRE ━━━
 - Nombre del plato tal cual se conoce. Sin marcas comerciales.
@@ -64,28 +66,4 @@ REGLAS ESTRICTAS — seguir sin excepción:
 
 ━━━ TAGS ━━━
 - 6 a 12 tags en minúsculas y sin tildes.
-- Ejemplos: "rapido", "alto-en-proteina", "sin-gluten", "vegetariano", "italiana", "horno", "comfort-food", "meal-prep", "economico", "para-ninos", "picante", "sin-lactosa"
-
-━━━ FORMATO DE SALIDA (RFC 8259) ━━━
-- SOLO JSON válido. Sin markdown, sin texto fuera del JSON, sin backticks.
-
-{
-  "nombre": "",
-  "descripcion": "",
-  "historia": "",
-  "categorias": ["Almuerzo"],
-  "porciones": 4,
-  "tiempoPreparacion": 0,
-  "tiempoCoccion": 0,
-  "dificultad": "Fácil|Media|Difícil",
-  "ingredientes": [
-    {"nombre": "", "cantidad": 0, "unidad": "g", "preparacion": "", "categoria": ""}
-  ],
-  "utensilios": [""],
-  "pasos": [
-    {"orden": 1, "titulo": "", "descripcion": "", "timerSegundos": null}
-  ],
-  "tips": [""],
-  "macros": {"calorias": 0, "proteinas": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0, "azucar": 0, "sodio": 0, "pesoPorPorcion": 0},
-  "tags": [""]
-}`
+- Ejemplos: "rapido", "alto-en-proteina", "sin-gluten", "vegetariano", "italiana", "horno", "comfort-food", "meal-prep", "economico", "para-ninos", "picante", "sin-lactosa"`

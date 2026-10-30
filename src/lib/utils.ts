@@ -17,31 +17,36 @@ export const getSafeImageSource = (item: any) => {
   return url;
 };
 
-export async function compressImageToBase64(file: File): Promise<string> {
+/** Reduce una imagen (src o data URL) a JPEG de máx. 700 px: entra cómoda en un documento de Firestore */
+export function compressImageSrc(src: string, max = 700, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new window.Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX = 700;
-        let { width, height } = img;
-        if (width > height) {
-          if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
-        } else {
-          if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
-      };
-      img.onerror = reject;
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height) {
+        if (width > max) { height = Math.round(height * max / width); width = max; }
+      } else if (height > max) {
+        width = Math.round(width * max / height); height = max;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
     };
-    reader.onerror = reject;
+    img.onerror = reject;
+    img.src = src;
   });
+}
+
+export async function compressImageToBase64(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  return compressImageSrc(dataUrl);
 }
 
 /**

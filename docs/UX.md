@@ -14,7 +14,7 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 | 4 | Las pestañas leían el store completo (`useAppStore()`) | Cualquier cambio (p. ej. tildar un ítem) re-renderizaba las 6 pestañas | Selectores con `useShallow` por pestaña |
 | 5 | `AddMealPlanDialog` y `AddMealLogDialog` abrían cada uno su propio listener sobre toda la colección de recetas, una vez por instancia (4+ en Plan) | N descargas de todas las recetas con fotos | Usan las recetas del store |
 | 6 | Detalle de receta: una consulta a Firestore por ingrediente para el semáforo de stock y otra tanda para "agregar faltantes" | 10–20 lecturas por apertura | Se calcula en memoria con la despensa del store |
-| 7 | Importar recetas: una consulta por ingrediente + escrituras secuenciales | Importaciones lentas | Un solo `writeBatch` y chequeo de duplicados en memoria |
+| 7 | Importar recetas: una consulta por ingrediente + escrituras secuenciales | Importaciones lentas | Guardado en un solo `writeBatch` y chequeo de duplicados en memoria |
 | 8 | Cada comida planificada copiaba la foto base64 de la receta | Documentos de plan pesados; el sync los relee todos | La foto ya no se copia; las vistas la toman de la receta |
 | 9 | El sync leía **todo** el historial de planes | Lecturas crecientes con el tiempo | Solo planes desde hoy (`date >= hoy`) |
 | 10 | El sync borraba y recreaba toda la lista de compras en cada cambio | Parpadeo y escrituras innecesarias | Reconciliación: actualiza, crea o borra solo lo que cambió |
@@ -47,7 +47,7 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 
 | Antes | Ahora |
 |-------|-------|
-| Recetas › ⋮: "Prompt IA" (sheet) **y** "Importar JSON" (modal con el mismo prompt) | Una sola entrada: **Importar con IA** (copiar prompt → pegar JSON) |
+| Recetas › ⋮: "Prompt IA" (sheet) **y** "Importar JSON" (modal con el mismo prompt): había que copiar el prompt a otra IA y pegar el JSON | **Crear con IA** dentro de la app: se escribe qué cocinar, Gemini arma la receta y genera la foto |
 | Despensa: modo "Seleccionar" + diálogo "Mover productos" **y** "Gestionar categorías" (que también mueve productos) | Solo **Gestionar categorías** |
 | "Limpieza de despensa" (unificar duplicados) escondida en los ajustes de Nutrición | En el menú de **Despensa** |
 | Compras: "Borrar todos manuales" **y** "Seleccionar manuales" (con "Todos") | Solo la selección |
@@ -64,8 +64,8 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
   - **Ajustes**: metas de macros por perfil y tema (sistema/claro/oscuro).
   - **Nutrición** (perfil): Día / Semana · "Comida fuera del plan".
 - **Plan** (perfil) › ⋯: Planificar semana con IA · Vaciar semana. Por día: "Armar día" con IA, agregar por momento, porciones ±, quitar.
-- **Recetas** › ⋯: Importar con IA · Seleccionar varias. `+` nueva receta.
-  - **Detalle** › ⋯: Editar · Registrar que la comí · Eliminar. Barra: Planificar · Cocinar.
+- **Recetas** › ⋯: Escribir a mano · Seleccionar varias. ✨ Crear con IA (pedido en texto → receta + foto).
+  - **Detalle** › ⋯: Editar · Generar foto con IA · Registrar que la comí · Eliminar. Barra: Planificar · Cocinar.
 - **Despensa** › ⋯: Expandir/contraer · Historial · Gestionar categorías · Unificar duplicados con IA · Mínimos en 0. `+` nuevo producto.
 - **Compras** › ⋯: Recalcular con el plan · Expandir/contraer · Borrar agregados a mano. `+` agregar producto.
 
@@ -79,11 +79,19 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 - Todos los diálogos pasan a ser bottom sheets con asa y safe-area; confirmaciones como tarjeta glass.
 - Presets de motion compartidos (`components/ui/motion.ts`).
 
-## 5. Propuestas (no implementadas)
+## 5. Recetas con IA
+
+- `src/ai/flows/generate-recipe-flow.ts`: dos server actions con Genkit.
+  - `generateRecipe`: `gemini-2.5-flash` con salida estructurada (esquema Zod con las unidades y categorías de la app) y las reglas de cocina de `lib/recipe-prompt.ts`.
+  - `generateRecipeImage`: `gemini-2.5-flash-image`; el cliente la comprime a JPEG de 700 px antes de guardarla.
+- Requiere `GEMINI_API_KEY` en Vercel (Production y Preview). La generación de imágenes puede requerir facturación activa en Google AI Studio (el nivel gratuito de la API no siempre la incluye). Si falla, la receta se guarda igual sin foto.
+- `maxDuration = 60` en el layout para que las llamadas no corten por tiempo.
+
+## 6. Propuestas (no implementadas)
 
 1. **Fotos en Firebase Storage** en vez de base64 dentro del documento: es la mejora de velocidad más grande que queda (cada receta pesa hoy decenas de KB por la foto).
 2. **Reglas de Firestore**: hoy no hay autenticación (usuario fijo `usuario-local`); conviene Auth + reglas por familia.
-3. **Estimar macros con IA** desde el formulario de receta (el flow `estimate-recipe-macros` ya existe, falta calorías en su salida).
+3. **Migrar a Neon (Postgres)**: pendiente por decisión. Implica perder la sincronización en vivo y el modo sin conexión de Firestore, y mover las fotos a un almacenamiento de archivos (p. ej. Vercel Blob).
 4. **Deshacer** al borrar (como en Finanzas) en vez de diálogos de confirmación.
 5. **Lista de compras por pasillo** con orden configurable del súper.
 6. **Exportar/compartir** la lista de compras por WhatsApp.

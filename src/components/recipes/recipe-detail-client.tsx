@@ -3,12 +3,13 @@
 import * as React from "react"
 import {
   ArrowLeft, Clock, Timer, ChefHat, Play, Utensils, CalendarPlus, Activity,
-  Trash2, Pencil, Lightbulb, Box, CookingPot, MoreHorizontal, Minus, Plus, Flame,
+  Trash2, Pencil, Lightbulb, Box, CookingPot, MoreHorizontal, Minus, Plus, Flame, Sparkles, Loader2,
 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { doc, deleteDoc } from "firebase/firestore"
+import { doc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { generateRecipeImage } from "@/ai/flows/generate-recipe-flow"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -24,7 +25,7 @@ import { useFirestore } from "@/firebase"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
 import { isSubPreparation } from "@/lib/categorizeIngredient"
-import { calcularCostoIngrediente, cn, convertirCantidad, formatPrecio, getSafeImageSource } from "@/lib/utils"
+import { calcularCostoIngrediente, cn, compressImageSrc, convertirCantidad, formatPrecio, getSafeImageSource } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
 
 type StockState = 'ok' | 'poco' | 'falta' | 'sin-datos'
@@ -55,6 +56,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const [tab, setTab] = React.useState<'ingredientes' | 'pasos' | 'extras' | 'costo'>('ingredientes')
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = React.useState(false)
 
   React.useEffect(() => {
     if (receta?.porciones) setPortions(receta.porciones)
@@ -85,6 +87,23 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
   const totalCost = rows.reduce((a: number, r: any) => a + r.cost, 0)
   const pricedCount = rows.filter((r: any) => r.hasPrice || isSubPreparation(r.ing.nombre)).length
   const missingCount = rows.filter((r: any) => r.state === 'falta' || r.state === 'poco').length
+
+  const handleGenerateImage = async () => {
+    if (!db || !receta) return
+    setIsGeneratingImage(true)
+    toast({ title: "Generando foto…", description: "Tarda unos segundos" })
+    try {
+      const raw = await generateRecipeImage({ nombre: receta.nombre, descripcion: receta.descripcion })
+      const fotoURL = await compressImageSrc(raw)
+      await updateDoc(doc(db, "users", USER_ID, "recipes", recipeId), { fotoURL, imageUrl: null, updatedAt: serverTimestamp() })
+      toast({ title: "Foto lista ✓" })
+    } catch (e) {
+      console.error(e)
+      toast({ variant: "destructive", title: "No se pudo generar la foto" })
+    } finally {
+      setIsGeneratingImage(false)
+    }
+  }
 
   const handleDeleteRecipe = async () => {
     if (!db) return
@@ -125,6 +144,11 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
           <GradientPlaceholder categoria={categorias[0]} className="rounded-none" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/30" />
+        {isGeneratingImage && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="rounded-full bg-black/40 backdrop-blur-md px-3 py-1.5 text-xs font-semibold text-white flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando foto…</span>
+          </div>
+        )}
         <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 flex justify-between items-center">
           <button aria-label="Volver" onClick={() => router.back()} className="h-10 w-10 rounded-full bg-black/25 backdrop-blur-md text-white flex items-center justify-center active:scale-90">
             <ArrowLeft className="h-5 w-5" />
@@ -137,6 +161,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => router.push(`/recetas/edit/${recipeId}`)}><Pencil /> Editar receta</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleGenerateImage} disabled={isGeneratingImage}><Sparkles /> {imageSource ? "Nueva foto con IA" : "Generar foto con IA"}</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLogOpen(true)}><Activity /> Registrar que la comí</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 /> Eliminar</DropdownMenuItem>

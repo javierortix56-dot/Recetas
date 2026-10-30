@@ -9,6 +9,9 @@ import { AppShell } from '@/components/app-shell';
 import { AmbientBackground } from '@/components/ui/ambient-background';
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from '@/lib/theme';
 
+// Las acciones de IA (receta + foto con Gemini) pueden tardar más que el límite por defecto
+export const maxDuration = 60;
+
 // next/font: la fuente se sirve desde el propio dominio y no bloquea el render
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 

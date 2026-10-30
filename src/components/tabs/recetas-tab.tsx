@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Sparkles, CheckSquare, X, Check, Flame, Plus, MoreHorizontal, Trash2, Clock, ChefHat } from "lucide-react";
+import { Search, Sparkles, CheckSquare, X, Check, Flame, Pencil, MoreHorizontal, Trash2, Clock, ChefHat } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ import { PageHeader, HeaderButton, EmptyState } from '@/components/ui/page-heade
 import { FilterChip } from '@/components/ui/segmented';
 import { easeOut, spring, stagger } from '@/components/ui/motion';
 import { GradientPlaceholder } from "@/components/gradient-placeholder";
-import { RecipeImportModal } from "@/components/recipe-import-modal";
+import { RecipeAIDialog } from "@/components/recipes/recipe-ai-dialog";
 import { useAppStore } from '@/store/app-store';
 import { useFirestore } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -37,7 +37,7 @@ export function RecetasTab() {
   const [activeCategory, setActiveCategory] = React.useState("Todos");
   const [activeTag, setActiveTag] = React.useState<string | null>(null);
   const [showTags, setShowTags] = React.useState(false);
-  const [isImportOpen, setIsImportOpen] = React.useState(false);
+  const [isAIOpen, setIsAIOpen] = React.useState(false);
 
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -104,15 +104,15 @@ export function RecetasTab() {
                 <HeaderButton label="Más opciones"><MoreHorizontal /></HeaderButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsImportOpen(true)}>
-                  <Sparkles /> Importar con IA
+                <DropdownMenuItem onClick={() => router.push("/recetas/nueva")}>
+                  <Pencil /> Escribir a mano
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsSelectionMode(true)} disabled={recetas.length === 0}>
                   <CheckSquare /> Seleccionar varias
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <HeaderButton primary label="Nueva receta" onClick={() => router.push("/recetas/nueva")}><Plus /></HeaderButton>
+            <HeaderButton primary label="Crear receta con IA" onClick={() => setIsAIOpen(true)}><Sparkles /></HeaderButton>
           </>
         )}
       >
@@ -179,8 +179,8 @@ export function RecetasTab() {
         <EmptyState
           icon={ChefHat}
           title="Todavía no hay recetas"
-          description="Creá una a mano o importá varias de una vez con IA."
-          action={<Button onClick={() => setIsImportOpen(true)} className="mt-2"><Sparkles className="h-4 w-4" /> Importar con IA</Button>}
+          description="Escribí qué querés cocinar y la IA arma la receta con foto."
+          action={<Button onClick={() => setIsAIOpen(true)} className="mt-2"><Sparkles className="h-4 w-4" /> Crear con IA</Button>}
         />
       ) : (
         <EmptyState icon={Search} title="Sin resultados" description="Probá con otro nombre, ingrediente o categoría." />
@@ -219,7 +219,7 @@ export function RecetasTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <RecipeImportModal open={isImportOpen} onOpenChange={setIsImportOpen} />
+      <RecipeAIDialog open={isAIOpen} onOpenChange={setIsAIOpen} />
     </div>
   );
 }
