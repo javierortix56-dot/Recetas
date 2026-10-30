@@ -1,8 +1,6 @@
 'use client';
 
-import PlanColumn from '@/components/planificacion/PlanColumn';
-
+// Contenido renderizado por AppShell (src/components/tabs/planificacion-tab.tsx)
 export default function PlanificacionPage() {
-  // Contenido cargado vía AppShell desde src/components/tabs/planificacion-tab.tsx
   return null;
 }

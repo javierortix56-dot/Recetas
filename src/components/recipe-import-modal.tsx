@@ -1,107 +1,19 @@
 "use client"
 
 import * as React from "react"
-import { Download, AlertCircle, CheckCircle2, Copy } from "lucide-react"
+import { AlertCircle, CheckCircle2, Copy, Sparkles } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { useFirestore } from "@/firebase"
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore"
+import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore"
+import { useAppStore } from "@/store/app-store"
 import { useRouter } from "next/navigation"
 import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, normalizeIngredientName } from "@/lib/categorizeIngredient"
+import { PROMPT_TEMPLATE } from "@/lib/recipe-prompt"
 
-const PROMPT_TEMPLATE = `Generame recetas en formato JSON. Una sola receta = objeto {}. Varias = array [{}, {}].
-
-REGLAS ESTRICTAS — seguir sin excepción:
-
-━━━ NOMBRE ━━━
-- Nombre del plato tal cual se conoce. Sin marcas comerciales.
-
-━━━ DESCRIPCIÓN ━━━
-- 2-3 oraciones: sabor, textura, ocasión ideal y origen del plato.
-
-━━━ HISTORIA ━━━
-- 1-2 oraciones sobre el origen cultural o anécdota del plato. Si no tiene historia conocida, inventar un dato curioso relacionado con el ingrediente principal.
-
-━━━ MOMENTOS (categorias) ━━━
-- Array con uno o varios de estos valores EXACTOS:
-  "Desayuno" | "Almuerzo" | "Cena" | "Merienda" | "Postre" | "Snack"
-
-━━━ PORCIONES ━━━
-- Número entero entre 2 y 6. Representa porciones para adultos.
-
-━━━ DIFICULTAD ━━━
-- "Fácil": menos de 30 min total, sin técnica especial.
-- "Media": 30-60 min total o requiere alguna técnica (ej: punto de caramelo, corte juliana).
-- "Difícil": más de 60 min o técnicas avanzadas (ej: masa hojaldrada, temperado de chocolate).
-
-━━━ TIEMPOS ━━━
-- tiempoPreparacion: minutos de trabajo activo (picar, mezclar, armar).
-- tiempoCoccion: minutos de cocción pasiva (horno, hervor, reposo en heladera).
-- Ambos son números enteros.
-
-━━━ INGREDIENTES ━━━
-- Listar SOLO ingredientes crudos tal como se compran en el supermercado.
-- NUNCA poner subpreparaciones ("sofrito", "salsa", "caldo casero"). Descomponer en ingredientes base.
-- PROHIBIDO: "c/n", "a gusto", "pizca", "un poco", "al gusto". TODO debe tener cantidad numérica exacta.
-- "nombre": sustantivo genérico en singular y minúsculas (ej: "cebolla", "pechuga de pollo", "sal fina"). NUNCA incluir cantidad, tamaño o marca en el nombre.
-- "cantidad": número > 0. Puede ser decimal (ej: 0.5).
-- "unidad": OBLIGATORIO usar una de estas EXACTAS: "g" | "kg" | "ml" | "l" | "unidad" | "cucharada" | "cucharadita" | "taza" | "docena"
-- "preparacion": cómo preparar el ingrediente antes de usarlo (ej: "picada en cubos", "rallado", "en juliana", "a temperatura ambiente"). Dejar "" si se usa tal cual.
-- "categoria": EXACTAMENTE una de:
-  "Lácteos y Huevos" | "Carnes y Aves" | "Pescados y Mariscos" | "Frutas y Verduras" | "Almacén" | "Especias y Condimentos" | "Bebidas" | "Otros"
-
-━━━ UTENSILIOS ━━━
-- Inferir de las técnicas usadas en los pasos. Incluir todos los necesarios.
-- Ejemplos: "Sartén antiadherente", "Cuchillo de chef", "Tabla de picar", "Horno", "Batidora eléctrica".
-
-━━━ PASOS ━━━
-- Cada paso debe ser ejecutable por alguien que nunca cocinó. Ser explícito con temperaturas, tiempos y señales visuales ("hasta que dore", "cuando burbujee").
-- Mínimo de pasos según dificultad: Fácil = 3, Media = 5, Difícil = 7. No agrupar acciones distintas en un solo paso.
-- "orden": número secuencial empezando en 1.
-- "titulo": resumen corto de la acción (ej: "Preparar la masa", "Sellar la carne").
-- "descripcion": instrucción detallada. Mencionar utensilios, fuego (bajo/medio/alto), y qué resultado esperar.
-- "timerSegundos": EN SEGUNDOS. Ej: 5 minutos = 300, 1 hora = 3600. Usar null si el paso es acción activa sin espera.
-
-━━━ TIPS DEL CHEF ━━━
-- 2-4 consejos prácticos: sustituciones, cómo potenciar sabor, métodos de conservación, errores comunes a evitar.
-
-━━━ MACROS (por porción individual) ━━━
-- Calcular con precisión nutricional real considerando las cantidades EXACTAS de todos los ingredientes (incluido aceite, manteca, sal).
-- Dividir el total entre el número de porciones.
-- calorias: kcal | proteinas: g | carbohidratos: g | grasas: g | fibra: g | azucar: g | sodio: mg
-- pesoPorPorcion: peso aproximado en gramos de una porción servida (suma del peso cocido total dividido porciones). Número entero.
-- Todos los valores son números, no strings.
-
-━━━ TAGS ━━━
-- 6 a 12 tags en minúsculas y sin tildes.
-- Ejemplos: "rapido", "alto-en-proteina", "sin-gluten", "vegetariano", "italiana", "horno", "comfort-food", "meal-prep", "economico", "para-ninos", "picante", "sin-lactosa"
-
-━━━ FORMATO DE SALIDA (RFC 8259) ━━━
-- SOLO JSON válido. Sin markdown, sin texto fuera del JSON, sin backticks.
-
-{
-  "nombre": "",
-  "descripcion": "",
-  "historia": "",
-  "categorias": ["Almuerzo"],
-  "porciones": 4,
-  "tiempoPreparacion": 0,
-  "tiempoCoccion": 0,
-  "dificultad": "Fácil|Media|Difícil",
-  "ingredientes": [
-    {"nombre": "", "cantidad": 0, "unidad": "g", "preparacion": "", "categoria": ""}
-  ],
-  "utensilios": [""],
-  "pasos": [
-    {"orden": 1, "titulo": "", "descripcion": "", "timerSegundos": null}
-  ],
-  "tips": [""],
-  "macros": {"calorias": 0, "proteinas": 0, "carbohidratos": 0, "grasas": 0, "fibra": 0, "azucar": 0, "sodio": 0, "pesoPorPorcion": 0},
-  "tags": [""]
-}`
 
 export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const router = useRouter()
@@ -169,6 +81,11 @@ export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpe
       const ingredientsCol = collection(db, "users", USER_ID, "ingredients")
       const recipesCol = collection(db, "users", USER_ID, "recipes")
 
+      // La despensa ya está en memoria: no hace falta una consulta por ingrediente
+      const knownIngredients = new Set(
+        useAppStore.getState().ingredientes.map(i => (i.nombre || "").toLowerCase().trim())
+      )
+      const batch = writeBatch(db)
       let firstRecipeId = ""
 
       for (const recipeData of items) {
@@ -196,18 +113,19 @@ export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpe
         recipeData.createdAt = serverTimestamp()
         recipeData.updatedAt = serverTimestamp()
 
-        const docRef = await addDoc(recipesCol, recipeData)
+        const docRef = doc(recipesCol)
+        batch.set(docRef, recipeData)
         if (!firstRecipeId) firstRecipeId = docRef.id
 
         // Guardar ingredientes en la despensa si no existen
         for (const ing of recipeData.ingredientes || []) {
           if (!ing.nombre) continue;
           const normalizedName = normalizeIngredientName(ing.nombre);
-          const q = query(ingredientsCol, where("nombre", "==", normalizedName))
-          const snap = await getDocs(q)
-          
-          if (snap.empty) {
-            await addDoc(ingredientsCol, {
+          const key = normalizedName.toLowerCase().trim()
+
+          if (!knownIngredients.has(key)) {
+            knownIngredients.add(key)
+            batch.set(doc(ingredientsCol), {
               nombre: normalizedName,
               categoria: ing.categoria || categorizeIngredient(normalizedName),
               unidad: ing.unidad || "unidad",
@@ -221,6 +139,7 @@ export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpe
         }
       }
 
+      await batch.commit()
       toast({ 
         title: "¡Importación exitosa!", 
         description: `Se han guardado ${items.length} recetas correctamente.` 
@@ -246,65 +165,63 @@ export function RecipeImportModal({ open, onOpenChange }: { open: boolean, onOpe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl p-6">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-primary flex items-center gap-2">
-            <Download className="h-6 w-6" /> Importar IA
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Importar recetas con IA
           </DialogTitle>
-          <DialogDescription className="text-sm font-bold text-muted-foreground uppercase tracking-widest pt-2">
-            Formato Estricto RFC 8259
+          <DialogDescription>
+            Copiá el prompt, pedile las recetas a tu IA (ChatGPT, Gemini, Claude) y pegá acá el JSON que te devuelva.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="bg-primary-suave p-4 rounded-2xl border border-primary/10 relative">
-             <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase text-primary">Prompt Maestro Actualizado</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyPrompt}>
-                  <Copy className="h-4 w-4" />
-                </Button>
-             </div>
-             <p className="text-[10px] text-primary/70 font-medium line-clamp-3 italic">
-               {PROMPT_TEMPLATE}
-             </p>
-          </div>
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={copyPrompt}
+            className="w-full glass rounded-[20px] p-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+          >
+            <span className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Copy className="h-4 w-4 text-primary" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold">1 · Copiar prompt</span>
+              <span className="block text-xs text-muted-foreground truncate">Reglas de formato, unidades y categorías</span>
+            </span>
+          </button>
 
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase text-muted-foreground tracking-widest">Contenido JSON</label>
-            <Textarea 
-              placeholder='Pegá el JSON aquí...' 
-              className="min-h-[160px] rounded-2xl border-2 font-mono text-xs focus-visible:ring-primary"
+            <p className="eyebrow px-1">2 · Pegar JSON</p>
+            <Textarea
+              placeholder='{"nombre": "...", "ingredientes": [...], "pasos": [...]}'
+              className="min-h-[160px] font-mono text-xs"
               value={jsonText}
               onChange={(e) => validateJson(e.target.value)}
             />
           </div>
 
           {isValid === false && (
-            <div className="bg-destructive/10 p-3 rounded-xl flex items-start gap-2 border border-destructive/20">
-              <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
-              <div className="flex-1 overflow-y-auto max-h-24">
-                {errors.map((err, i) => <p key={i} className="text-xs font-bold text-destructive">{err}</p>)}
+            <div className="bg-destructive/10 p-3 rounded-2xl flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <div className="flex-1 overflow-y-auto max-h-24 space-y-0.5">
+                {errors.map((err, i) => <p key={i} className="text-xs font-medium text-destructive">{err}</p>)}
               </div>
             </div>
           )}
 
           {isValid === true && (
-            <div className="bg-primary/10 p-3 rounded-xl flex items-center gap-2 border border-primary/20">
+            <div className="bg-primary/10 p-3 rounded-2xl flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-primary" />
-              <p className="text-xs font-bold text-primary">Listo para importar {importCount} recetas.</p>
+              <p className="text-xs font-semibold text-primary">Listo para importar {importCount} {importCount === 1 ? "receta" : "recetas"}.</p>
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1 rounded-2xl h-12" onClick={() => onOpenChange(false)}>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button 
-              className="flex-1 rounded-2xl h-12 bg-primary text-white font-black" 
-              disabled={!isValid || isImporting}
-              onClick={handleImport}
-            >
-              {isImporting ? "Importando..." : "Confirmar"}
+            <Button className="flex-1" disabled={!isValid || isImporting} onClick={handleImport}>
+              {isImporting ? "Importando..." : "Importar"}
             </Button>
           </div>
         </div>

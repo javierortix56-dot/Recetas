@@ -1,7 +1,7 @@
 import type {Config} from 'tailwindcss';
 
 export default {
-  darkMode: ['class'],
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        headline: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -29,6 +29,7 @@ export default {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
           suave: 'hsl(var(--primary-suave))',
+          2: 'hsl(var(--primary-2))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -58,10 +59,10 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        'recipe': '0 2px 12px rgba(0, 0, 0, 0.06)',
-        'nav': '0 4px 30px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
-        'card-hover': '0 8px 30px rgba(0, 0, 0, 0.08)',
-        'glow': '0 0 20px rgba(45, 154, 107, 0.15)',
+        'recipe': 'var(--shadow-soft)',
+        'nav': 'var(--shadow-lift)',
+        'card-hover': 'var(--shadow-lift)',
+        'glow': '0 8px 22px -8px hsl(var(--primary) / 0.55)',
       },
     },
   },

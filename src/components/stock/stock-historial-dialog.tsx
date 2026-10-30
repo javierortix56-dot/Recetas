@@ -65,9 +65,9 @@ export function StockHistorialDialog({ asMenuItem }: { asMenuItem?: boolean } = 
           </Button>
         )}
       </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-[2rem] max-h-[80vh] overflow-y-auto">
+      <SheetContent side="bottom">
         <SheetHeader className="pb-4">
-          <SheetTitle className="font-black text-primary text-xl">Historial de Stock</SheetTitle>
+          <SheetTitle className="text-[19px] font-bold tracking-tight">Historial de Stock</SheetTitle>
         </SheetHeader>
 
         {loading ? (
@@ -79,19 +79,19 @@ export function StockHistorialDialog({ asMenuItem }: { asMenuItem?: boolean } = 
         ) : entries.length === 0 ? (
           <div className="py-16 text-center opacity-40">
             <History className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-            <p className="text-xs font-black uppercase tracking-widest">Sin movimientos registrados</p>
+            <p className="text-xs font-bold uppercase tracking-widest">Sin movimientos registrados</p>
           </div>
         ) : (
           <div className="space-y-5 pb-8">
             {Object.entries(grouped).map(([fecha, items]) => (
               <div key={fecha}>
-                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-2 px-1 capitalize">{fecha}</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-1 capitalize">{fecha}</p>
                 <div className="space-y-1.5">
                   {items.map(entry => {
                     const esCompra = entry.tipo === 'compra';
                     const esPositivo = entry.diferencia > 0;
                     return (
-                      <div key={entry.id} className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 border border-border/50">
+                      <div key={entry.id} className="bg-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-border/50">
                         <div className={cn(
                           "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
                           esPositivo ? "bg-green-100 text-green-600" : entry.diferencia < 0 ? "bg-red-100 text-red-500" : "bg-muted text-muted-foreground"
@@ -103,15 +103,15 @@ export function StockHistorialDialog({ asMenuItem }: { asMenuItem?: boolean } = 
                           <p className="text-[10px] text-muted-foreground font-medium">
                             {entry.cantidadAntes} → {entry.cantidadDespues} {entry.unidad}
                             {' · '}
-                            <span className={cn("font-black", esPositivo ? "text-green-600" : "text-red-500")}>
+                            <span className={cn("font-bold", esPositivo ? "text-green-600" : "text-red-500")}>
                               {esPositivo ? '+' : ''}{entry.diferencia} {entry.unidad}
                             </span>
                           </p>
                         </div>
                         <div className="text-right shrink-0">
                           <span className={cn(
-                            "text-[8px] font-black uppercase px-2 py-0.5 rounded-full",
-                            esCompra ? "bg-blue-100 text-blue-600" : "bg-primary-suave text-primary"
+                            "text-[8px] font-bold uppercase px-2 py-0.5 rounded-full",
+                            esCompra ? "bg-sky-500/15 text-sky-600" : "bg-primary-suave text-primary"
                           )}>
                             {esCompra ? 'compra' : 'ajuste'}
                           </span>

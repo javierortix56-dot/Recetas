@@ -1,11 +1,15 @@
 /**
  * @fileOverview Lógica centralizada para la sincronización de la lista de compras.
  *
- * Estrategia: DELETE + RECREATE
- * En lugar de lógica diferencial compleja (que tiene edge cases), este sync:
- * 1. Borra TODOS los ítems del plan (source === "plan") de Firestore
- * 2. Calcula desde cero lo que se necesita (MRP: plan + stock mínimo vs stock actual)
- * 3. Crea solo los ítems necesarios
+ * 1. Calcula desde cero lo que se necesita (MRP: plan + stock mínimo vs stock actual)
+ * 2. Reconcilia contra la lista actual por nombre: actualiza los que siguen,
+ *    crea los nuevos y borra los que ya no hacen falta. Así los ítems que ya
+ *    estaban tildados en el carrito conservan su estado (antes se borraba y
+ *    recreaba todo, y cualquier cambio en el plan destildaba el carrito).
+ *
+ * La lista es compartida, así que suma los planes de TODOS los perfiles
+ * (antes solo los del perfil activo: si Mary planificaba, desaparecían de la
+ * lista los ingredientes del plan de Javi).
  *
  * Los ítems manuales (source === "manual" | reason === "Manual") nunca se tocan.
  */
@@ -15,56 +19,55 @@ import {
   collection,
   getDocs,
   writeBatch,
+  WriteBatch,
   doc,
   serverTimestamp,
   query,
   where
 } from "firebase/firestore";
 import { USER_ID } from "@/lib/constants";
-import { UserProfileName } from "@/store/app-store";
+import type { UserProfileName } from "@/store/app-store";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
+import { format } from "date-fns";
 
 // Bloqueo de concurrencia: si hay un sync en curso, el nuevo se encola
 let isSyncing = false;
-let pendingSync: { db: Firestore; profile: UserProfileName } | null = null;
+let pendingSync: Firestore | null = null;
 
 /**
  * MRP de la lista de compras:
  * Para cada ingrediente: faltante = MAX(necesidadPlan, stockMínimo) - stockActual
  * Si faltante > 0 → agregar a la lista de compras
  *
- * Solo considera los planes del perfil activo.
+ * El parámetro de perfil se mantiene por compatibilidad con los llamadores.
  */
-export const syncShoppingList = async (db: Firestore, activeProfile: UserProfileName) => {
+export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfileName) => {
   if (!db) return;
 
   if (isSyncing) {
-    pendingSync = { db, profile: activeProfile };
+    pendingSync = db;
     return;
   }
 
   isSyncing = true;
-  console.log(`[Sync] Iniciando para perfil="${activeProfile}"...`);
 
   try {
     // 1. Cargar datos en paralelo
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     const [plansSnap, ingsSnap, shoppingSnap] = await Promise.all([
+      // Solo planes de hoy en adelante (antes se leía todo el historial)
       getDocs(query(
         collection(db, "users", USER_ID, "meal_plans"),
-        where("perfil", "==", activeProfile)
+        where("date", ">=", todayStr)
       )),
       getDocs(collection(db, "users", USER_ID, "ingredients")),
       getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
     ]);
 
-    const todayStr = new Date().toISOString().split("T")[0]; // "yyyy-MM-dd"
-    const allPlansRaw    = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-    const allPlans       = allPlansRaw.filter(p => !p.date || p.date >= todayStr);
+    const allPlans       = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
     const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
     const allShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-
-    console.log(`[Sync] Planes(${activeProfile}): ${allPlans.length} (desde ${todayStr}, total=${allPlansRaw.length}) | Ingredientes: ${allIngredients.length} | Items actuales: ${allShoppingItems.length}`);
 
     const stockMap = new Map<string, any>(
       allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing])
@@ -105,8 +108,6 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       });
     });
 
-    console.log(`[Sync] Ingredientes requeridos por plan: [${[...neededMap.keys()].join(", ") || "ninguno"}]`);
-
     // 3. Calcular qué debería haber en la lista (desiredItems)
     const desiredItems = new Map<string, any>();
 
@@ -124,8 +125,6 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
         const recipes       = recipesByIngredient.get(key) || [];
         const justificacion = recipes.length > 0 ? recipes.join(" · ") : "Stock mínimo";
         const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(ing.nombre, faltante, ing.unidad);
-
-        console.log(`[Sync] NECESITA COMPRA → "${ing.nombre}": plan=${planNeed}, min=${minNeed}, stock=${enStock}, faltante=${faltante.toFixed(2)} | motivo="${justificacion}"`);
 
         desiredItems.set(key, {
           nombre:        ing.nombre,
@@ -147,7 +146,6 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       if (desiredItems.has(key) || stockMap.has(key)) return;
       const { cantidad: finalQty, unidad: finalUnit } = sugerirUnidadLogica(data.nombre, data.cantidad, data.unidad);
       const recipes = recipesByIngredient.get(key) || [];
-      console.log(`[Sync] NECESITA COMPRA (sin stock) → "${data.nombre}": sin entrada en ingredientes`);
       desiredItems.set(key, {
         ...data,
         cantidad:      Number(finalQty.toFixed(2)),
@@ -161,46 +159,60 @@ export const syncShoppingList = async (db: Firestore, activeProfile: UserProfile
       });
     });
 
-    console.log(`[Sync] Lista deseada: ${desiredItems.size} ítems → [${[...desiredItems.keys()].join(", ") || "vacía"}]`);
+    // 4. Reconciliar con la lista actual (los manuales no se tocan)
+    const ops: ((batch: WriteBatch) => void)[] = [];
+    const seen = new Set<string>();
 
-    // 4. ESTRATEGIA DELETE + RECREATE para ítems del plan
-    const batch = writeBatch(db);
-    let ops = 0;
-
-    // Borrar TODOS los ítems actuales del plan (source="plan" o sin source y sin reason Manual)
-    // Preservar siempre los ítems manuales
     for (const item of allShoppingItems) {
       const isManual = item.source === "manual" || item.reason === "Manual";
-      const isPlanItem = item.source === "plan" || (!item.source && !isManual);
-      if (isPlanItem) {
-        batch.delete(doc(db, "users", USER_ID, "shopping_list_items", item.id));
-        ops++;
+      if (isManual) continue;
+      const ref = doc(db, "users", USER_ID, "shopping_list_items", item.id);
+      const key = (item.nombre || "").toLowerCase().trim();
+      const desired = desiredItems.get(key);
+
+      if (!desired || seen.has(key)) {
+        // Ya no hace falta (o es un duplicado de otro ítem del plan)
+        ops.push(b => b.delete(ref));
+        continue;
+      }
+      seen.add(key);
+
+      const changed =
+        item.cantidad !== desired.cantidad ||
+        item.unidad !== desired.unidad ||
+        item.precioUnitario !== desired.precioUnitario ||
+        item.justificacion !== desired.justificacion ||
+        item.categoria !== desired.categoria ||
+        item.ingredienteId !== desired.ingredienteId ||
+        item.source !== "plan";
+      if (changed) {
+        const { isPurchased: _keep, ...fields } = desired;
+        ops.push(b => b.update(ref, { ...fields, updatedAt: serverTimestamp() }));
       }
     }
 
-    // Crear los ítems nuevos desde desiredItems
-    desiredItems.forEach((data) => {
+    desiredItems.forEach((data, key) => {
+      if (seen.has(key)) return;
       const ref = doc(collection(db, "users", USER_ID, "shopping_list_items"));
-      batch.set(ref, { userId: USER_ID, ...data, createdAt: serverTimestamp() });
-      ops++;
+      ops.push(b => b.set(ref, { userId: USER_ID, ...data, createdAt: serverTimestamp() }));
     });
 
-    if (ops > 0) {
+    // Firestore admite hasta 500 operaciones por batch
+    for (let i = 0; i < ops.length; i += 450) {
+      const batch = writeBatch(db);
+      ops.slice(i, i + 450).forEach(op => op(batch));
       await batch.commit();
-      console.log(`[Sync] Completado: ${ops} operaciones (borrados + creados).`);
-    } else {
-      console.log("[Sync] Sin cambios.");
     }
 
   } catch (error) {
-    console.error("[Sync] ERROR:", error);
+    console.error("[Sync] Error:", error);
     throw error;
   } finally {
     isSyncing = false;
     if (pendingSync) {
-      const { db: pDb, profile: pProfile } = pendingSync;
+      const pDb = pendingSync;
       pendingSync = null;
-      syncShoppingList(pDb, pProfile);
+      syncShoppingList(pDb).catch(() => {});
     }
   }
 };

@@ -2,86 +2,273 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Tokens de marca ──────────────────────────────────────────────────────────
+   Mismo lenguaje visual que Finanzas J&M: superficies "glass" (translúcidas +
+   blur) sobre un fondo ambiental con manchas de color suaves. Todo color sale
+   de estas variables, así el modo oscuro es solo un cambio de tokens.
+   Formato HSL sin hsl() para que funcionen las opacidades de Tailwind
+   (bg-primary/10, etc.). */
 @layer base {
   :root {
-    /* Basado en las especificaciones de Cocina Familiar */
-    --background: 140 20% 98%; /* #F7FAF8 */
-    --foreground: 149 28% 14%; /* #1A2E24 */
+    --background: 80 18% 95%;
+    --foreground: 150 22% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 149 28% 14%;
+    --card-foreground: 150 22% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 149 28% 14%;
-    --primary: 153 55% 39%; /* #2D9A6B */
-    --primary-foreground: 147 43% 94%;
-    --primary-suave: 147 43% 94%; /* #E8F5EF */
-    --secondary: 147 43% 94%;
-    --secondary-foreground: 153 55% 39%;
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%; /* #6B7280 */
-    --accent: 38 92% 50%; /* #F59E0B */
-    --accent-foreground: 149 28% 14%;
-    --destructive: 350 89% 60%; /* #F43F5E */
-    --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%; /* #E5E7EB */
-    --input: 214 32% 91%;
-    --ring: 153 55% 39%;
+    --popover-foreground: 150 22% 10%;
+    --primary: 153 58% 36%;
+    --primary-2: 158 58% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-suave: 150 40% 93%;
+    --secondary: 150 40% 93%;
+    --secondary-foreground: 153 58% 30%;
+    --muted: 90 12% 92%;
+    --muted-foreground: 150 6% 42%;
+    --accent: 36 92% 50%;
+    --accent-foreground: 150 22% 10%;
+    --destructive: 350 84% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 100 10% 88%;
+    --input: 100 10% 86%;
+    --ring: 153 58% 36%;
     --radius: 1rem;
+
+    --glass: rgba(255, 255, 255, 0.66);
+    --glass-strong: rgba(255, 255, 255, 0.88);
+    --sheet: rgba(251, 252, 249, 0.96);
+    --glass-border: rgba(255, 255, 255, 0.8);
+    --hairline: rgba(16, 32, 24, 0.07);
+    --shadow-soft: 0 1px 2px rgba(16, 32, 24, 0.04), 0 10px 30px -12px rgba(30, 110, 75, 0.22);
+    --shadow-lift: 0 2px 6px rgba(16, 32, 24, 0.06), 0 22px 44px -16px rgba(30, 110, 75, 0.35);
+
+    --blob-1: #9be7bf;
+    --blob-2: #fcd889;
+    --blob-3: #fdb4a8;
+
+    color-scheme: light;
+  }
+}
+
+/* Dos caminos al tema oscuro: el sistema (si no se forzó "claro") o la
+   elección manual (data-theme="dark" en <html>). */
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background: 150 14% 5%;
+      --foreground: 140 12% 94%;
+      --card: 150 10% 10%;
+      --card-foreground: 140 12% 94%;
+      --popover: 150 10% 11%;
+      --popover-foreground: 140 12% 94%;
+      --primary: 152 52% 48%;
+      --primary-2: 158 60% 60%;
+      --primary-foreground: 150 30% 6%;
+      --primary-suave: 152 30% 14%;
+      --secondary: 152 30% 14%;
+      --secondary-foreground: 152 52% 62%;
+      --muted: 150 8% 14%;
+      --muted-foreground: 140 6% 62%;
+      --accent: 38 92% 56%;
+      --accent-foreground: 150 30% 6%;
+      --destructive: 350 80% 62%;
+      --border: 150 8% 18%;
+      --input: 150 8% 20%;
+      --ring: 152 52% 48%;
+
+      --glass: rgba(24, 30, 27, 0.58);
+      --glass-strong: rgba(26, 32, 29, 0.88);
+      --sheet: rgba(18, 23, 21, 0.97);
+      --glass-border: rgba(255, 255, 255, 0.07);
+      --hairline: rgba(255, 255, 255, 0.06);
+      --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -14px rgba(0, 0, 0, 0.6);
+      --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+
+      --blob-1: #14532d;
+      --blob-2: #6b4a10;
+      --blob-3: #6b2320;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --background: 150 14% 5%;
+    --foreground: 140 12% 94%;
+    --card: 150 10% 10%;
+    --card-foreground: 140 12% 94%;
+    --popover: 150 10% 11%;
+    --popover-foreground: 140 12% 94%;
+    --primary: 152 52% 48%;
+    --primary-2: 158 60% 60%;
+    --primary-foreground: 150 30% 6%;
+    --primary-suave: 152 30% 14%;
+    --secondary: 152 30% 14%;
+    --secondary-foreground: 152 52% 62%;
+    --muted: 150 8% 14%;
+    --muted-foreground: 140 6% 62%;
+    --accent: 38 92% 56%;
+    --accent-foreground: 150 30% 6%;
+    --destructive: 350 80% 62%;
+    --border: 150 8% 18%;
+    --input: 150 8% 20%;
+    --ring: 152 52% 48%;
+
+    --glass: rgba(24, 30, 27, 0.58);
+    --glass-strong: rgba(26, 32, 29, 0.88);
+    --sheet: rgba(18, 23, 21, 0.97);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --hairline: rgba(255, 255, 255, 0.06);
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -14px rgba(0, 0, 0, 0.6);
+    --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+
+    --blob-1: #14532d;
+    --blob-2: #6b4a10;
+    --blob-3: #6b2320;
+
+    color-scheme: dark;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    background: hsl(var(--background));
   }
   html, body {
     overscroll-behavior: none;
   }
   body {
-    @apply bg-background text-foreground font-body;
+    /* Transparente: el fondo ambiental (fixed, z negativo) se ve a través */
+    @apply bg-transparent text-foreground font-body;
     font-variant-numeric: tabular-nums;
+  }
+  /* Evita el zoom de iOS al enfocar inputs (requiere ≥16px) */
+  input, select, textarea {
+    font-size: max(16px, 1em);
   }
 }
 
-.safe-area-pb {
-  padding-bottom: env(safe-area-inset-bottom);
+/* ── Utilidades de superficie ─────────────────────────────────────────────── */
+@layer utilities {
+  .glass {
+    background-color: var(--glass);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-soft);
+  }
+  .glass-strong {
+    background-color: var(--glass-strong);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-lift);
+  }
+  /* Bottom sheets: casi opacos para que el fondo no compita */
+  .sheet-surface {
+    background-color: var(--sheet);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -12px 40px -12px rgba(16, 32, 24, 0.25);
+  }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-lift { box-shadow: var(--shadow-lift); }
+  .border-hairline { border-color: var(--hairline); }
+
+  /* Gradiente de marca para héroes y CTA */
+  .bg-brand {
+    background-image:
+      radial-gradient(120% 140% at 100% 0%, rgba(255, 255, 255, 0.22) 0%, transparent 45%),
+      linear-gradient(135deg, hsl(var(--primary-2)) 0%, hsl(var(--primary)) 60%, hsl(153 60% 24%) 100%);
+  }
+
+  /* Etiqueta de sección (sobre-título en mayúsculas) */
+  .eyebrow {
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Zona táctil mínima de 44×44 px sin cambiar el tamaño visual */
+  .hit-44 { position: relative; }
+  .hit-44::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  .safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
 }
 
-.recipe-card-shadow {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+/* ── Fondo ambiental ──────────────────────────────────────────────────────── */
+@keyframes drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(30px, 40px, 0) scale(1.08); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-40px, -20px, 0) scale(1.12); }
 }
 
-/* Smooth image loading */
-img {
-  image-rendering: auto;
+.ambient-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.ambient-blob.a { animation: drift-a 22s ease-in-out infinite; }
+.ambient-blob.b { animation: drift-b 26s ease-in-out infinite; }
+.ambient-blob.c { animation: drift-a 30s ease-in-out infinite reverse; }
+
+/* Skeleton con brillo en barrido */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: hsl(var(--muted));
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: shimmer 1.4s infinite;
 }
 
-/* Mejora de selección en mobile */
-* {
-  -webkit-tap-highlight-color: transparent;
+/* Paneles de pestañas persistentes */
+.tab-panel { display: none; }
+.tab-panel.visible { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob { animation: none !important; }
+  .skeleton::after { animation: none; }
 }
 
-/* Optimización de scrollbars para chips horizontales */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Transiciones de tab suaves */
-.tab-panel {
-  transition: opacity 150ms ease;
-  opacity: 0;
-  display: none;
-}
-
-.tab-panel.visible {
-  display: block;
-  opacity: 1;
-}
-
-.tab-panel.hidden {
-  display: none;
-  opacity: 0;
+/* Con "Reducir transparencia" las superficies glass pasan a ser sólidas
+   (también alivia el costo del blur en equipos modestos). */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong, .sheet-surface {
+    background-color: hsl(var(--card));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ambient-blob { display: none; }
 }

@@ -2,286 +2,251 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  ChevronRight, Calendar, Activity, DollarSign, TrendingDown, TrendingUp, Minus, Flame
-} from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { GradientPlaceholder } from '@/components/gradient-placeholder';
+import { ChevronRight, TrendingDown, TrendingUp, Minus, CalendarPlus, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { format, startOfWeek, startOfDay, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAppStore } from '@/store/app-store';
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { useShallow } from 'zustand/react/shallow';
 import Image from "next/image";
+import { GradientPlaceholder } from '@/components/gradient-placeholder';
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader, SectionTitle } from '@/components/ui/page-header';
+import { WeekBars } from '@/components/ui/week-bars';
+import { ProfileSwitcher } from '@/components/profile-switcher';
+import { easeOut, stagger } from '@/components/ui/motion';
+import { useAppStore } from '@/store/app-store';
 import { cn, formatPrecio, getSafeImageSource } from '@/lib/utils';
+import { MOMENTOS, sumMacros, summaryDate } from '@/lib/meal-plan';
 
-function MacroRing({ label, value, target, size = 60, strokeWidth = 6 }: { label: string, value: number, target: number, size?: number, strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const rawPercentage = target > 0 ? (value / target) * 100 : 0;
-  const visualPercentage = Math.min(rawPercentage, 100);
-  const offset = circumference - (visualPercentage / 100) * circumference;
-
-  let ringColor = "text-primary";
-  if (rawPercentage > 110) ringColor = "text-destructive";
-  else if (rawPercentage > 100) ringColor = "text-accent";
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg className="w-full h-full transform -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" strokeWidth={strokeWidth} className="text-primary-suave" />
-          <circle 
-            cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" 
-            strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} 
-            strokeLinecap="round" className={`${ringColor} transition-all duration-500`} 
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[10px] font-black">{Math.round(rawPercentage)}%</span>
-        </div>
-      </div>
-      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight">{label}</span>
-    </div>
-  );
-}
-
-function WeeklyEvolutionChart({ data, target }: { data: any[], target: number }) {
-  const maxVal = Math.max(...data.map(d => d.value), target, 1);
-  
-  return (
-    <div className="h-32 w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorVal" x1="0" x2="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <XAxis 
-            dataKey="name" 
-            axisLine={false} 
-            tickLine={false} 
-            tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} 
-            dy={10}
-          />
-          <YAxis hide domain={[0, maxVal * 1.1]} />
-          <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" animationDuration={1000} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+const DEFAULT_GOALS = { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
 
 export function InicioTab() {
   const router = useRouter();
-  const [mounted, setMounted] = React.useState(false);
-  const { userProfile, macrosHoy, planificacion, macrosSemana, recetas, historialCompras } = useAppStore();
+  const [now, setNow] = React.useState<Date | null>(null);
+  const { userProfile, macrosHoy, planificacion, macrosSemana, recetas, historialCompras, ingredientes, listaCompras, planificacionCargada } = useAppStore(useShallow(s => ({
+    userProfile: s.userProfile,
+    macrosHoy: s.macrosHoy,
+    planificacion: s.planificacion,
+    macrosSemana: s.macrosSemana,
+    recetas: s.recetas,
+    historialCompras: s.historialCompras,
+    ingredientes: s.ingredientes,
+    listaCompras: s.listaCompras,
+    planificacionCargada: s.planificacionCargada,
+  })));
 
-  const [formattedDate, setFormattedDate] = React.useState("");
-  const [greeting, setGreeting] = React.useState("");
+  React.useEffect(() => { setNow(new Date()); }, []);
 
-  React.useEffect(() => {
-    setMounted(true);
-    const now = new Date();
-    setFormattedDate(format(now, "EEEE d 'de' MMMM", { locale: es }));
-    const h = now.getHours();
-    if (h < 12) setGreeting("Buenos días");
-    else if (h < 19) setGreeting("Buenas tardes");
-    else setGreeting("Buenas noches");
-  }, []);
+  const todayStr = now ? format(now, "yyyy-MM-dd") : "";
+  const goals = userProfile?.objetivosMacros || DEFAULT_GOALS;
+  const recipesById = React.useMemo(() => new Map(recetas.map(r => [r.id, r])), [recetas]);
 
-  const todayStr = React.useMemo(() => mounted ? format(new Date(), "yyyy-MM-dd") : "", [mounted]);
-  const goals = userProfile?.objetivosMacros || { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
-  
+  const todayPlans = React.useMemo(() => planificacion
+    .filter(p => p.date === todayStr)
+    .sort((a, b) => MOMENTOS.indexOf(a.mealType) - MOMENTOS.indexOf(b.mealType)),
+  [planificacion, todayStr]);
+
   const currentMacros = React.useMemo(() => {
-    if (macrosHoy && macrosHoy.totalesDia && Number(macrosHoy.totalesDia.calorias) > 0) {
-      return {
-        calorias: Number(macrosHoy.totalesDia.calorias || 0),
-        proteinas: Number(macrosHoy.totalesDia.proteinas || 0),
-        carbohidratos: Number(macrosHoy.totalesDia.carbohidratos || 0),
-        grasas: Number(macrosHoy.totalesDia.grasas || 0)
-      };
+    if (macrosHoy?.totalesDia && Number(macrosHoy.totalesDia.calorias) > 0) {
+      return sumMacros([{ macros: macrosHoy.totalesDia }]);
     }
-    
-    const todayPlans = planificacion.filter(p => p.date === todayStr);
-    return todayPlans.reduce((acc, p) => ({
-      calorias: acc.calorias + Number(p.macros?.calorias || 0),
-      proteinas: acc.proteinas + Number(p.macros?.proteinas || 0),
-      carbohidratos: acc.carbohidratos + Number(p.macros?.carbohidratos || 0),
-      grasas: acc.grasas + Number(p.macros?.grasas || 0),
-    }), { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 });
-  }, [macrosHoy, planificacion, todayStr]);
-
-  const todayPlansSorted = React.useMemo(() => {
-    const orden = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
-    return planificacion
-      .filter(p => p.date === todayStr)
-      .sort((a, b) => orden.indexOf(a.mealType) - orden.indexOf(b.mealType));
-  }, [planificacion, todayStr]);
+    return sumMacros(todayPlans);
+  }, [macrosHoy, todayPlans]);
 
   const weeklyData = React.useMemo(() => {
-    if (!mounted) return [];
-    const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-    const data = labels.map(label => ({ name: label, value: 0 }));
-    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const startTs = startOfDay(start).getTime();
-    
+    if (!now) return [];
+    const labels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    const startTs = startOfDay(startOfWeek(now, { weekStartsOn: 1 })).getTime();
+    const todayIdx = (now.getDay() + 6) % 7;
+    const data = labels.map((label, i) => ({ label, value: 0, highlight: i === todayIdx }));
     macrosSemana.forEach(m => {
-      const dateVal = m.date || m.id;
-      if (!dateVal) return;
-      const macroDate = new Date(dateVal + "T00:00:00");
-      const diff = Math.floor((macroDate.getTime() - startTs) / (1000 * 60 * 60 * 24));
-      if (diff >= 0 && diff < 7) {
-        data[diff].value = Number(m.totalesDia?.calorias || 0);
-      }
+      const date = summaryDate(m);
+      if (!date) return;
+      const diff = Math.round((new Date(date + "T00:00:00").getTime() - startTs) / 86_400_000);
+      if (diff >= 0 && diff < 7) data[diff].value = Number(m.totalesDia?.calorias || 0);
     });
     return data;
-  }, [macrosSemana, mounted]);
+  }, [macrosSemana, now]);
 
-  const spendingStats = React.useMemo(() => {
-    if (!mounted) return null;
-    const weekId = format(new Date(), "yyyy-'W'ww");
-    const lastWeekId = format(subWeeks(new Date(), 1), "yyyy-'W'ww");
-    
-    const currentWeekData = historialCompras.find(h => h.semana === weekId);
-    const lastWeekData = historialCompras.find(h => h.semana === lastWeekId);
-    
-    const current = currentWeekData?.totalGastado || 0;
-    const previous = lastWeekData?.totalGastado || 0;
-    
-    let diffPercent = 0;
-    if (previous > 0) {
-      diffPercent = Math.round(((current - previous) / previous) * 100);
-    }
-
+  const spending = React.useMemo(() => {
+    if (!now) return null;
+    const current = historialCompras.find(h => h.semana === format(now, "yyyy-'W'ww"))?.totalGastado || 0;
+    const previous = historialCompras.find(h => h.semana === format(subWeeks(now, 1), "yyyy-'W'ww"))?.totalGastado || 0;
+    const diffPercent = previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0;
     return { current, previous, diffPercent };
-  }, [historialCompras, mounted]);
+  }, [historialCompras, now]);
 
-  if (!mounted) {
-    return <div className="space-y-6 p-4"><Skeleton className="h-48 w-full rounded-[2rem]" /></div>;
-  }
+  const lowStock = React.useMemo(
+    () => ingredientes.filter(i => Number(i.stockMinimo) > 0 && Number(i.stockActual) <= Number(i.stockMinimo)).length,
+    [ingredientes]
+  );
+  const pendingCompras = React.useMemo(() => listaCompras.filter(i => !i.isPurchased).length, [listaCompras]);
+
+  if (!now) return <div className="space-y-4"><Skeleton className="h-16 w-2/3" /><Skeleton className="h-48 w-full rounded-[24px]" /></div>;
+
+  const h = now.getHours();
+  const greeting = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
+  const goTo = (tab: string) => router.push(`/${tab}`);
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-1">{greeting}</p>
-          <h1 className="text-3xl font-black text-primary leading-none tracking-tighter">
-            {userProfile?.displayName?.split(' ')[0] || 'Chef'}
-          </h1>
-          <p className="text-[10px] font-bold text-muted-foreground/70 capitalize mt-1">{formattedDate}</p>
-        </div>
-        <Avatar className="h-12 w-12 ring-4 ring-primary/10 shadow-glow">
-          <AvatarFallback className="bg-primary text-white font-black text-sm">
-            {(userProfile?.displayName || 'CF').slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      </header>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        subtitle={`${greeting} · ${format(now, "EEE d MMM", { locale: es })}`}
+        title={userProfile?.displayName?.split(' ')[0] || 'Chef'}
+        actions={<ProfileSwitcher />}
+      />
 
-      <Card className="border border-primary/10 shadow-recipe hover:shadow-card-hover bg-white rounded-3xl cursor-pointer transition-shadow" onClick={() => router.push('/macros')}>
-        <CardContent className="p-6 space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-base font-black flex items-center gap-2 uppercase">
-              <Activity className="h-5 w-5 text-primary" /> Nutrición de hoy
-            </h3>
-            <Badge variant="secondary" className="bg-primary-suave text-primary border-none text-[10px] px-3">En vivo</Badge>
+      {/* Héroe de nutrición */}
+      <motion.button
+        type="button"
+        onClick={() => goTo('macros')}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={easeOut}
+        className="relative overflow-hidden rounded-[28px] bg-brand text-white p-5 text-left shadow-lift active:scale-[0.99] transition-transform"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/75">Nutrición de hoy</p>
+            <p className="mt-1.5 text-[34px] leading-none font-bold tracking-tight tabular-nums">
+              {Math.round(currentMacros.calorias).toLocaleString('es-AR')}
+              <span className="text-base font-semibold text-white/70"> / {goals.calorias} kcal</span>
+            </p>
           </div>
-          <div className="flex justify-around items-center pt-2">
-            <MacroRing label="Kcal" value={currentMacros.calorias} target={goals.calorias} size={85} />
-            <MacroRing label="Prot" value={currentMacros.proteinas} target={goals.proteinas} />
-            <MacroRing label="Carbs" value={currentMacros.carbohidratos} target={goals.carbohidratos} />
-            <MacroRing label="Grasas" value={currentMacros.grasas} target={goals.grasas} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-base font-black flex items-center gap-2 uppercase">
-            <Calendar className="h-5 w-5 text-primary" /> Mi Plan de hoy
-          </h3>
-          <Button variant="link" className="text-primary font-black text-[10px] p-0" onClick={() => router.push('/planificacion')}>
-            Ver calendario <ChevronRight className="h-3 w-3 ml-1" />
-          </Button>
+          <span className="h-9 w-9 rounded-full bg-white/15 flex items-center justify-center">
+            <ChevronRight className="h-4 w-4" />
+          </span>
         </div>
-        
-        {todayPlansSorted.length > 0 ? (
-          <div className="flex flex-wrap gap-4 pb-2 px-1">
-            {todayPlansSorted.map((plan) => {
-              const imageUrl = getSafeImageSource(plan);
+        <div className="mt-4 h-2 rounded-full bg-white/20 overflow-hidden">
+          <motion.div
+            className={cn("h-full rounded-full", currentMacros.calorias > goals.calorias * 1.1 ? "bg-rose-300" : "bg-white")}
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min((currentMacros.calorias / Math.max(goals.calorias, 1)) * 100, 100)}%` }}
+            transition={{ ...easeOut, duration: 0.7 }}
+          />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {([
+            ['Proteínas', currentMacros.proteinas, goals.proteinas],
+            ['Carbos', currentMacros.carbohidratos, goals.carbohidratos],
+            ['Grasas', currentMacros.grasas, goals.grasas],
+          ] as const).map(([label, value, target]) => (
+            <div key={label} className="rounded-2xl bg-white/15 px-3 py-2">
+              <p className="text-[10px] font-semibold text-white/70">{label}</p>
+              <p className="text-sm font-bold tabular-nums">{Math.round(value)}<span className="text-white/60 font-medium">/{target}g</span></p>
+            </div>
+          ))}
+        </div>
+      </motion.button>
+
+      {/* Plan de hoy */}
+      <section className="space-y-2.5">
+        <SectionTitle action={
+          <button onClick={() => goTo('planificacion')} className="text-xs font-semibold text-primary flex items-center gap-0.5">
+            Ver semana <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        }>
+          Plan de hoy
+        </SectionTitle>
+
+        {!planificacionCargada && planificacion.length === 0 ? (
+          <div className="flex gap-3"><Skeleton className="h-36 w-40 rounded-[22px]" /><Skeleton className="h-36 w-40 rounded-[22px]" /></div>
+        ) : todayPlans.length > 0 ? (
+          <div className="-mx-4 px-4 flex gap-3 overflow-x-auto scrollbar-hide snap-x pb-1">
+            {todayPlans.map((plan, i) => {
+              const recipe = recipesById.get(plan.recipeId);
+              const imageUrl = getSafeImageSource(recipe) || getSafeImageSource(plan);
               return (
-                <Card key={plan.id} className="min-w-[170px] max-w-[170px] border-none shadow-recipe hover:shadow-card-hover rounded-3xl overflow-hidden snap-start active:scale-[0.97] transition-all" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
-                  <div className="h-28 w-full relative bg-muted">
-                    {imageUrl ? (
-                      <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
-                    ) : (
-                      <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} className="rounded-none" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <Badge className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-[7px] font-black text-primary border-none shadow-sm">{plan.mealType}</Badge>
-                    <div className="absolute bottom-2 left-2.5 right-2.5">
-                      <h4 className="font-black text-[11px] text-white truncate leading-tight drop-shadow-sm">{plan.recipeName}</h4>
-                      <p className="text-[9px] font-bold text-white/80 mt-0.5">
-                        {Math.round(plan.macros?.calorias || 0)} kcal
-                      </p>
-                    </div>
+                <motion.button
+                  key={plan.id}
+                  type="button"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...easeOut, delay: stagger(i, 0.05) }}
+                  onClick={() => router.push(`/recetas/${plan.recipeId}`)}
+                  className="relative shrink-0 w-40 h-36 rounded-[22px] overflow-hidden snap-start shadow-soft active:scale-[0.97] transition-transform text-left"
+                >
+                  {imageUrl ? (
+                    <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
+                  ) : (
+                    <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} className="rounded-none" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                  <span className="absolute top-2 left-2 rounded-full bg-black/30 backdrop-blur-md px-2 py-0.5 text-[10px] font-semibold text-white">{plan.mealType}</span>
+                  <div className="absolute bottom-2.5 left-3 right-3 text-white">
+                    <p className="font-semibold text-[13px] leading-tight line-clamp-2">{plan.recipeName}</p>
+                    <p className="text-[11px] text-white/75 mt-0.5 tabular-nums">{Math.round(plan.macros?.calorias || 0)} kcal · {plan.plannedPortions || 1} porc.</p>
                   </div>
-                </Card>
+                </motion.button>
               );
             })}
           </div>
         ) : (
-          <div className="bg-primary/5 border-2 border-dashed border-primary/20 rounded-[2rem] p-8 text-center cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => router.push('/planificacion')}>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nada planeado para hoy. ¡Empezá a cocinar!</p>
-          </div>
+          <button
+            onClick={() => goTo('planificacion')}
+            className="w-full glass rounded-[22px] p-5 flex items-center gap-4 text-left active:scale-[0.99] transition-transform"
+          >
+            <span className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+              <CalendarPlus className="h-5 w-5 text-primary" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold">Nada planificado para hoy</span>
+              <span className="block text-xs text-muted-foreground mt-0.5">Elegí recetas o dejá que la IA arme el día</span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
         )}
       </section>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="border-none shadow-recipe bg-white rounded-3xl">
-          <CardContent className="p-6 space-y-4">
-            <h3 className="text-base font-black flex items-center gap-2 uppercase">
-              <Activity className="h-5 w-5 text-primary" /> Progreso de Calorías
-            </h3>
-            <WeeklyEvolutionChart data={weeklyData} target={goals.calorias} />
-          </CardContent>
-        </Card>
+      {/* Accesos rápidos con estado */}
+      {(lowStock > 0 || pendingCompras > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => goTo('compras')} className="glass rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
+            <ShoppingCart className="h-5 w-5 text-primary" />
+            <p className="mt-2 text-2xl font-bold tabular-nums leading-none">{pendingCompras}</p>
+            <p className="text-xs text-muted-foreground mt-1">por comprar</p>
+          </button>
+          <button onClick={() => goTo('stock')} className="glass rounded-[22px] p-4 text-left active:scale-[0.98] transition-transform">
+            <AlertTriangle className={cn("h-5 w-5", lowStock > 0 ? "text-accent" : "text-muted-foreground")} />
+            <p className="mt-2 text-2xl font-bold tabular-nums leading-none">{lowStock}</p>
+            <p className="text-xs text-muted-foreground mt-1">con stock bajo</p>
+          </button>
+        </div>
+      )}
 
-        <Card className="border-none shadow-recipe bg-white rounded-3xl overflow-hidden" onClick={() => router.push('/compras')}>
-          <CardContent className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-black flex items-center gap-2 uppercase">
-                <DollarSign className="h-5 w-5 text-primary" /> Gasto Semanal
-              </h3>
-              {spendingStats && (
-                <div className={cn(
-                  "flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase",
-                  spendingStats.diffPercent > 0 ? "bg-destructive/10 text-destructive" : spendingStats.diffPercent < 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                )}>
-                  {spendingStats.diffPercent > 0 ? <TrendingUp className="h-3 w-3" /> : spendingStats.diffPercent < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                  {Math.abs(spendingStats.diffPercent)}%
-                </div>
-              )}
-            </div>
+      {/* Semana */}
+      <section className="glass rounded-[24px] p-4">
+        <SectionTitle className="px-0 mb-1">
+          Calorías de la semana
+        </SectionTitle>
+        <div className="pt-3"><WeekBars data={weeklyData} target={goals.calorias} /></div>
+      </section>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Esta semana</p>
-                <p className="text-2xl font-black text-primary leading-tight">{formatPrecio(spendingStats?.current || 0)}</p>
-              </div>
-              <div className="space-y-1 text-right">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">La anterior</p>
-                <p className="text-xl font-bold text-muted-foreground leading-tight">{formatPrecio(spendingStats?.previous || 0)}</p>
-              </div>
+      {/* Gasto */}
+      {spending && (
+        <button onClick={() => goTo('compras')} className="glass rounded-[24px] p-4 text-left active:scale-[0.99] transition-transform">
+          <div className="flex items-center justify-between">
+            <p className="eyebrow">Gasto en compras</p>
+            <span className={cn(
+              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold",
+              spending.diffPercent > 0 ? "bg-destructive/10 text-destructive" : spending.diffPercent < 0 ? "bg-primary/10 text-primary" : "bg-foreground/5 text-muted-foreground"
+            )}>
+              {spending.diffPercent > 0 ? <TrendingUp className="h-3 w-3" /> : spending.diffPercent < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+              {Math.abs(spending.diffPercent)}%
+            </span>
+          </div>
+          <div className="mt-3 flex items-end justify-between">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Esta semana</p>
+              <p className="text-2xl font-bold tracking-tight tabular-nums">{formatPrecio(spending.current)}</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="text-right">
+              <p className="text-[11px] text-muted-foreground">Anterior</p>
+              <p className="text-base font-semibold text-muted-foreground tabular-nums">{formatPrecio(spending.previous)}</p>
+            </div>
+          </div>
+        </button>
+      )}
     </div>
   );
 }

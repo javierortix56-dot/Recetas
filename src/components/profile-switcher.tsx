@@ -1,40 +1,58 @@
 "use client"
 
 import * as React from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { useAppStore, UserProfileName } from "@/store/app-store"
 import { cn } from "@/lib/utils"
-import { motion } from "framer-motion"
+import { spring } from "@/components/ui/motion"
 
-export function ProfileSwitcher() {
-  const { activeProfile, setActiveProfile } = useAppStore()
+export const PROFILES: { id: UserProfileName; label: string; emoji: string }[] = [
+  { id: "javi", label: "Javi", emoji: "🧔‍♂️" },
+  { id: "mary", label: "Mary", emoji: "👩🏻‍🦰" },
+]
 
-  const profiles: { id: UserProfileName; label: string; emoji: string; color: string }[] = [
-    { id: 'javi', label: 'Javi', emoji: '🧔‍♂️', color: 'bg-primary' },
-    { id: 'mary', label: 'Mary', emoji: '👩🏻‍🦰', color: 'bg-accent' }
-  ]
+/**
+ * Selector de perfil compacto para el header de las pantallas que dependen
+ * del perfil (Inicio, Plan, Nutrición). Antes era una barra fija arriba de
+ * todas las pestañas, incluso las compartidas (Recetas, Despensa, Compras).
+ */
+export function ProfileSwitcher({ className }: { className?: string }) {
+  const activeProfile = useAppStore(s => s.activeProfile)
+  const setActiveProfile = useAppStore(s => s.setActiveProfile)
 
   return (
-    <div className="flex bg-primary-suave p-1 rounded-2xl border border-primary/10 w-fit">
-      {profiles.map((p) => {
+    <div role="tablist" aria-label="Perfil" className={cn("relative flex gap-0.5 p-[3px] rounded-full glass", className)}>
+      {PROFILES.map((p) => {
         const isActive = activeProfile === p.id
         return (
           <button
             key={p.id}
-            onClick={() => setActiveProfile(p.id)}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => !isActive && setActiveProfile(p.id)}
             className={cn(
-              "relative px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-              isActive ? "text-white" : "text-primary/60"
+              "relative h-8 px-2.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors",
+              isActive ? "text-primary-foreground" : "text-muted-foreground"
             )}
           >
             {isActive && (
-              <motion.div
-                layoutId="activeProfileBg"
-                className={cn("absolute inset-0 rounded-xl shadow-sm", p.color)}
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
+              <motion.span layoutId="profile-active" transition={spring} className="absolute inset-0 rounded-full bg-primary shadow-glow" />
             )}
-            <span className="relative z-10">{p.emoji}</span>
-            <span className="relative z-10">{p.label}</span>
+            <span className="relative z-10 text-sm leading-none">{p.emoji}</span>
+            <AnimatePresence initial={false}>
+              {isActive && (
+                <motion.span
+                  className="relative z-10 overflow-hidden whitespace-nowrap"
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: "auto", opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {p.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </button>
         )
       })}
