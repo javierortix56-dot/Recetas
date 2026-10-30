@@ -112,7 +112,7 @@ export function RecetasTab() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <HeaderButton primary label="Crear receta con IA" onClick={() => setIsAIOpen(true)}><Sparkles /></HeaderButton>
+            <HeaderButton primary label="Crear receta con IA" onClick={() => setIsAIOpen(true)} className="px-3.5"><Sparkles /> Crear con IA</HeaderButton>
           </>
         )}
       >

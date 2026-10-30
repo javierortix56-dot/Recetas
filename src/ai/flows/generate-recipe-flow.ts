@@ -9,7 +9,7 @@
 import { ai, IMAGE_MODEL } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
-import { RECIPE_RULES } from '@/lib/recipe-prompt';
+import { PROMPT_TEMPLATE } from '@/lib/recipe-prompt';
 
 const CATEGORIAS_RECETA = ['Desayuno', 'Almuerzo', 'Cena', 'Merienda', 'Postre', 'Snack'] as const;
 const UNIDADES = ['g', 'kg', 'ml', 'l', 'unidad', 'cucharada', 'cucharadita', 'taza', 'docena'] as const;
@@ -65,9 +65,13 @@ export type GeneratedRecipe = z.infer<typeof RecipeSchema>;
 const generateRecipeFlow = ai.defineFlow(
   { name: 'generateRecipeFlow', inputSchema: GenerateRecipeInputSchema, outputSchema: RecipeSchema },
   async ({ pedido, porciones }) => {
+    // Se usa el prompt maestro completo (el mismo de las recetas ya cargadas) y se le
+    // agrega el pedido. La salida se valida contra el esquema, que refleja su formato JSON.
     const { output } = await ai.generate({
-      system: `Sos un chef profesional con foco en técnica y autenticidad (cocina italiana, argentina e internacional). Escribís en español rioplatense.\n\n${RECIPE_RULES}`,
-      prompt: `Armá la receta que pide el usuario.\nPedido: ${pedido}${porciones ? `\nPorciones: ${porciones}` : ''}`,
+      prompt:
+        `${PROMPT_TEMPLATE}\n\n━━━ PEDIDO ━━━\n` +
+        `Generá UNA sola receta (un objeto, no un array) para este pedido: ${pedido}` +
+        (porciones ? `\nPorciones: ${porciones}` : ''),
       output: { schema: RecipeSchema },
     });
     if (!output) throw new Error('La IA no devolvió una receta');
