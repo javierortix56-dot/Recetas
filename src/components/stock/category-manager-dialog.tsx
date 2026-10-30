@@ -128,10 +128,10 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSelectedIds(new Set()); setRenamingCat(null); setMoveTo(''); } }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-sm rounded-3xl p-0 flex flex-col max-h-[88vh] overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="px-0 pb-0 flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/50">
-          <DialogTitle className="text-xl font-black text-primary">Categorías</DialogTitle>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+          <DialogTitle>Categorías</DialogTitle>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             {allCategories.length} categorías · {ingredientes.length} ingredientes
           </p>
         </DialogHeader>
@@ -147,7 +147,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
             return (
               <div key={cat} className="border-b border-border/30 last:border-0">
                 {/* Category row */}
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-primary/5 transition-colors">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-card hover:bg-primary/5 transition-colors">
                   <button onClick={() => toggleExpand(cat)} className="shrink-0">
                     <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', isOpen && 'rotate-90')} />
                   </button>
@@ -164,7 +164,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
                     <span className="flex-1 font-bold text-sm truncate">{cat}</span>
                   )}
 
-                  <Badge className="text-[8px] font-black h-4 px-1.5 bg-primary/10 text-primary border-none shrink-0">
+                  <Badge className="text-[8px] font-bold h-4 px-1.5 bg-primary/10 text-primary border-none shrink-0">
                     {items.length}
                   </Badge>
 
@@ -191,7 +191,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
                 {isOpen && (
                   <div className="bg-background/60">
                     {items.length === 0 ? (
-                      <p className="px-10 py-3 text-[10px] font-black text-muted-foreground uppercase">Sin productos</p>
+                      <p className="px-10 py-3 text-[10px] font-bold text-muted-foreground uppercase">Sin productos</p>
                     ) : (
                       <>
                         {/* Select all in category */}
@@ -200,13 +200,13 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
                           className="w-full flex items-center gap-2 px-10 py-1.5 hover:bg-primary/5 text-left"
                         >
                           <div className={cn(
-                            'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                            'h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors',
                             selectedInCat === items.length ? 'bg-primary border-primary text-white' :
                             selectedInCat > 0 ? 'bg-primary/30 border-primary' : 'border-muted-foreground/30'
                           )}>
                             {selectedInCat === items.length && <Check className="h-2.5 w-2.5 stroke-[3]" />}
                           </div>
-                          <span className="text-[9px] font-black uppercase text-muted-foreground">
+                          <span className="text-[9px] font-bold uppercase text-muted-foreground">
                             {selectedInCat === items.length ? 'Desmarcar todos' : 'Seleccionar todos'}
                           </span>
                         </button>
@@ -221,7 +221,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
                               className="w-full flex items-center gap-3 px-10 py-2 hover:bg-primary/5 text-left transition-colors"
                             >
                               <div className={cn(
-                                'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                                'h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors',
                                 selectedIds.has(ing.id) ? 'bg-primary border-primary text-white' : 'border-muted-foreground/30'
                               )}>
                                 {selectedIds.has(ing.id) && <Check className="h-2.5 w-2.5 stroke-[3]" />}
@@ -240,12 +240,12 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border/50 px-4 py-3 space-y-2 bg-white">
+        <div className="border-t border-border/50 px-4 py-3 space-y-2 bg-card">
           {/* Move selected */}
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
               <MoveRight className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[10px] font-black text-primary uppercase shrink-0">{selectedIds.size} prod.</span>
+              <span className="text-[10px] font-bold text-primary uppercase shrink-0">{selectedIds.size} prod.</span>
               <Select value={moveTo} onValueChange={setMoveTo}>
                 <SelectTrigger className="h-8 rounded-xl text-xs font-bold flex-1">
                   <SelectValue placeholder="Mover a..." />
@@ -260,7 +260,7 @@ export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) 
                 onClick={handleMoveSelected}
                 disabled={!moveTo || isSaving}
                 size="sm"
-                className="h-8 rounded-xl font-black text-[10px] uppercase px-3 bg-primary text-white shrink-0"
+                className="h-8 rounded-xl font-bold text-[10px] uppercase px-3 bg-primary text-white shrink-0"
               >
                 Mover
               </Button>

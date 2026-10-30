@@ -10,7 +10,6 @@ import { StockTab } from './tabs/stock-tab';
 import { PlanificacionTab } from './tabs/planificacion-tab';
 import { ComprasTab } from './tabs/compras-tab';
 import { MacrosTab } from './tabs/macros-tab';
-import { ProfileSwitcher } from './profile-switcher';
 import { cn } from '@/lib/utils';
 
 function useOnlineStatus() {
@@ -26,82 +25,84 @@ function useOnlineStatus() {
   return isOnline;
 }
 
+const TABS = {
+  inicio: InicioTab,
+  planificacion: PlanificacionTab,
+  recetas: RecetasTab,
+  stock: StockTab,
+  compras: ComprasTab,
+  macros: MacrosTab,
+} as const;
+
+type TabKey = keyof typeof TABS;
+
+const PATH_TO_TAB: Record<string, TabKey> = {
+  '/inicio': 'inicio',
+  '/planificacion': 'planificacion',
+  '/recetas': 'recetas',
+  '/stock': 'stock',
+  '/compras': 'compras',
+  '/macros': 'macros',
+};
+
 /**
- * @fileOverview Contenedor principal que maneja la persistencia de las pestañas.
- * Se ha eliminado la pantalla de bienvenida obligatoria para una entrada directa.
+ * Contenedor de pestañas persistentes. Cada pestaña se monta recién la
+ * primera vez que se visita (antes se montaban las seis al abrir la app) y
+ * después queda viva para conservar su scroll y estado.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activeTab, setActiveTab } = useAppStore();
+  const activeTab = useAppStore(s => s.activeTab) as TabKey;
+  const setActiveTab = useAppStore(s => s.setActiveTab);
   const isOnline = useOnlineStatus();
-  
+
   const normalizedPath = React.useMemo(() => {
     if (!pathname || pathname === '/' || pathname === '/inicio' || pathname === '/inicio/') return '/inicio';
     return pathname.replace(/\/$/, '');
   }, [pathname]);
 
+  const routeTab = PATH_TO_TAB[normalizedPath];
+  const isCoreTab = !!routeTab;
+
   React.useEffect(() => {
-    const pathMap: Record<string, string> = {
-      '/inicio': 'inicio',
-      '/planificacion': 'planificacion',
-      '/recetas': 'recetas',
-      '/stock': 'stock',
-      '/compras': 'compras',
-      '/macros': 'macros'
-    };
+    if (routeTab) setActiveTab(routeTab);
+  }, [routeTab, setActiveTab]);
 
-    if (pathMap[normalizedPath]) {
-      setActiveTab(pathMap[normalizedPath]);
-    }
-  }, [normalizedPath, setActiveTab]);
-
-  const isCoreTab = ['/inicio', '/planificacion', '/recetas', '/stock', '/compras', '/macros'].includes(normalizedPath);
+  const [visited, setVisited] = React.useState<Set<TabKey>>(() => new Set(routeTab ? [routeTab] : []));
+  React.useEffect(() => {
+    if (!isCoreTab || visited.has(activeTab)) return;
+    setVisited(prev => new Set(prev).add(activeTab));
+  }, [activeTab, isCoreTab, visited]);
 
   return (
-    <div className="relative w-full h-full min-h-screen overflow-hidden">
-      {/* Selector de perfil superior - Siempre visible en pestañas principales */}
-      {isCoreTab && (
-        <div className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 py-3 flex justify-center max-w-lg mx-auto pointer-events-none">
-          <div className="pointer-events-auto">
-            <ProfileSwitcher />
-          </div>
-        </div>
-      )}
-
-      {/* Indicador sin conexión */}
+    <div className="relative w-full h-full min-h-[100dvh] overflow-hidden">
       {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
-          <div className="mt-14 mx-4 bg-destructive/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg pointer-events-auto">
-            <WifiOff className="h-3 w-3" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sin conexión · Modo local</span>
+        <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="glass-strong text-destructive px-3.5 py-1.5 rounded-full flex items-center gap-1.5 pointer-events-auto">
+            <WifiOff className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-semibold">Sin conexión · los cambios se sincronizan al volver</span>
           </div>
         </div>
       )}
 
-      {/* Paneles persistentes */}
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'inicio' && isCoreTab) ? 'visible' : 'hidden')}>
-        <InicioTab />
-      </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'planificacion' && isCoreTab) ? 'visible' : 'hidden')}>
-        <PlanificacionTab />
-      </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'recetas' && isCoreTab) ? 'visible' : 'hidden')}>
-        <RecetasTab />
-      </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'stock' && isCoreTab) ? 'visible' : 'hidden')}>
-        <StockTab />
-      </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'compras' && isCoreTab) ? 'visible' : 'hidden')}>
-        <ComprasTab />
-      </div>
-      <div className={cn("tab-panel absolute inset-0 overflow-y-auto overscroll-none pb-28 px-4 pt-16", (activeTab === 'macros' && isCoreTab) ? 'visible' : 'hidden')}>
-        <MacrosTab />
-      </div>
+      {(Object.keys(TABS) as TabKey[]).map((key) => {
+        if (!visited.has(key) && !(isCoreTab && activeTab === key)) return null;
+        const Tab = TABS[key];
+        return (
+          <div
+            key={key}
+            className={cn(
+              "tab-panel absolute inset-0 overflow-y-auto overscroll-contain px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]",
+              isCoreTab && activeTab === key && 'visible'
+            )}
+          >
+            <Tab />
+          </div>
+        );
+      })}
 
-      {/* Contenido dinámico (Subpáginas) */}
-      <div className={cn("relative w-full min-h-screen", isCoreTab ? 'hidden' : 'block')}>
-        {!isCoreTab && children}
-      </div>
+      {/* Subpáginas (detalle, edición, modo cocina) */}
+      {!isCoreTab && <div className="relative w-full min-h-[100dvh]">{children}</div>}
     </div>
   );
 }

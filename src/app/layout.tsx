@@ -1,36 +1,43 @@
-
-import type {Metadata} from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { BottomNav } from '@/components/bottom-nav';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import { AuthGuard } from '@/components/auth-guard';
 import { AppShell } from '@/components/app-shell';
+import { AmbientBackground } from '@/components/ui/ambient-background';
+import { THEME_BOOT_SCRIPT, THEME_COLORS } from '@/lib/theme';
+
+// Las acciones de IA (receta + foto con Gemini) pueden tardar más que el límite por defecto
+export const maxDuration = 60;
+
+// next/font: la fuente se sirve desde el propio dominio y no bloquea el render
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Cocina Familiar',
   description: 'Gestión de recetas familiares, stock, planificación y macros.',
-  manifest: '/manifest.json',
-  themeColor: '#2D9A6B',
+  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Cocina Familiar',
   },
-  icons: {
-    apple: 'https://picsum.photos/seed/hamburger/180/180',
-  },
 };
 
-export function generateViewport() {
-  return {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover',
-  };
-}
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  // La barra de estado se funde con el fondo ambiental
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: THEME_COLORS.light },
+    { media: '(prefers-color-scheme: dark)', color: THEME_COLORS.dark },
+  ],
+};
 
 export default function RootLayout({
   children,
@@ -38,16 +45,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" className={inter.variable} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        {/* Tema manual guardado: se aplica antes del primer pintado */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
-      <body className="font-body antialiased bg-background text-foreground overflow-x-hidden">
+      <body className="font-body antialiased overflow-x-hidden min-h-[100dvh]">
+        <AmbientBackground />
         <FirebaseClientProvider>
           <AuthGuard>
-            <main className="min-h-screen flex flex-col max-w-lg mx-auto bg-background relative shadow-xl">
+            <main className="min-h-[100dvh] flex flex-col max-w-lg mx-auto relative">
               <AppShell>
                 {children}
               </AppShell>

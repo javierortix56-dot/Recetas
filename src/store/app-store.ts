@@ -1,25 +1,33 @@
-
 import { create } from 'zustand';
 import { format } from 'date-fns';
 
-const CACHE_KEY = 'cocina_familiar_cache';
+// Solo se guarda el perfil activo. Los datos los cachea Firestore en IndexedDB
+// (ver firebase/index.ts); antes se serializaba todo el store en localStorage
+// en cada snapshot, lo que bloqueaba el hilo principal y superaba la cuota
+// con las fotos en base64.
+const PROFILE_KEY = 'cocina_familiar_profile';
 
-const getCachedData = () => {
+const getCachedProfile = (): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const saved = localStorage.getItem(PROFILE_KEY);
+    if (saved) return saved;
+    // Migración del caché anterior (pesado): rescata el perfil y lo borra
+    const legacy = localStorage.getItem('cocina_familiar_cache');
+    if (legacy) {
+      localStorage.removeItem('cocina_familiar_cache');
+      const profile = /"activeProfile":"(\w+)"/.exec(legacy)?.[1] ?? null;
+      if (profile) localStorage.setItem(PROFILE_KEY, profile);
+      return profile;
+    }
+    return null;
   } catch {
     return null;
   }
 };
 
-const updateCache = (key: string, data: any) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const current = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ...current, [key]: data }));
-  } catch {}
+const saveProfile = (profile: string) => {
+  try { localStorage.setItem(PROFILE_KEY, profile); } catch {}
 };
 
 export type UserProfileName = 'javi' | 'mary';
@@ -67,27 +75,27 @@ interface AppState {
   optimisticToggleCompra: (id: string) => void;
 }
 
-const cached = getCachedData();
+const cachedProfile = getCachedProfile();
 
 const initialState = {
-  activeProfile: (cached?.activeProfile as UserProfileName) ?? 'javi',
-  isProfileConfirmed: true, // Cambiado a true por defecto para evitar overlay
-  
-  recetas: cached?.recetas ?? [],
-  ingredientes: cached?.ingredientes ?? [],
-  planificacion: cached?.planificacion ?? [],
-  listaCompras: cached?.listaCompras ?? [],
-  macrosHoy: cached?.macrosHoy ?? null,
-  macrosSemana: cached?.macrosSemana ?? [],
-  historialCompras: cached?.historialCompras ?? [],
-  userProfile: cached?.userProfile ?? null,
-  
-  recetasCargadas: !!cached?.recetas?.length,
-  ingredientesCargadas: !!cached?.ingredientes?.length,
-  planificacionCargada: !!cached?.planificacion?.length,
-  listaComprasCargada: !!cached?.listaCompras?.length,
-  macrosCargados: !!cached?.macrosHoy || !!cached?.macrosSemana?.length,
-  profileCargado: !!cached?.userProfile,
+  activeProfile: (cachedProfile === 'mary' ? 'mary' : 'javi') as UserProfileName,
+  isProfileConfirmed: true,
+
+  recetas: [] as any[],
+  ingredientes: [] as any[],
+  planificacion: [] as any[],
+  listaCompras: [] as any[],
+  macrosHoy: null as any | null,
+  macrosSemana: [] as any[],
+  historialCompras: [] as any[],
+  userProfile: null as any | null,
+
+  recetasCargadas: false,
+  ingredientesCargadas: false,
+  planificacionCargada: false,
+  listaComprasCargada: false,
+  macrosCargados: false,
+  profileCargado: false,
 
   activeTab: 'inicio',
 };
@@ -96,7 +104,7 @@ export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
   setActiveProfile: (profile) => {
-    updateCache('activeProfile', profile);
+    saveProfile(profile);
     set({
       activeProfile: profile,
       isProfileConfirmed: true,
@@ -113,46 +121,34 @@ export const useAppStore = create<AppState>((set) => ({
   confirmProfile: () => set({ isProfileConfirmed: true }),
 
   setRecetas: (data) => {
-    updateCache('recetas', data);
     set({ recetas: data, recetasCargadas: true });
   },
   setIngredientes: (data) => {
-    updateCache('ingredientes', data);
     set({ ingredientes: data, ingredientesCargadas: true });
   },
   setPlanificacion: (data) => {
-    updateCache('planificacion', data);
     set({ planificacion: data, planificacionCargada: true });
   },
   setListaCompras: (data) => {
-    updateCache('listaCompras', data);
     set({ listaCompras: data, listaComprasCargada: true });
   },
   
   setMacrosSemana: (data) => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    const todayMacros = data.find(m => m.date === todayStr) || null;
+    const todayMacros = data.find(m => (m.date || m.id) === todayStr || m.id === `${todayStr}_${m.perfil}`) || null;
     
-    if (typeof window !== 'undefined') {
-      updateCache('macrosSemana', data);
-      updateCache('macrosHoy', todayMacros);
-    }
-
     set({ macrosSemana: data, macrosHoy: todayMacros, macrosCargados: true });
   },
 
   setMacrosHoy: (data) => {
-    updateCache('macrosHoy', data);
     set({ macrosHoy: data, macrosCargados: true });
   },
 
   setHistorialCompras: (data) => {
-    updateCache('historialCompras', data);
     set({ historialCompras: data });
   },
   
   setUserProfile: (data) => {
-    updateCache('userProfile', data);
     set({ userProfile: data, profileCargado: true });
   },
   
@@ -164,10 +160,6 @@ export const useAppStore = create<AppState>((set) => ({
     )
   })),
 
-  resetStore: () => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.removeItem(CACHE_KEY); } catch {}
-    }
-    set(initialState);
-  },
+  resetStore: () => set(initialState),
 }));
+

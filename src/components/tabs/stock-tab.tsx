@@ -1,381 +1,275 @@
 'use client';
 
 import * as React from 'react';
-import { useSearchParams } from "next/navigation";
-import {
-  Search, Plus, Minus, Package,
-  AlertCircle, RotateCcw, X, Check,
-  ChevronDown, ChevronUp, MoreVertical, History, CalendarDays
-} from "lucide-react";
+import { Search, Plus, Minus, Package, AlertCircle, RotateCcw, X, ChevronDown, MoreHorizontal, CalendarDays } from "lucide-react";
+import { motion, AnimatePresence } from 'framer-motion';
+import { doc, serverTimestamp, collection, writeBatch } from "firebase/firestore";
+import { useShallow } from 'zustand/react/shallow';
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { doc, serverTimestamp, collection, writeBatch, getDocs, updateDoc, addDoc } from "firebase/firestore";
-import { useFirestore } from "@/firebase";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { PageHeader, HeaderButton, EmptyState } from '@/components/ui/page-header';
+import { FilterChip } from '@/components/ui/segmented';
+import { easeOut } from '@/components/ui/motion';
 import { StockFormDialog } from "@/components/stock/stock-form-dialog";
-import { BulkCategoryDialog } from "@/components/stock/bulk-category-dialog";
 import { StockHistorialDialog } from "@/components/stock/stock-historial-dialog";
 import { CategoryManagerDialog, normalizeCategoria } from "@/components/stock/category-manager-dialog";
+import { IngredientMergerDialog } from "@/components/macros/ingredient-merger-dialog";
+import { useFirestore } from "@/firebase";
 import { toast } from "@/hooks/use-toast";
 import { useAppStore } from '@/store/app-store';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { USER_ID } from '@/lib/constants';
 import { cn, formatPrecio } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { syncShoppingList } from '@/lib/sync-logic';
+
+const isLow = (i: any) => Number(i.stockMinimo) > 0 && Number(i.stockActual) <= Number(i.stockMinimo);
 
 export function StockTab() {
-  const searchParams = useSearchParams();
   const db = useFirestore();
-  const { ingredientes, ingredientesCargadas, planificacion } = useAppStore();
-  
+  const { ingredientes, ingredientesCargadas, planificacion } = useAppStore(useShallow(s => ({
+    ingredientes: s.ingredientes,
+    ingredientesCargadas: s.ingredientesCargadas,
+    planificacion: s.planificacion,
+  })));
+
   const [search, setSearch] = React.useState("");
-  const [showLowStockOnly, setShowLowStockOnly] = React.useState(false);
-  const [showPlannedOnly, setShowPlannedOnly] = React.useState(false);
-  const [isResetting, setIsResetting] = React.useState(false);
+  const deferredSearch = React.useDeferredValue(search);
+  const [filter, setFilter] = React.useState<'todos' | 'bajo' | 'plan'>('todos');
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [editing, setEditing] = React.useState<any | null>(null);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [confirmReset, setConfirmReset] = React.useState(false);
 
-
-  // Ingredientes que aparecen en el plan de la semana
-  const plannedIngredientNames = React.useMemo(() => {
+  const plannedNames = React.useMemo(() => {
     const names = new Set<string>();
-    planificacion.forEach(plan => {
-      (plan.ingredientes || []).forEach((ing: any) => {
-        if (ing.nombre) names.add(ing.nombre.toLowerCase().trim());
-      });
-    });
+    planificacion.forEach(plan => (plan.ingredientes || []).forEach((ing: any) => {
+      if (ing.nombre) names.add(ing.nombre.toLowerCase().trim());
+    }));
     return names;
   }, [planificacion]);
-  
-  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  
-  // Contraído por defecto: array vacío
-  const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
-  const categoriesInView = React.useMemo(() => {
-    const cats = Array.from(new Set(ingredientes.map(i => i.categoria || "Otros")));
-    return cats.sort();
-  }, [ingredientes]);
-
-  // Manejo de filtro por URL - Solo se ejecuta al montar o cambiar el parámetro
-  React.useEffect(() => {
-    const filtro = searchParams?.get("filtro");
-    if (filtro === "stockBajo") {
-      setShowLowStockOnly(true);
-    }
-  }, [searchParams]);
-
-  const toggleExpandAll = () => {
-    if (expandedItems.length === categoriesInView.length) {
-      setExpandedItems([]);
-    } else {
-      setExpandedItems(categoriesInView);
-    }
-  };
-
-  const handleResetAllMinStock = async () => {
-    if (!db) return;
-    setIsResetting(true);
-    try {
-      const batch = writeBatch(db);
-      const snap = await getDocs(collection(db, "users", USER_ID, "ingredients"));
-      snap.docs.forEach(d => {
-        batch.update(d.ref, { stockMinimo: 0, updatedAt: serverTimestamp() });
-      });
-      await batch.commit();
-      toast({ title: "¡Listo!", description: "Todos los stock mínimos se pusieron en 0." });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error al resetear" });
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const updateStockDirect = async (id: string, val: number) => {
-    if (!db) return;
-    const ing = ingredientes.find(i => i.id === id);
-    if (!ing) return;
-    const newVal = Math.max(0, val);
-    try {
-      await updateDoc(doc(db, "users", USER_ID, "ingredients", id), { stockActual: newVal, updatedAt: serverTimestamp() });
-      addDoc(collection(db, "users", USER_ID, "stock_historial"), {
-        ingredienteId: id,
-        ingredienteNombre: ing.nombre,
-        tipo: 'ajuste',
-        cantidadAntes: ing.stockActual,
-        cantidadDespues: newVal,
-        diferencia: newVal - ing.stockActual,
-        unidad: ing.unidad,
-        fecha: serverTimestamp(),
-      });
-    } catch (e) { console.error(e); }
-  };
-
-  const toggleSelection = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) newSelected.delete(id);
-    else newSelected.add(id);
-    setSelectedIds(newSelected);
-  };
-
-  const filteredIngredients = React.useMemo(() => {
-    return ingredientes.filter(item => {
-      const matchesSearch = (item.nombre || "").toLowerCase().includes(search.toLowerCase());
-      const isLow = item.stockActual <= (item.stockMinimo || 0);
-      const isPlanned = plannedIngredientNames.has((item.nombre || "").toLowerCase().trim());
-      return matchesSearch && (!showLowStockOnly || isLow) && (!showPlannedOnly || isPlanned);
-    });
-  }, [ingredientes, search, showLowStockOnly, showPlannedOnly, plannedIngredientNames]);
+  const lowCount = React.useMemo(() => ingredientes.filter(isLow).length, [ingredientes]);
 
   const grouped = React.useMemo(() => {
+    const q = deferredSearch.toLowerCase().trim();
     const groups: Record<string, any[]> = {};
-    filteredIngredients.forEach(item => {
-      const cat = normalizeCategoria(item.categoria || "Otros");
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
+    ingredientes.forEach(item => {
+      if (q && !(item.nombre || "").toLowerCase().includes(q)) return;
+      if (filter === 'bajo' && !isLow(item)) return;
+      if (filter === 'plan' && !plannedNames.has((item.nombre || "").toLowerCase().trim())) return;
+      (groups[normalizeCategoria(item.categoria || "Otros")] ||= []).push(item);
     });
-    // Sort within each category: with stock A-Z first, then without stock A-Z
-    Object.keys(groups).forEach(cat => {
-      groups[cat].sort((a, b) => {
-        const aHas = (a.stockActual || 0) > 0 ? 0 : 1;
-        const bHas = (b.stockActual || 0) > 0 ? 0 : 1;
-        if (aHas !== bHas) return aHas - bHas;
-        return (a.nombre || "").localeCompare(b.nombre || "", "es");
-      });
-    });
+    // Con stock primero, después sin stock; alfabético dentro de cada grupo
+    Object.values(groups).forEach(list => list.sort((a, b) =>
+      Number((a.stockActual || 0) <= 0) - Number((b.stockActual || 0) <= 0) || (a.nombre || "").localeCompare(b.nombre || "", "es")
+    ));
     return groups;
-  }, [filteredIngredients]);
+  }, [ingredientes, deferredSearch, filter, plannedNames]);
+
+  const categories = React.useMemo(() => Object.keys(grouped).sort((a, b) => a.localeCompare(b, "es")), [grouped]);
+  // Buscando o filtrando, todo abierto; si no, lo que el usuario expandió
+  const autoOpen = !!deferredSearch.trim() || filter !== 'todos';
+
+  const toggleCategory = (cat: string) => setExpanded(prev => {
+    const next = new Set(prev);
+    next.has(cat) ? next.delete(cat) : next.add(cat);
+    return next;
+  });
+
+  const updateStock = React.useCallback(async (item: any, value: number) => {
+    if (!db) return;
+    const newVal = Math.max(0, Math.round(value * 100) / 100);
+    if (newVal === Number(item.stockActual)) return;
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "users", USER_ID, "ingredients", item.id), { stockActual: newVal, updatedAt: serverTimestamp() });
+      batch.set(doc(collection(db, "users", USER_ID, "stock_historial")), {
+        ingredienteId: item.id,
+        ingredienteNombre: item.nombre,
+        tipo: 'ajuste',
+        cantidadAntes: Number(item.stockActual) || 0,
+        cantidadDespues: newVal,
+        diferencia: newVal - (Number(item.stockActual) || 0),
+        unidad: item.unidad,
+        fecha: serverTimestamp(),
+      });
+      await batch.commit();
+    } catch {
+      toast({ variant: "destructive", title: "No se pudo actualizar el stock" });
+    }
+  }, [db]);
+
+  const handleResetMinimos = async () => {
+    if (!db) return;
+    try {
+      const withMin = ingredientes.filter(i => Number(i.stockMinimo) > 0);
+      for (let i = 0; i < withMin.length; i += 450) {
+        const batch = writeBatch(db);
+        withMin.slice(i, i + 450).forEach(ing => batch.update(doc(db, "users", USER_ID, "ingredients", ing.id), { stockMinimo: 0, updatedAt: serverTimestamp() }));
+        await batch.commit();
+      }
+      syncShoppingList(db).catch(() => {});
+      toast({ title: "Mínimos en 0", description: `${withMin.length} productos actualizados` });
+    } catch {
+      toast({ variant: "destructive", title: "Error al resetear" });
+    }
+  };
 
   if (!ingredientesCargadas && ingredientes.length === 0) {
     return (
-      <div className="p-4 space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-        ))}
+      <div className="space-y-3">
+        <Skeleton className="h-9 w-40" />
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
       </div>
     );
   }
 
-  const allSelected = selectedIds.size > 0 && selectedIds.size === filteredIngredients.length;
+  const allOpen = categories.length > 0 && categories.every(c => expanded.has(c));
 
   return (
-    <div className="flex flex-col gap-3 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col gap-2.5 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-2.5">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-black tracking-tight text-primary">
-            {isSelectionMode ? `(${selectedIds.size})` : 'Despensa'}
-          </h1>
-          <div className="flex gap-2">
-            {isSelectionMode ? (
-              <Button size="icon" variant="ghost" onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="rounded-full h-10 w-10 bg-primary text-white">
-                <X className="h-5 w-5" />
-              </Button>
-            ) : (
-              <>
-                <StockFormDialog />
-                <Button variant="ghost" size="icon" onClick={toggleExpandAll} className="h-10 w-10 rounded-full bg-primary-suave text-primary">
-                  {expandedItems.length === categoriesInView.length ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full bg-primary-suave text-primary">
-                      <MoreVertical className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-2xl">
-                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-bold">
-                      <Check className="h-4 w-4" /> Seleccionar
-                    </DropdownMenuItem>
-                    <StockHistorialDialog asMenuItem />
-                    <CategoryManagerDialog asMenuItem />
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-3 font-bold text-accent focus:text-accent">
-                          <RotateCcw className="h-4 w-4" /> Resetear mínimos a 0
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2rem]">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-black text-primary">¿Poner todos los mínimos en 0?</AlertDialogTitle>
-                          <AlertDialogDescription>Nada aparecerá automáticamente en la lista de compras salvo que lo planees.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-2">
-                          <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-                          <AlertDialogAction className="bg-accent text-white rounded-xl font-black" onClick={handleResetAllMinStock}>Sí, poner en 0</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-          </div>
-        </div>
-
-        {!isSelectionMode && (
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        sticky
+        subtitle={`${ingredientes.length} productos${lowCount > 0 ? ` · ${lowCount} con stock bajo` : ""}`}
+        title="Despensa"
+        actions={
           <>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar por nombre..." className="pl-9 h-10 bg-white rounded-xl border-2 border-primary/5 font-bold text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Badge variant={showLowStockOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider", showLowStockOnly ? "bg-destructive text-white" : "bg-destructive/10 text-destructive border-none")} onClick={() => setShowLowStockOnly(!showLowStockOnly)}>
-                {showLowStockOnly ? "Viendo Stock Bajo" : "⚠️ Filtrar Stock Bajo"}
-              </Badge>
-              <Badge variant={showPlannedOnly ? "default" : "secondary"} className={cn("px-3 py-1 rounded-lg cursor-pointer font-black text-[9px] uppercase w-fit tracking-wider flex items-center gap-1", showPlannedOnly ? "bg-primary text-white" : "bg-primary/10 text-primary border-none")} onClick={() => setShowPlannedOnly(!showPlannedOnly)}>
-                <CalendarDays className="h-3 w-3" />
-                {showPlannedOnly ? "Viendo Planificado" : "Filtrar Planificado"}
-              </Badge>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <HeaderButton label="Más opciones"><MoreHorizontal /></HeaderButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setExpanded(allOpen ? new Set() : new Set(categories))}>
+                  <ChevronDown className={cn("transition-transform", allOpen && "rotate-180")} /> {allOpen ? "Contraer todo" : "Expandir todo"}
+                </DropdownMenuItem>
+                <StockHistorialDialog asMenuItem />
+                <DropdownMenuSeparator />
+                <CategoryManagerDialog asMenuItem />
+                <IngredientMergerDialog asMenuItem />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setConfirmReset(true)} className="text-accent focus:text-accent focus:bg-accent/10">
+                  <RotateCcw /> Poner mínimos en 0
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <HeaderButton primary label="Nuevo producto" onClick={() => setIsCreating(true)}><Plus /></HeaderButton>
           </>
-        )}
-
-        {isSelectionMode && (
-          <div className="flex flex-wrap gap-2 py-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="rounded-xl h-8 px-3 text-[10px] font-black uppercase"
-              onClick={() => {
-                if (allSelected) setSelectedIds(new Set());
-                else setSelectedIds(new Set(filteredIngredients.map(i => i.id)));
-              }}
-            >
-              {allSelected ? "Desmarcar todos" : "Seleccionar visibles"}
-            </Button>
-          </div>
-        )}
-      </header>
-
-      {Object.keys(grouped).length > 0 ? (
-        <Accordion 
-          type="multiple" 
-          value={expandedItems} 
-          onValueChange={setExpandedItems}
-          className="space-y-1.5"
-        >
-          {Object.keys(grouped).sort().map(category => (
-            <AccordionItem key={category} value={category} className="border-none">
-              <AccordionTrigger className="flex hover:no-underline bg-white px-4 py-2 rounded-2xl border border-border shadow-sm mb-0.5 transition-all">
-                <div className="flex items-center gap-3">
-                  <Package className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-black uppercase text-primary tracking-tight">{category}</span>
-                  <Badge variant="secondary" className="ml-auto bg-primary-suave text-primary border-none text-[9px] h-5 px-1.5">{grouped[category].length}</Badge>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pt-0.5 space-y-1 px-1">
-                {grouped[category].map((item) => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => isSelectionMode && toggleSelection(item.id)}
-                    className={cn(
-                      "bg-white py-2 px-3 rounded-xl border border-border/50 flex items-center justify-between gap-3 transition-all",
-                      isSelectionMode && "active:scale-[0.98] cursor-pointer",
-                      selectedIds.has(item.id) && "ring-2 ring-primary bg-primary/5 border-primary/20"
-                    )}
-                  >
-                    {isSelectionMode && (
-                      <div className={cn(
-                        "h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
-                        selectedIds.has(item.id) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
-                      )}>
-                        {selectedIds.has(item.id) && <Check className="h-3.5 w-3.5 stroke-[4]" />}
-                      </div>
-                    )}
-
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate leading-tight">{item.nombre}</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {item.stockMinimo > 0 && item.stockActual <= item.stockMinimo ? (
-                          <span className="text-[8px] font-black text-destructive uppercase flex items-center gap-0.5">
-                            <AlertCircle className="h-2.5 w-2.5" /> Bajo
-                          </span>
-                        ) : null}
-                        <span className={cn("text-[9px] font-black tabular-nums", item.stockActual <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? "text-destructive" : "text-primary")}>
-                          {item.stockActual} {item.unidad}
-                        </span>
-                        {item.stockMinimo > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground">mín {item.stockMinimo}</span>
-                        )}
-                        {item.precioUnitario > 0 && (
-                          <span className="text-[8px] font-bold text-muted-foreground opacity-60">
-                            {formatPrecio(item.precioUnitario)}/{item.unidad}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {!isSelectionMode && (
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        <StockFormDialog ingredientToEdit={item} />
-                        <div className="flex items-center gap-0.5 bg-background p-0.5 rounded-xl border border-border/50">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
-                            onClick={(e) => { e.stopPropagation(); updateStockDirect(item.id, item.stockActual - 1); }}
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </Button>
-                          <div className="w-6 text-center font-black text-xs text-primary tabular-nums">
-                            {item.stockActual}
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-white active:scale-90 transition-transform" 
-                            onClick={(e) => { e.stopPropagation(); updateStockDirect(item.id, item.stockActual + 1); }}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      ) : (
-        <div className="py-20 text-center opacity-40">
-          <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-xs font-black uppercase">Sin resultados en la despensa</p>
+        }
+      >
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar producto" className="pl-10 glass" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {search && (
+            <button onClick={() => setSearch("")} aria-label="Limpiar búsqueda" className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-foreground/10 flex items-center justify-center">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
+        <div className="flex gap-2">
+          <FilterChip active={filter === 'todos'} onClick={() => setFilter('todos')}>Todos</FilterChip>
+          <FilterChip active={filter === 'bajo'} onClick={() => setFilter(filter === 'bajo' ? 'todos' : 'bajo')} tone="destructive">
+            <AlertCircle /> Stock bajo{lowCount > 0 ? ` (${lowCount})` : ""}
+          </FilterChip>
+          <FilterChip active={filter === 'plan'} onClick={() => setFilter(filter === 'plan' ? 'todos' : 'plan')}>
+            <CalendarDays /> En el plan
+          </FilterChip>
+        </div>
+      </PageHeader>
+
+      {categories.length > 0 ? (
+        <div className="space-y-3">
+          {categories.map(category => {
+            const items = grouped[category];
+            const isOpen = autoOpen || expanded.has(category);
+            const low = items.filter(isLow).length;
+            return (
+              <section key={category} className="glass rounded-[22px] overflow-hidden">
+                <button onClick={() => toggleCategory(category)} disabled={autoOpen} className="w-full flex items-center justify-between px-4 py-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    {category}
+                    {low > 0 && <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label={`${low} con stock bajo`} />}
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
+                    {items.length}
+                    {!autoOpen && <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />}
+                  </span>
+                </button>
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} transition={easeOut} className="overflow-hidden">
+                      <div className="border-t border-hairline">
+                        {items.map(item => (
+                          <StockRow key={item.id} item={item} onEdit={setEditing} onUpdate={updateStock} />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </section>
+            );
+          })}
+        </div>
+      ) : ingredientes.length === 0 ? (
+        <EmptyState icon={Package} title="Despensa vacía" description="Los ingredientes se agregan solos al importar recetas, o podés cargarlos a mano." />
+      ) : (
+        <EmptyState icon={Search} title="Sin resultados" description="Probá con otro nombre o quitá el filtro." />
       )}
 
-      <AnimatePresence>
-        {isSelectionMode && selectedIds.size > 0 && (
-          <motion.div 
-            initial={{ y: 100, opacity: 0 }} 
-            animate={{ y: 0, opacity: 1 }} 
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-20 left-4 right-4 z-[60] max-w-lg mx-auto"
-          >
-            <div className="bg-primary shadow-2xl rounded-3xl p-4 flex items-center justify-between border-2 border-white/20">
-              <span className="text-white font-black text-sm">{selectedIds.size} seleccionados</span>
-              <div className="flex gap-2">
-                <BulkCategoryDialog 
-                  selectedIds={Array.from(selectedIds)} 
-                  onSuccess={() => {
-                    setSelectedIds(new Set());
-                    setIsSelectionMode(false);
-                  }}
-                />
-                <Button 
-                  variant="ghost" 
-                  onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }}
-                  className="bg-white/10 text-white rounded-2xl h-12 px-4 font-black uppercase text-[10px]"
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Un único diálogo de alta/edición para toda la lista */}
+      <StockFormDialog
+        ingredientToEdit={editing || undefined}
+        open={!!editing || isCreating}
+        onOpenChange={(o) => { if (!o) { setEditing(null); setIsCreating(false); } }}
+      />
+
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Poner todos los mínimos en 0?</AlertDialogTitle>
+            <AlertDialogDescription>A partir de ahí, a la lista de compras solo entra lo que necesite el plan.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetMinimos} className="bg-accent text-accent-foreground hover:bg-accent/90">Poner en 0</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+const StockRow = React.memo(function StockRow({ item, onEdit, onUpdate }: {
+  item: any
+  onEdit: (item: any) => void
+  onUpdate: (item: any, value: number) => void
+}) {
+  const low = isLow(item);
+  const stock = Number(item.stockActual) || 0;
+  // Paso del +/−: 1 para unidades, 100 para g/ml, 0.25 para kg/l
+  const step = ['g', 'ml'].includes(item.unidad) ? 100 : ['kg', 'l'].includes(item.unidad) ? 0.25 : 1;
+
+  return (
+    <div className="px-4 py-2.5 flex items-center gap-3 bg-card/60 border-b border-hairline last:border-b-0">
+      <button type="button" onClick={() => onEdit(item)} className="flex-1 min-w-0 text-left">
+        <p className={cn("font-medium text-sm truncate", stock <= 0 && "text-muted-foreground")}>{item.nombre}</p>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 tabular-nums">
+          {low && <span className="text-destructive font-semibold flex items-center gap-0.5"><AlertCircle className="h-3 w-3" />bajo</span>}
+          {Number(item.stockMinimo) > 0 && <span>mín {Number(item.stockMinimo).toLocaleString('es-AR', { maximumFractionDigits: 2 })} {item.unidad}</span>}
+          {item.precioUnitario > 0 && <span>· {formatPrecio(item.precioUnitario)}/{item.unidad}</span>}
+        </p>
+      </button>
+      <div className="flex items-center gap-0.5 rounded-full bg-foreground/[0.05] p-0.5 shrink-0">
+        <button aria-label={`Restar ${item.nombre}`} onClick={() => onUpdate(item, stock - step)} disabled={stock <= 0} className="h-8 w-8 rounded-full flex items-center justify-center text-foreground/70 active:scale-90 disabled:opacity-30">
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <span className={cn("min-w-[52px] text-center text-xs font-bold tabular-nums", low ? "text-destructive" : stock > 0 ? "text-foreground" : "text-muted-foreground")}>
+          {stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })} <span className="font-medium text-muted-foreground">{item.unidad}</span>
+        </span>
+        <button aria-label={`Sumar ${item.nombre}`} onClick={() => onUpdate(item, stock + step)} className="h-8 w-8 rounded-full flex items-center justify-center text-primary active:scale-90">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+});

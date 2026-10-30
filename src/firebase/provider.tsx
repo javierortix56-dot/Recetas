@@ -3,7 +3,6 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { FirebaseStorage, getStorage } from 'firebase/storage';
 import { USER_ID } from '@/lib/constants';
 
 interface FirebaseProviderProps {
@@ -24,14 +23,12 @@ export interface FirebaseContextState {
   areServicesAvailable: boolean;
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
-  storage: FirebaseStorage | null;
   user: any | null;
 }
 
 export interface FirebaseServicesAndUser {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
-  storage: FirebaseStorage;
   user: any;
 }
 
@@ -47,7 +44,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       areServicesAvailable: true,
       firebaseApp,
       firestore,
-      storage: getStorage(firebaseApp),
       user: LOCAL_USER,
     };
   }, [firebaseApp, firestore]);
@@ -67,7 +63,6 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   return {
     firebaseApp: context.firebaseApp!,
     firestore: context.firestore!,
-    storage: context.storage!,
     user: context.user,
   };
 };
@@ -75,11 +70,6 @@ export const useFirebase = (): FirebaseServicesAndUser => {
 export const useFirestore = (): Firestore => {
   const { firestore } = useFirebase();
   return firestore;
-};
-
-export const useStorage = (): FirebaseStorage => {
-  const { storage } = useFirebase();
-  return storage;
 };
 
 export const useFirebaseApp = (): FirebaseApp => {

@@ -35,7 +35,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="font-black uppercase text-[10px] tracking-widest text-primary">Cargando Cocina Familiar...</p>
+          <p className="font-bold uppercase text-[10px] tracking-widest text-primary">Cargando Cocina Familiar...</p>
         </div>
       </div>
     );

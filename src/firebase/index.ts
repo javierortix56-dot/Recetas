@@ -2,33 +2,47 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore'
+import {
+  Firestore,
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
+
+let firestoreInstance: Firestore | null = null;
+
+/**
+ * Firestore con caché persistente en IndexedDB: al abrir la app los listeners
+ * responden al instante desde el disco (y funcionan sin conexión), y luego
+ * se sincronizan con el servidor. Reemplaza el caché manual en localStorage,
+ * que serializaba todas las recetas (con fotos base64) en cada cambio.
+ */
+function getFirestoreWithCache(app: FirebaseApp): Firestore {
+  if (firestoreInstance) return firestoreInstance;
+  try {
+    firestoreInstance = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    // Ya inicializado (p. ej. HMR en desarrollo) o IndexedDB no disponible
+    firestoreInstance = getFirestore(app);
+  }
+  return firestoreInstance;
+}
 
 export function initializeFirebase() {
-  if (!getApps().length) {
-    let firebaseApp;
-    try {
-      firebaseApp = initializeApp(firebaseConfig);
-    } catch (e) {
-      console.error('Firebase initialization failed:', e);
-      firebaseApp = initializeApp(firebaseConfig);
-    }
-
-    return getSdks(firebaseApp);
-  }
-
-  return getSdks(getApp());
+  const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  return getSdks(firebaseApp);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
-    firestore: getFirestore(firebaseApp)
+    firestore: getFirestoreWithCache(firebaseApp),
   };
 }
 
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
-export * from './firestore/use-doc';
-export * from './non-blocking-updates';

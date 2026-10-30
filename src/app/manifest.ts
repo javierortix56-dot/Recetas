@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Gestión de recetas familiares y nutrición',
     start_url: '/',
     display: 'standalone',
-    background_color: '#F7FAF8',
-    theme_color: '#2D9A6B',
+    background_color: '#f2f4ee',
+    theme_color: '#f2f4ee',
     icons: [
       {
         src: 'https://picsum.photos/seed/hamburger/192/192',

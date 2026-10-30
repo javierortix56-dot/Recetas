@@ -1,652 +1,365 @@
 'use client';
 
 import * as React from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Trash2,
-  Eye,
-  Plus,
-  Sparkles,
-  Loader2,
-  CalendarX,
-  Flame,
-  Beef,
-  Wheat,
-  Droplets,
-  Activity,
-  MoreVertical,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { format, addDays, startOfWeek, subWeeks, addWeeks } from "date-fns";
+import { ChevronLeft, ChevronRight, Trash2, Plus, Sparkles, Loader2, CalendarX, MoreHorizontal, Minus } from "lucide-react";
+import { motion, AnimatePresence } from 'framer-motion';
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { format, addDays, startOfWeek, subWeeks, addWeeks, isSameWeek } from "date-fns";
 import { es } from "date-fns/locale";
-import { collection, writeBatch, doc, serverTimestamp, getDocs, query, where, increment } from "firebase/firestore";
+import { writeBatch, doc, serverTimestamp } from "firebase/firestore";
+import { useShallow } from 'zustand/react/shallow';
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PageHeader, HeaderButton } from '@/components/ui/page-header';
+import { MacroRing } from '@/components/ui/macro-ring';
+import { easeOut, spring } from '@/components/ui/motion';
+import { ProfileSwitcher } from '@/components/profile-switcher';
+import { AddMealPlanDialog } from '@/components/plan/add-meal-plan-dialog';
+import { GradientPlaceholder } from '@/components/gradient-placeholder';
 import { useFirestore } from "@/firebase";
 import { toast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
 import { useAppStore } from '@/store/app-store';
-import { AddMealPlanDialog } from '@/components/plan/add-meal-plan-dialog';
 import { USER_ID } from '@/lib/constants';
 import { cn, getSafeImageSource } from '@/lib/utils';
-import { GradientPlaceholder } from '@/components/gradient-placeholder';
-import { motion, AnimatePresence } from 'framer-motion';
+import { syncShoppingList } from '@/lib/sync-logic';
+import { addMealPlan, addToSummary, clearPlansForDates, removeMealPlan, sumMacros, MOMENTOS, EMPTY_MACROS } from '@/lib/meal-plan';
 import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
 import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
-import Image from "next/image";
-import { syncShoppingList } from '@/lib/sync-logic';
 
-const MOMENTOS = ["Desayuno", "Almuerzo", "Merienda", "Cena"];
+const DEFAULT_GOALS = { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
 
-function WeeklyMacroRing({ label, value, target, size = 60, strokeWidth = 5, icon: Icon }: { label: string, value: number, target: number, size?: number, strokeWidth?: number, icon?: any }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const rawPercentage = target > 0 ? (value / target) * 100 : 0;
-  const visualPercentage = Math.min(rawPercentage, 100);
-  const offset = circumference - (visualPercentage / 100) * circumference;
-
-  let ringColor = "text-primary";
-  if (rawPercentage > 110) ringColor = "text-destructive";
-  else if (rawPercentage > 100) ringColor = "text-accent";
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg className="w-full h-full transform -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" strokeWidth={strokeWidth} className="text-primary-suave" />
-          <circle 
-            cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke="currentColor" 
-            strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} 
-            strokeLinecap="round" className={`${ringColor} transition-all duration-700 ease-out`} 
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {Icon && <Icon className={cn("h-3 w-3 mb-0.5", ringColor)} />}
-          <span className="text-[10px] font-black leading-none">{Math.round(rawPercentage)}%</span>
-        </div>
-      </div>
-      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">{label}</span>
-    </div>
-  );
-}
+const recipesForAI = (recetas: any[]) => recetas.map(r => ({
+  id: r.id,
+  nombre: r.nombre,
+  categorias: r.categorias,
+  categoria: r.categoria,
+  tags: r.tags,
+}));
 
 export function PlanificacionTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { planificacion, planificacionCargada, recetas, activeProfile, userProfile } = useAppStore();
-  
-  const [currentWeek, setCurrentWeek] = React.useState(new Date());
-  const [expandedDay, setExpandedDay] = React.useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = React.useState<any>(null);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isAutoPlanning, setIsAutoPlanning] = React.useState(false);
-  const [isAutoPlanningDay, setIsAutoPlanningDay] = React.useState<string | null>(null);
-  const [isClearing, setIsClearing] = React.useState(false);
+  const { planificacion, planificacionCargada, recetas, activeProfile, userProfile } = useAppStore(useShallow(s => ({
+    planificacion: s.planificacion,
+    planificacionCargada: s.planificacionCargada,
+    recetas: s.recetas,
+    activeProfile: s.activeProfile,
+    userProfile: s.userProfile,
+  })));
+
+  const [currentWeek, setCurrentWeek] = React.useState(() => new Date());
+  const [selectedDay, setSelectedDay] = React.useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [planToDelete, setPlanToDelete] = React.useState<any>(null);
+  const [busy, setBusy] = React.useState<null | 'week' | 'clear' | string>(null);
   const [isConfirmClearOpen, setIsConfirmClearOpen] = React.useState(false);
 
-  const startDate = startOfWeek(currentWeek, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const startDate = React.useMemo(() => startOfWeek(currentWeek, { weekStartsOn: 1 }), [currentWeek]);
+  const weekDays = React.useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startDate, i)), [startDate]);
+  const weekStrs = React.useMemo(() => weekDays.map(d => format(d, "yyyy-MM-dd")), [weekDays]);
+  const recipesById = React.useMemo(() => new Map(recetas.map(r => [r.id, r])), [recetas]);
 
-  const goals = userProfile?.objetivosMacros || { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
-  const weeklyGoals = React.useMemo(() => ({
-    calorias: goals.calorias * 7,
-    proteinas: goals.proteinas * 7,
-    carbohidratos: goals.carbohidratos * 7,
-    grasas: goals.grasas * 7
-  }), [goals]);
+  // Planes agrupados por día una sola vez (antes se filtraba la lista en cada celda)
+  const plansByDay = React.useMemo(() => {
+    const map = new Map<string, any[]>();
+    planificacion.forEach(p => {
+      const list = map.get(p.date) || [];
+      list.push(p);
+      map.set(p.date, list);
+    });
+    return map;
+  }, [planificacion]);
 
-  const weeklyTotals = React.useMemo(() => {
-    const weekStrArray = weekDays.map(d => format(d, "yyyy-MM-dd"));
-    const weekPlans = planificacion.filter(p => weekStrArray.includes(p.date));
-    
-    return weekPlans.reduce((acc, p) => {
-      const m = p.macros || {};
-      return {
-        calorias: acc.calorias + (Number(m.calorias) || 0),
-        proteinas: acc.proteinas + (Number(m.proteinas) || 0),
-        carbohidratos: acc.carbohidratos + (Number(m.carbohidratos) || 0),
-        grasas: acc.grasas + (Number(m.grasas) || 0),
-      };
-    }, { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 });
-  }, [planificacion, weekDays]);
+  const goals = userProfile?.objetivosMacros || DEFAULT_GOALS;
+  const weeklyTotals = React.useMemo(() => sumMacros(weekStrs.flatMap(d => plansByDay.get(d) || [])), [weekStrs, plansByDay]);
 
-  React.useEffect(() => {
-    if (planificacionCargada && !expandedDay) {
-      setExpandedDay(format(new Date(), "yyyy-MM-dd"));
+  // Al cambiar de semana, seleccionar hoy (si está) o el lunes
+  const goToWeek = (d: Date) => {
+    setCurrentWeek(d);
+    const start = startOfWeek(d, { weekStartsOn: 1 });
+    setSelectedDay(isSameWeek(d, new Date(), { weekStartsOn: 1 }) ? todayStr : format(start, "yyyy-MM-dd"));
+  };
+
+  const commitAndSync = async (batch: ReturnType<typeof writeBatch>) => {
+    await batch.commit();
+    syncShoppingList(db, activeProfile).catch(() => {});
+  };
+
+  const writeAIPlans = async (plans: { date: string; mealType: string; recipeId: string }[], dates: string[]) => {
+    const batch = writeBatch(db);
+    await clearPlansForDates(batch, db, dates, activeProfile);
+    const totals = new Map<string, typeof EMPTY_MACROS>();
+    for (const p of plans) {
+      const recipe = recipesById.get(p.recipeId);
+      if (!recipe || !dates.includes(p.date)) continue;
+      const macros = addMealPlan(batch, db, { recipe, date: p.date, mealType: p.mealType, portions: recipe.porciones || 3, profile: activeProfile });
+      totals.set(p.date, sumMacros([{ macros: totals.get(p.date) || EMPTY_MACROS }, { macros }]));
     }
-  }, [planificacionCargada, expandedDay]);
+    totals.forEach((m, date) => addToSummary(batch, db, date, activeProfile, m));
+    await commitAndSync(batch);
+  };
 
-  const handleAutoPlan = async () => {
+  const handleAutoPlanWeek = async () => {
     if (!db || recetas.length === 0) return;
-    setIsAutoPlanning(true);
+    setBusy('week');
     try {
-      const result = await autoPlanWeek({
-        recipes: recetas.map(r => ({
-          id: r.id,
-          nombre: r.nombre,
-          categorias: r.categorias,
-          categoria: r.categoria,
-          tags: r.tags
-        })),
-        startDate: format(startDate, "yyyy-MM-dd")
-      });
-
-      const batch = writeBatch(db);
-      const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
-      
-      const currentPlansSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "meal_plans"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
-      
-      const currentLogsSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
-
-      for (const date of weekStr) {
-        const summaryId = `${date}_${activeProfile}`
-        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
-          totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
-
-      for (const p of result.plans) {
-        const fullRecipe = recetas.find(r => r.id === p.recipeId);
-        if (!fullRecipe) continue;
-
-        const m = fullRecipe.macros || {};
-        const macrosCalculados = {
-          calorias: Math.round(Number(m.calorias || 0)),
-          proteinas: Math.round(Number(m.proteinas || 0)),
-          carbohidratos: Math.round(Number(m.carbohidratos || 0)),
-          grasas: Math.round(Number(m.grasas || 0)),
-        };
-
-        const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
-        batch.set(planRef, {
-          userId: USER_ID,
-          perfil: activeProfile,
-          date: p.date,
-          mealType: p.mealType,
-          recipeId: p.recipeId,
-          recipeName: p.recipeName,
-          recipeCategory: fullRecipe.categoria || "Almuerzo",
-          recipeImageUrl: fullRecipe.fotoURL || fullRecipe.imageUrl || null,
-          plannedPortions: 3,
-          recipeOriginalPortions: fullRecipe.porciones || 1,
-          macros: macrosCalculados,
-          ingredientes: fullRecipe.ingredientes || [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-
-        batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
-          userId: USER_ID,
-          perfil: activeProfile,
-          date: p.date,
-          momento: p.mealType,
-          recetaId: p.recipeId,
-          recetaNombre: p.recipeName,
-          recetaCategoria: fullRecipe.categoria || "Almuerzo",
-          porciones: 1, 
-          macros: macrosCalculados,
-          planId: planRef.id,
-          createdAt: serverTimestamp()
-        });
-
-        const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${p.date}_${activeProfile}`);
-        batch.set(summaryRef, {
-          totalesDia: {
-            calorias: increment(macrosCalculados.calorias),
-            proteinas: increment(macrosCalculados.proteinas),
-            carbohidratos: increment(macrosCalculados.carbohidratos),
-            grasas: increment(macrosCalculados.grasas)
-          },
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
-
-      await batch.commit();
-      await syncShoppingList(db, activeProfile);
-      toast({ title: `¡Plan de ${activeProfile} listo! ✨` });
+      const result = await autoPlanWeek({ recipes: recipesForAI(recetas), startDate: weekStrs[0] });
+      await writeAIPlans(result.plans, weekStrs);
+      toast({ title: "Semana planificada ✨" });
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "Error al generar plan semanal" });
+      toast({ variant: "destructive", title: "Error al generar el plan semanal" });
     } finally {
-      setIsAutoPlanning(false);
+      setBusy(null);
     }
   };
 
-  const handleAutoPlanDay = async (date: Date) => {
+  const handleAutoPlanDay = async (dateStr: string) => {
     if (!db || recetas.length === 0) return;
-
-    const dateStr = format(date, "yyyy-MM-dd");
-    setIsAutoPlanningDay(dateStr);
+    setBusy(dateStr);
     try {
-      const result = await autoPlanDay({
-        recipes: recetas.map(r => ({
-          id: r.id,
-          nombre: r.nombre,
-          categorias: r.categorias,
-          categoria: r.categoria,
-          tags: r.tags
-        })),
-        date: dateStr
-      });
-
-      const batch = writeBatch(db);
-
-      // Delete existing meal_plans and daily_logs for this day before re-planning
-      const [existingPlansSnap, existingLogsSnap] = await Promise.all([
-        getDocs(query(collection(db, "users", USER_ID, "meal_plans"), where("date", "==", dateStr), where("perfil", "==", activeProfile))),
-        getDocs(query(collection(db, "users", USER_ID, "daily_logs"), where("date", "==", dateStr), where("perfil", "==", activeProfile)))
-      ]);
-      existingPlansSnap.docs.forEach(d => batch.delete(d.ref));
-      existingLogsSnap.docs.forEach(d => batch.delete(d.ref));
-
-      // Accumulate total macros to write summaryRef only once
-      const totalMacros = { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 };
-
-      for (const p of result.plans) {
-        const fullRecipe = recetas.find(r => r.id === p.recipeId);
-        if (!fullRecipe) continue;
-
-        const m = fullRecipe.macros || {};
-        const macrosCalculados = {
-          calorias: Math.round(Number(m.calorias || 0)),
-          proteinas: Math.round(Number(m.proteinas || 0)),
-          carbohidratos: Math.round(Number(m.carbohidratos || 0)),
-          grasas: Math.round(Number(m.grasas || 0)),
-        };
-
-        totalMacros.calorias += macrosCalculados.calorias;
-        totalMacros.proteinas += macrosCalculados.proteinas;
-        totalMacros.carbohidratos += macrosCalculados.carbohidratos;
-        totalMacros.grasas += macrosCalculados.grasas;
-
-        const planRef = doc(collection(db, "users", USER_ID, "meal_plans"));
-        batch.set(planRef, {
-          userId: USER_ID,
-          perfil: activeProfile,
-          date: dateStr,
-          mealType: p.mealType,
-          recipeId: p.recipeId,
-          recipeName: p.recipeName,
-          recipeCategory: fullRecipe.categoria || "Almuerzo",
-          recipeImageUrl: fullRecipe.fotoURL || fullRecipe.imageUrl || null,
-          plannedPortions: 3,
-          recipeOriginalPortions: fullRecipe.porciones || 1,
-          macros: macrosCalculados,
-          ingredientes: fullRecipe.ingredientes || [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-
-        batch.set(doc(collection(db, "users", USER_ID, "daily_logs")), {
-          userId: USER_ID,
-          perfil: activeProfile,
-          date: dateStr,
-          momento: p.mealType,
-          recetaId: p.recipeId,
-          recetaNombre: p.recipeName,
-          recetaCategoria: fullRecipe.categoria || "Almuerzo",
-          porciones: 1,
-          macros: macrosCalculados,
-          planId: planRef.id,
-          createdAt: serverTimestamp()
-        });
-      }
-
-      // Single write to summaryRef with accumulated totals
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${dateStr}_${activeProfile}`);
-      batch.set(summaryRef, {
-        date: dateStr,
-        userId: USER_ID,
-        perfil: activeProfile,
-        totalesDia: totalMacros,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await batch.commit();
-      await syncShoppingList(db, activeProfile);
-
-      toast({ title: `Día de ${activeProfile} planeado ✓` });
-      setExpandedDay(dateStr);
+      const result = await autoPlanDay({ recipes: recipesForAI(recetas), date: dateStr });
+      await writeAIPlans(result.plans.map(p => ({ ...p, date: dateStr })), [dateStr]);
+      toast({ title: "Día planificado ✓" });
     } catch (e) {
-      console.error("Error autoPlanDay:", e);
-      toast({ variant: "destructive", title: "Error al planear el día" });
+      console.error(e);
+      toast({ variant: "destructive", title: "Error al planificar el día" });
     } finally {
-      setIsAutoPlanningDay(null);
+      setBusy(null);
     }
   };
 
-  const handleUnplanWeek = async () => {
+  const handleClearWeek = async () => {
     if (!db) return;
-    setIsClearing(true);
+    setBusy('clear');
     try {
       const batch = writeBatch(db);
-      const weekStr = weekDays.map(d => format(d, "yyyy-MM-dd"));
-      
-      const currentPlansSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "meal_plans"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      
-      const currentLogsSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("date", "in", weekStr),
-        where("perfil", "==", activeProfile)
-      ));
-      
-      currentPlansSnap.docs.forEach(d => batch.delete(d.ref));
-      currentLogsSnap.docs.forEach(d => batch.delete(d.ref));
-      
-      for (const date of weekStr) {
-        const summaryId = `${date}_${activeProfile}`
-        batch.set(doc(db, "users", USER_ID, "daily_macro_summaries", summaryId), {
-          totalesDia: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      }
-
-      await batch.commit();
-      await syncShoppingList(db, activeProfile);
-      toast({ title: `Semana desplanificada` });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Error al limpiar plan" });
+      await clearPlansForDates(batch, db, weekStrs, activeProfile);
+      await commitAndSync(batch);
+      toast({ title: "Semana vaciada" });
+    } catch {
+      toast({ variant: "destructive", title: "Error al vaciar la semana" });
     } finally {
-      setIsClearing(false);
+      setBusy(null);
     }
   };
 
-  const handleUpdatePortions = async (planId: string, currentPortions: number, delta: number) => {
+  const handleUpdatePortions = async (plan: any, delta: number) => {
     if (!db) return;
-    const newPortions = Math.max(1, currentPortions + delta);
-    try {
-      const planRef = doc(db, "users", USER_ID, "meal_plans", planId);
-      await writeBatch(db)
-        .update(planRef, { plannedPortions: newPortions, updatedAt: serverTimestamp() })
-        .commit();
-      await syncShoppingList(db, activeProfile);
-    } catch (e) {}
-  };
-
-  const handleDeleteFromPlan = async () => {
-    if (!db || !selectedPlan) return;
-    setIsDeleting(true);
+    const next = Math.max(1, (plan.plannedPortions || 1) + delta);
+    if (next === plan.plannedPortions) return;
     try {
       const batch = writeBatch(db);
-      batch.delete(doc(db, "users", USER_ID, "meal_plans", selectedPlan.id));
-      
-      const logSnap = await getDocs(query(
-        collection(db, "users", USER_ID, "daily_logs"), 
-        where("planId", "==", selectedPlan.id),
-        where("perfil", "==", activeProfile)
-      ));
-      logSnap.docs.forEach(d => batch.delete(d.ref));
-
-      const macros = selectedPlan.macros || {};
-      const summaryRef = doc(db, "users", USER_ID, "daily_macro_summaries", `${selectedPlan.date}_${activeProfile}`);
-      batch.set(summaryRef, {
-        totalesDia: {
-          calorias: increment(-Math.round(macros.calorias || 0)),
-          proteinas: increment(-Math.round(macros.proteinas || 0)),
-          carbohidratos: increment(-Math.round(macros.carbohidratos || 0)),
-          grasas: increment(-Math.round(macros.grasas || 0))
-        },
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await batch.commit();
-      await syncShoppingList(db, activeProfile);
-      
-      toast({ title: "Comida eliminada" });
-      setSelectedPlan(null);
-    } catch (e) { 
-      toast({ variant: "destructive", title: "Error al borrar" }); 
+      batch.update(doc(db, "users", USER_ID, "meal_plans", plan.id), { plannedPortions: next, updatedAt: serverTimestamp() });
+      await commitAndSync(batch);
+    } catch {
+      toast({ variant: "destructive", title: "No se pudieron cambiar las porciones" });
     }
-    finally { setIsDeleting(false); }
   };
 
-  if (!planificacionCargada && planificacion.length === 0) {
-    return (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
-      </div>
-    );
-  }
+  const handleDelete = async () => {
+    if (!db || !planToDelete) return;
+    const plan = planToDelete;
+    setPlanToDelete(null);
+    try {
+      const batch = writeBatch(db);
+      await removeMealPlan(batch, db, plan, activeProfile);
+      await commitAndSync(batch);
+      toast({ title: "Comida quitada del plan" });
+    } catch {
+      toast({ variant: "destructive", title: "Error al quitar" });
+    }
+  };
+
+  const selectedDate = new Date(selectedDay + "T00:00:00");
+  const dayPlans = plansByDay.get(selectedDay) || [];
+  const dayKcal = sumMacros(dayPlans).calorias;
+  const isCurrentWeek = isSameWeek(currentWeek, new Date(), { weekStartsOn: 1 });
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-12">
-      {/* Header compacto con dropdown de acciones */}
-      <header className="flex items-center justify-between pt-2">
-        <div>
-          <h1 className="text-2xl font-black text-primary leading-none">Plan</h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">{activeProfile}</p>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        subtitle={`${format(startDate, "d MMM", { locale: es })} – ${format(addDays(startDate, 6), "d MMM", { locale: es })}`}
+        title="Plan"
+        actions={
+          <>
+            <ProfileSwitcher />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <HeaderButton label="Acciones de la semana">
+                  {busy === 'week' || busy === 'clear' ? <Loader2 className="animate-spin" /> : <MoreHorizontal />}
+                </HeaderButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleAutoPlanWeek} disabled={!!busy || recetas.length === 0}>
+                  <Sparkles className="text-accent" /> Planificar semana con IA
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} disabled={!!busy} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <CalendarX /> Vaciar semana
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      {/* Navegación de semana + tira de días */}
+      <section className="glass rounded-[24px] p-3 space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <button onClick={() => goToWeek(subWeeks(currentWeek, 1))} aria-label="Semana anterior" className="hit-44 h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-foreground/5 active:scale-90">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button onClick={() => goToWeek(new Date())} disabled={isCurrentWeek} className="text-xs font-semibold text-primary disabled:text-foreground">
+            {isCurrentWeek ? "Esta semana" : "Volver a hoy"}
+          </button>
+          <button onClick={() => goToWeek(addWeeks(currentWeek, 1))} aria-label="Semana siguiente" className="hit-44 h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-foreground/5 active:scale-90">
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0 bg-white border rounded-full px-1 py-1 shadow-sm">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-[10px] font-black px-2 tabular-nums">
-              {format(startDate, "d MMM", { locale: es })} – {format(addDays(startDate, 6), "d MMM", { locale: es })}
-            </span>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="h-7 w-7 rounded-full">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 bg-primary-suave text-primary rounded-full">
-                {isAutoPlanning || isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-2xl">
-              <DropdownMenuItem onClick={handleAutoPlan} disabled={isAutoPlanning} className="gap-3 font-bold">
-                <Sparkles className="h-4 w-4 text-accent" /> Planear semana con IA
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsConfirmClearOpen(true)} className="gap-3 font-bold text-destructive focus:text-destructive">
-                <CalendarX className="h-4 w-4" /> Vaciar semana
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
-
-      {/* Macro rings compactos */}
-      <Card className="border-none shadow-sm bg-white rounded-3xl overflow-hidden border border-primary/5">
-        <CardContent className="p-4">
-          <div className="flex justify-around items-center">
-            <WeeklyMacroRing label="Kcal" value={weeklyTotals.calorias} target={weeklyGoals.calorias} size={72} strokeWidth={6} icon={Flame} />
-            <WeeklyMacroRing label="Prot" value={weeklyTotals.proteinas} target={weeklyGoals.proteinas} size={56} strokeWidth={5} icon={Beef} />
-            <WeeklyMacroRing label="Carbs" value={weeklyTotals.carbohidratos} target={weeklyGoals.carbohidratos} size={56} strokeWidth={5} icon={Wheat} />
-            <WeeklyMacroRing label="Grasas" value={weeklyTotals.grasas} target={weeklyGoals.grasas} size={56} strokeWidth={5} icon={Droplets} />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Calendar strip horizontal */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {weekDays.map((day) => {
-          const dayStr = format(day, "yyyy-MM-dd");
-          const isSelected = expandedDay === dayStr;
-          const isToday = dayStr === format(new Date(), "yyyy-MM-dd");
-          const dayPlansCount = planificacion.filter(p => p.date === dayStr).length;
-
-          return (
-            <button
-              key={dayStr}
-              onClick={() => setExpandedDay(isSelected ? null : dayStr)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-2xl transition-all shrink-0 min-w-[52px]",
-                isSelected
-                  ? "bg-primary text-white shadow-md"
-                  : isToday
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "bg-white text-foreground border border-border"
-              )}
-            >
-              <span className="text-[9px] font-black uppercase tracking-widest opacity-80">
-                {format(day, "EEE", { locale: es })}
-              </span>
-              <span className="text-lg font-black leading-none">{format(day, "d")}</span>
-              <div className="flex gap-0.5 h-1.5 items-center">
-                {dayPlansCount > 0
-                  ? Array.from({ length: Math.min(dayPlansCount, 4) }).map((_, i) => (
-                      <div key={i} className={cn("h-1 w-1 rounded-full", isSelected ? "bg-white/70" : "bg-primary")} />
-                    ))
-                  : <div className={cn("h-1 w-1 rounded-full", isSelected ? "bg-white/30" : "bg-border")} />}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Vista del día seleccionado */}
-      <AnimatePresence mode="wait">
-        {expandedDay && (() => {
-          const day = weekDays.find(d => format(d, "yyyy-MM-dd") === expandedDay);
-          if (!day) return null;
-          const dayStr = expandedDay;
-          const plans = planificacion.filter(p => p.date === dayStr);
-          const isLoadingThisDay = isAutoPlanningDay === dayStr;
-
-          return (
-            <motion.div
-              key={expandedDay}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="space-y-2.5"
-            >
-              <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-black text-primary capitalize">
-                  {format(day, "EEEE d 'de' MMMM", { locale: es })}
+        <div className="grid grid-cols-7 gap-1">
+          {weekDays.map((day, i) => {
+            const dayStr = weekStrs[i];
+            const isSelected = selectedDay === dayStr;
+            const isToday = dayStr === todayStr;
+            const count = plansByDay.get(dayStr)?.length || 0;
+            return (
+              <button
+                key={dayStr}
+                onClick={() => setSelectedDay(dayStr)}
+                className={cn("relative flex flex-col items-center gap-1 py-2 rounded-2xl transition-colors", isSelected ? "text-primary-foreground" : isToday ? "text-primary" : "text-foreground")}
+              >
+                {isSelected && <motion.span layoutId="plan-day" transition={spring} className="absolute inset-0 rounded-2xl bg-primary shadow-glow" />}
+                <span className={cn("relative text-[10px] font-semibold uppercase", !isSelected && "text-muted-foreground")}>{format(day, "EEEEEE", { locale: es })}</span>
+                <span className="relative text-base font-bold leading-none tabular-nums">{format(day, "d")}</span>
+                <span className="relative flex gap-0.5 h-1">
+                  {Array.from({ length: Math.min(count, 4) }).map((_, j) => (
+                    <span key={j} className={cn("h-1 w-1 rounded-full", isSelected ? "bg-primary-foreground/80" : "bg-primary")} />
+                  ))}
                 </span>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-8 w-8 bg-accent/8 text-accent rounded-full hover:bg-accent/15"
-                  onClick={() => handleAutoPlanDay(day)}
-                  disabled={!!isAutoPlanningDay}
-                >
-                  {isLoadingThisDay ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                </Button>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Día seleccionado */}
+      {!planificacionCargada && planificacion.length === 0 ? (
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.section
+            key={selectedDay}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18 }}
+            className="space-y-3"
+          >
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <p className="text-[15px] font-bold first-letter:uppercase">{format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}</p>
+                <p className="text-xs text-muted-foreground tabular-nums">{Math.round(dayKcal)} / {goals.calorias} kcal</p>
               </div>
+              <button
+                onClick={() => handleAutoPlanDay(selectedDay)}
+                disabled={!!busy || recetas.length === 0}
+                className="h-8 px-3 rounded-full glass text-xs font-semibold text-accent flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+              >
+                {busy === selectedDay ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                Armar día
+              </button>
+            </div>
 
-              {MOMENTOS.map((m) => {
-                const mealPlans = plans.filter(p => p.mealType === m);
-
-                return (
-                  <div key={m} className="flex gap-3 items-start">
-                    <span className="w-16 text-[9px] font-black text-muted-foreground uppercase shrink-0 text-right pt-3">{m}</span>
-                    <div className="flex-1 space-y-1.5 min-w-0">
-                      {mealPlans.map((plan) => {
-                        const recipe = recetas.find(r => r.id === plan.recipeId);
-                        const imageUrl = getSafeImageSource(plan) || getSafeImageSource(recipe);
-                        return (
-                          <div key={plan.id} className="flex items-center gap-2.5 bg-white p-2 rounded-2xl relative shadow-sm border border-border/60">
-                            <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 relative bg-muted">
-                              {imageUrl ? (
-                                <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
-                              ) : (
-                                <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0 pr-14">
-                              <h4 className="font-bold text-xs truncate leading-tight cursor-pointer" onClick={() => router.push(`/recetas/${plan.recipeId}`)}>
-                                {plan.recipeName}
-                              </h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, -1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">-</button>
-                                  <span className="text-[9px] font-black tabular-nums">{plan.plannedPortions || 3}p</span>
-                                  <button onClick={() => handleUpdatePortions(plan.id, plan.plannedPortions || 3, 1)} className="h-4 w-4 bg-muted rounded text-xs font-black flex items-center justify-center">+</button>
-                                </div>
-                                <span className="text-[9px] font-black text-primary">{plan.macros?.calorias ?? recipe?.macros?.calorias ?? 0} kcal</span>
-                              </div>
-                            </div>
-                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => router.push(`/recetas/${plan.recipeId}`)}><Eye className="h-3 w-3" /></Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setSelectedPlan(plan)}><Trash2 className="h-3 w-3" /></Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <AddMealPlanDialog date={day} momento={m} onSave={() => {}}>
-                        <button className={cn(
-                          "w-full border border-dashed border-border rounded-2xl flex items-center justify-center gap-1.5 text-muted-foreground hover:bg-primary/5 transition-colors",
-                          mealPlans.length === 0 ? "h-10" : "h-7 rounded-xl border-border/50"
-                        )}>
-                          <Plus className="h-3 w-3" />
-                          {mealPlans.length === 0 && <span className="text-[9px] font-black uppercase">Agregar</span>}
-                        </button>
-                      </AddMealPlanDialog>
-                    </div>
+            {MOMENTOS.map((m) => {
+              const mealPlans = dayPlans.filter(p => p.mealType === m);
+              return (
+                <div key={m} className="glass rounded-[22px] p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between pl-1.5">
+                    <p className="eyebrow">{m}</p>
+                    <AddMealPlanDialog date={selectedDate} momento={m}>
+                      <button aria-label={`Agregar a ${m}`} className="hit-44 h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center active:scale-90">
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </AddMealPlanDialog>
                   </div>
-                );
-              })}
-            </motion.div>
-          );
-        })()}
-      </AnimatePresence>
+                  {mealPlans.length === 0 && (
+                    <AddMealPlanDialog date={selectedDate} momento={m}>
+                      <button className="w-full h-11 rounded-2xl border border-dashed border-foreground/15 text-xs font-medium text-muted-foreground hover:bg-foreground/[0.03]">
+                        Agregar receta
+                      </button>
+                    </AddMealPlanDialog>
+                  )}
+                  {mealPlans.map(plan => {
+                    const recipe = recipesById.get(plan.recipeId);
+                    const imageUrl = getSafeImageSource(recipe) || getSafeImageSource(plan);
+                    return (
+                      <motion.div layout key={plan.id} transition={easeOut} className="flex items-center gap-2.5 rounded-2xl bg-card/70 p-1.5 pr-2">
+                        <button onClick={() => router.push(`/recetas/${plan.recipeId}`)} className="h-11 w-11 rounded-xl overflow-hidden shrink-0 relative bg-muted">
+                          {imageUrl ? (
+                            <Image src={imageUrl} alt={plan.recipeName} fill className="object-cover" unoptimized />
+                          ) : (
+                            <GradientPlaceholder categoria={plan.recipeCategory || "Almuerzo"} />
+                          )}
+                        </button>
+                        <button onClick={() => router.push(`/recetas/${plan.recipeId}`)} className="flex-1 min-w-0 text-left">
+                          <p className="font-semibold text-[13px] truncate leading-tight">{plan.recipeName}</p>
+                          <p className="text-[11px] text-muted-foreground tabular-nums">{Math.round(plan.macros?.calorias || 0)} kcal/porc.</p>
+                        </button>
+                        <div className="flex items-center gap-1 rounded-full bg-foreground/[0.05] p-0.5">
+                          <button aria-label="Menos porciones" onClick={() => handleUpdatePortions(plan, -1)} className="h-6 w-6 rounded-full flex items-center justify-center active:scale-90"><Minus className="h-3 w-3" /></button>
+                          <span className="text-[11px] font-bold tabular-nums w-5 text-center">{plan.plannedPortions || 1}</span>
+                          <button aria-label="Más porciones" onClick={() => handleUpdatePortions(plan, 1)} className="h-6 w-6 rounded-full flex items-center justify-center active:scale-90"><Plus className="h-3 w-3" /></button>
+                        </div>
+                        <button aria-label="Quitar del plan" onClick={() => setPlanToDelete(plan)} className="hit-44 h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </motion.section>
+        </AnimatePresence>
+      )}
 
-      {/* Confirm vaciar semana */}
+      {/* Balance semanal */}
+      <section className="glass rounded-[24px] p-4">
+        <p className="eyebrow mb-3">Balance de la semana</p>
+        <div className="flex justify-around items-center">
+          <MacroRing label="Kcal" value={weeklyTotals.calorias} target={goals.calorias * 7} size={68} />
+          <MacroRing label="Prot" value={weeklyTotals.proteinas} target={goals.proteinas * 7} size={56} strokeWidth={5} />
+          <MacroRing label="Carbs" value={weeklyTotals.carbohidratos} target={goals.carbohidratos * 7} size={56} strokeWidth={5} />
+          <MacroRing label="Grasas" value={weeklyTotals.grasas} target={goals.grasas * 7} size={56} strokeWidth={5} />
+        </div>
+      </section>
+
       <AlertDialog open={isConfirmClearOpen} onOpenChange={setIsConfirmClearOpen}>
-        <AlertDialogContent className="rounded-[2rem]">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-black text-primary text-xl">¿Vaciar tu semana?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">Se quitarán todas las comidas de esta semana.</AlertDialogDescription>
+            <AlertDialogTitle>¿Vaciar la semana?</AlertDialogTitle>
+            <AlertDialogDescription>Se quitan todas las comidas planificadas de esta semana para este perfil.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setIsConfirmClearOpen(false); handleUnplanWeek(); }} className="bg-destructive text-white rounded-xl font-black">
-              {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Vaciar"}
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearWeek} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Vaciar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirm eliminar receta del plan */}
-      <AlertDialog open={!!selectedPlan} onOpenChange={(open) => !open && setSelectedPlan(null)}>
-        <AlertDialogContent className="rounded-[2rem]">
+      <AlertDialog open={!!planToDelete} onOpenChange={(o) => !o && setPlanToDelete(null)}>
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-black text-primary text-xl">¿Eliminar del plan?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">
-              Se quitará <span className="font-bold text-foreground">{selectedPlan?.recipeName}</span> de tu plan.
+            <AlertDialogTitle>¿Quitar del plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se quita <span className="font-semibold text-foreground">{planToDelete?.recipeName}</span> y su registro de macros.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteFromPlan} disabled={isDeleting} className="bg-destructive text-white rounded-xl font-black">
-              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Quitar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

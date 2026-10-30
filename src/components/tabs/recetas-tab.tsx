@@ -1,154 +1,154 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Search, Download, Clock, CheckSquare,
-  X, Check, Flame, Hash, Plus, Users, MoreVertical, Bot
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Search, Sparkles, CheckSquare, X, Check, Flame, Pencil, MoreHorizontal, Trash2, Clock, ChefHat } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from 'framer-motion';
+import { writeBatch, doc } from 'firebase/firestore';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { PageHeader, HeaderButton, EmptyState } from '@/components/ui/page-header';
+import { FilterChip } from '@/components/ui/segmented';
+import { easeOut, spring, stagger } from '@/components/ui/motion';
 import { GradientPlaceholder } from "@/components/gradient-placeholder";
-import { RecipeImportModal } from "@/components/recipe-import-modal";
-import { RecipePromptSheet } from "@/components/recipe-prompt-sheet";
+import { RecipeAIDialog } from "@/components/recipes/recipe-ai-dialog";
 import { useAppStore } from '@/store/app-store';
-import { cn, getSafeImageSource } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { USER_ID } from '@/lib/constants';
+import { cn, getSafeImageSource } from '@/lib/utils';
 
-const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Cena", "Merienda", "Postre", "Snack"];
+const CATEGORIES = ["Todos", "Desayuno", "Almuerzo", "Merienda", "Cena", "Postre", "Snack"];
+
+const recipeCats = (r: any): string[] => Array.isArray(r.categorias) ? r.categorias : (r.categoria ? [r.categoria] : []);
 
 export function RecetasTab() {
   const router = useRouter();
   const db = useFirestore();
-  const { recetas, recetasCargadas } = useAppStore();
+  const recetas = useAppStore(s => s.recetas);
+  const recetasCargadas = useAppStore(s => s.recetasCargadas);
   const [search, setSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(search);
   const [activeCategory, setActiveCategory] = React.useState("Todos");
   const [activeTag, setActiveTag] = React.useState<string | null>(null);
-  const [isImportOpen, setIsImportOpen] = React.useState(false);
-  const [isTagsExpanded, setIsTagsExpanded] = React.useState(false);
+  const [showTags, setShowTags] = React.useState(false);
+  const [isAIOpen, setIsAIOpen] = React.useState(false);
 
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
-  const allTagsSorted = React.useMemo(() => {
-    const tagCounts: Record<string, number> = {};
-    recetas.forEach(r => {
-      (r.tags || []).forEach((t: string) => {
-        const tag = t.toLowerCase().trim();
-        if (tag) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      });
-    });
-    return Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag);
+  const tagsSorted = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    recetas.forEach(r => (r.tags || []).forEach((t: string) => {
+      const tag = t.toLowerCase().trim();
+      if (tag) counts[tag] = (counts[tag] || 0) + 1;
+    }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([tag]) => tag).slice(0, 24);
   }, [recetas]);
 
-  const filteredRecipes = React.useMemo(() => {
-    return recetas.filter(r => {
-      const nombreLower = (r.nombre || "").toLowerCase();
-      const ingredientsMatch = r.ingredientes?.some((ing: any) => 
-        (ing.nombre || "").toLowerCase().includes(search.toLowerCase())
-      );
-      const matchesSearch = nombreLower.includes(search.toLowerCase()) || ingredientsMatch;
-      
-      const cats = Array.isArray(r.categorias) ? r.categorias : (r.categoria ? [r.categoria] : []);
-      const matchesCategory = activeCategory === "Todos" || cats.includes(activeCategory);
-      const matchesTag = !activeTag || (r.tags || []).some((t: string) => t.toLowerCase() === activeTag.toLowerCase());
-      
-      return matchesSearch && matchesCategory && matchesTag;
-    });
-  }, [recetas, search, activeCategory, activeTag]);
+  const filtered = React.useMemo(() => {
+    const q = deferredSearch.toLowerCase().trim();
+    return recetas
+      .filter(r => {
+        const matchesSearch = !q
+          || (r.nombre || "").toLowerCase().includes(q)
+          || r.ingredientes?.some((ing: any) => (ing.nombre || "").toLowerCase().includes(q));
+        const matchesCategory = activeCategory === "Todos" || recipeCats(r).includes(activeCategory);
+        const matchesTag = !activeTag || (r.tags || []).some((t: string) => t.toLowerCase().trim() === activeTag);
+        return matchesSearch && matchesCategory && matchesTag;
+      })
+      .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
+  }, [recetas, deferredSearch, activeCategory, activeTag]);
 
-  const toggleRecipeSelection = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) newSelected.delete(id);
-    else newSelected.add(id);
-    setSelectedIds(newSelected);
+  const toggleSelection = React.useCallback((id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  }), []);
+
+  const exitSelection = () => { setIsSelectionMode(false); setSelectedIds(new Set()); };
+
+  const handleDeleteSelected = async () => {
+    if (!db || selectedIds.size === 0) return;
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => batch.delete(doc(db, "users", USER_ID, "recipes", id)));
+      await batch.commit();
+      toast({ title: `${selectedIds.size} ${selectedIds.size === 1 ? "receta eliminada" : "recetas eliminadas"}` });
+      exitSelection();
+    } catch {
+      toast({ variant: "destructive", title: "Error al eliminar" });
+    } finally {
+      setConfirmDelete(false);
+    }
   };
 
-  if (!recetasCargadas && recetas.length === 0) {
-    return (
-      <div className="grid grid-cols-3 gap-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-36 w-full rounded-3xl" />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-32">
-      <header className="flex flex-col gap-4 sticky top-0 bg-background/95 backdrop-blur-md z-30 -mx-4 px-4 pb-4">
-        <div className="flex items-center justify-between pt-2">
-          <h1 className="text-3xl font-black tracking-tight text-primary">
-            {isSelectionMode ? `(${selectedIds.size})` : 'Recetas'}
-          </h1>
-          <div className="flex gap-2">
-            {isSelectionMode ? (
-              <Button size="icon" variant="ghost" onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="rounded-full bg-primary text-white">
-                <X className="h-5 w-5" />
-              </Button>
-            ) : (
-              <>
-                <Button size="icon" variant="ghost" onClick={() => router.push("/recetas/nueva")} className="rounded-full bg-primary text-white shadow-md">
-                  <Plus className="h-6 w-6" />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="ghost" className="rounded-full bg-primary-suave text-primary">
-                      <MoreVertical className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-2xl">
-                    <DropdownMenuItem onClick={() => setIsSelectionMode(true)} className="gap-3 font-bold">
-                      <CheckSquare className="h-4 w-4" /> Seleccionar
-                    </DropdownMenuItem>
-                    <RecipePromptSheet onOpenImport={() => setIsImportOpen(true)} asMenuItem />
-                    <DropdownMenuItem onClick={() => setIsImportOpen(true)} className="gap-3 font-bold">
-                      <Download className="h-4 w-4" /> Importar JSON
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-          </div>
-        </div>
-        
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        sticky
+        subtitle={isSelectionMode ? "Tocá para seleccionar" : `${recetas.length} recetas`}
+        title={isSelectionMode ? `${selectedIds.size} seleccionadas` : "Recetas"}
+        actions={isSelectionMode ? (
+          <HeaderButton label="Salir de selección" onClick={exitSelection}><X /></HeaderButton>
+        ) : (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <HeaderButton label="Más opciones"><MoreHorizontal /></HeaderButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push("/recetas/nueva")}>
+                  <Pencil /> Escribir a mano
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsSelectionMode(true)} disabled={recetas.length === 0}>
+                  <CheckSquare /> Seleccionar varias
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <HeaderButton primary label="Crear receta con IA" onClick={() => setIsAIOpen(true)} className="px-3.5"><Sparkles /> Crear con IA</HeaderButton>
+          </>
+        )}
+      >
         {!isSelectionMode && (
           <>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input placeholder="Buscar recetas..." className="pl-10 h-12 bg-white rounded-2xl font-bold shadow-sm border-2 border-primary/5" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar por nombre o ingrediente" className="pl-10 glass" value={search} onChange={(e) => setSearch(e.target.value)} />
+              {search && (
+                <button onClick={() => setSearch("")} aria-label="Limpiar búsqueda" className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-foreground/10 flex items-center justify-center">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
-            
-            <div className="flex flex-wrap gap-2 pb-1 items-center">
-              {CATEGORIES.map((cat) => (
-                <Badge key={cat} variant={activeCategory === cat ? "default" : "secondary"} className={cn("px-4 py-2 rounded-full cursor-pointer whitespace-nowrap text-[10px] font-black snap-start transition-all uppercase tracking-widest", activeCategory === cat ? "bg-primary text-white shadow-md" : "bg-primary-suave text-primary border-none")} onClick={() => setActiveCategory(cat)}>{cat}</Badge>
+            <div className="-mx-4 px-4 flex gap-2 overflow-x-auto scrollbar-hide">
+              {CATEGORIES.map(cat => (
+                <FilterChip key={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)}>{cat}</FilterChip>
               ))}
-              <Button variant="ghost" size="sm" onClick={() => setIsTagsExpanded(!isTagsExpanded)} className={cn("rounded-full h-8 px-3 shrink-0 font-black text-[10px] uppercase tracking-widest gap-1", isTagsExpanded ? "bg-primary text-white" : "bg-primary-suave text-primary")}>
-                <Hash className="h-3 w-3" /> Tags {isTagsExpanded ? '↑' : '↓'}
-              </Button>
+              {tagsSorted.length > 0 && (
+                <FilterChip active={showTags || !!activeTag} onClick={() => setShowTags(v => !v)} tone="accent">
+                  #{activeTag || "tags"}
+                </FilterChip>
+              )}
             </div>
-
-            <AnimatePresence>
-              {isTagsExpanded && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div className="flex flex-wrap gap-2 pt-2 px-1">
-                    {allTagsSorted.slice(0, 20).map((tag) => (
-                      <Badge key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className={cn("px-3 py-1.5 rounded-xl cursor-pointer text-[9px] font-bold transition-all uppercase border-none", activeTag === tag ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>#{tag}</Badge>
+            <AnimatePresence initial={false}>
+              {showTags && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={easeOut} className="overflow-hidden">
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {tagsSorted.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => { setActiveTag(activeTag === tag ? null : tag); setShowTags(false); }}
+                        className={cn("px-2.5 h-7 rounded-full text-[11px] font-semibold transition-colors", activeTag === tag ? "bg-accent text-accent-foreground" : "bg-foreground/[0.06] text-muted-foreground")}
+                      >
+                        #{tag}
+                      </button>
                     ))}
                   </div>
                 </motion.div>
@@ -156,70 +156,121 @@ export function RecetasTab() {
             </AnimatePresence>
           </>
         )}
-      </header>
+      </PageHeader>
 
-      {filteredRecipes.length > 0 ? (
-        <div className="grid grid-cols-3 gap-2">
-          {filteredRecipes.map((recipe, i) => (
-            <RecipeListItem key={recipe.id} recipe={recipe} index={i} isSelectionMode={isSelectionMode} isSelected={selectedIds.has(recipe.id)} onToggleSelection={() => toggleRecipeSelection(recipe.id)} />
+      {!recetasCargadas && recetas.length === 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="aspect-square w-full rounded-[22px]" />)}
+        </div>
+      ) : filtered.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          {filtered.map((recipe, i) => (
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              index={i}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedIds.has(recipe.id)}
+              onToggle={toggleSelection}
+            />
           ))}
         </div>
+      ) : recetas.length === 0 ? (
+        <EmptyState
+          icon={ChefHat}
+          title="Todavía no hay recetas"
+          description="Escribí qué querés cocinar y la IA arma la receta con foto."
+          action={<Button onClick={() => setIsAIOpen(true)} className="mt-2"><Sparkles className="h-4 w-4" /> Crear con IA</Button>}
+        />
       ) : (
-        <div className="py-24 text-center">
-          <p className="font-bold text-muted-foreground uppercase text-xs tracking-widest">No encontramos recetas</p>
-        </div>
+        <EmptyState icon={Search} title="Sin resultados" description="Probá con otro nombre, ingrediente o categoría." />
       )}
 
-      <RecipeImportModal open={isImportOpen} onOpenChange={setIsImportOpen} />
+      {/* Barra de acciones de selección */}
+      <AnimatePresence>
+        {isSelectionMode && selectedIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={spring}
+            className="fixed bottom-[calc(max(12px,env(safe-area-inset-bottom))+76px)] inset-x-0 mx-auto w-[calc(100%-24px)] max-w-[480px] z-50"
+          >
+            <div className="glass-strong rounded-[22px] p-2 pl-4 flex items-center justify-between">
+              <span className="text-sm font-semibold">{selectedIds.size} seleccionadas</span>
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" /> Eliminar
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar {selectedIds.size} {selectedIds.size === 1 ? "receta" : "recetas"}?</AlertDialogTitle>
+            <AlertDialogDescription>No se puede deshacer. Los planes existentes conservan su copia de ingredientes.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <RecipeAIDialog open={isAIOpen} onOpenChange={setIsAIOpen} />
     </div>
   );
 }
 
-function RecipeListItem({ recipe, index, isSelectionMode, isSelected, onToggleSelection }: any) {
-  const handleClick = (e: React.MouseEvent) => {
-    if (isSelectionMode && onToggleSelection) {
-      e.preventDefault();
-      onToggleSelection();
-    }
-  };
-
-  const primaryCategory = Array.isArray(recipe.categorias) && recipe.categorias.length > 0 ? recipe.categorias[0] : (recipe.categoria || "Almuerzo");
+const RecipeCard = React.memo(function RecipeCard({ recipe, index, isSelectionMode, isSelected, onToggle }: {
+  recipe: any
+  index: number
+  isSelectionMode: boolean
+  isSelected: boolean
+  onToggle: (id: string) => void
+}) {
+  const category = recipeCats(recipe)[0] || "Almuerzo";
   const imageSource = getSafeImageSource(recipe);
-  const totalTime = (recipe.tiempoPreparacion || 0) + (recipe.tiempoCoccion || 0);
+  const totalTime = (Number(recipe.tiempoPreparacion) || 0) + (Number(recipe.tiempoCoccion) || 0);
+
+  const body = (
+    <>
+      {imageSource ? (
+        <Image src={imageSource} alt={recipe.nombre} fill sizes="50vw" className="object-cover" unoptimized />
+      ) : (
+        <GradientPlaceholder categoria={category} className="rounded-none" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
+      <span className="absolute top-2 left-2 rounded-full bg-black/30 backdrop-blur-md px-2 py-0.5 text-[10px] font-semibold text-white">{category}</span>
+      {isSelectionMode && (
+        <span className={cn("absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center border-2 transition-colors", isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-black/20 border-white/70")}>
+          {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+        </span>
+      )}
+      <div className="absolute bottom-2.5 left-3 right-3 text-white">
+        <h3 className="font-semibold text-[13px] leading-tight line-clamp-2">{recipe.nombre}</h3>
+        <div className="flex items-center gap-2.5 mt-1 text-[11px] text-white/80 tabular-nums">
+          <span className="flex items-center gap-0.5"><Flame className="h-3 w-3" />{Math.round(recipe.macros?.calorias || 0)}</span>
+          {totalTime > 0 && <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{totalTime}′</span>}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.4) }}
+      transition={{ ...easeOut, delay: stagger(index) }}
+      className={cn("relative aspect-square rounded-[22px] overflow-hidden shadow-soft active:scale-[0.97] transition-transform", isSelected && "ring-[3px] ring-primary ring-offset-2 ring-offset-background")}
     >
-      <Card onClick={handleClick} className={cn("overflow-hidden border-none shadow-recipe hover:shadow-card-hover active:scale-[0.97] transition-all rounded-3xl h-full flex flex-col relative group", isSelected ? "ring-4 ring-primary" : "bg-white")}>
-        {isSelectionMode && <div className={cn("absolute top-3 right-3 z-20 h-7 w-7 rounded-full flex items-center justify-center border-2", isSelected ? "bg-primary border-primary text-white" : "bg-white/80 border-primary/20")}>{isSelected && <Check className="h-4 w-4 stroke-[4]" />}</div>}
-        <div className="relative h-24 w-full pointer-events-none bg-muted">
-          {imageSource ? (
-            <Image
-              src={imageSource}
-              alt={recipe.nombre}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-              unoptimized
-            />
-          ) : (
-            <GradientPlaceholder categoria={primaryCategory} className="rounded-none" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-          <div className="absolute bottom-2 left-2 right-2">
-            <h3 className="font-black text-[11px] leading-tight text-white drop-shadow-sm line-clamp-2">{recipe.nombre}</h3>
-            <span className="flex items-center gap-0.5 text-[9px] font-black text-white/80 mt-0.5">
-              <Flame className="h-2.5 w-2.5" /> {recipe.macros?.calorias || 0}
-            </span>
-          </div>
-          <Badge className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-sm text-[7px] font-black text-primary border-none h-4 px-1.5 uppercase shadow-sm">
-            {primaryCategory}
-          </Badge>
-        </div>
-        {!isSelectionMode && <Link href={`/recetas/${recipe.id}`} className="absolute inset-0 z-10" />}
-      </Card>
+      {isSelectionMode ? (
+        <button type="button" onClick={() => onToggle(recipe.id)} className="absolute inset-0 text-left">{body}</button>
+      ) : (
+        <Link href={`/recetas/${recipe.id}`} className="absolute inset-0">{body}</Link>
+      )}
     </motion.div>
-  )
-}
+  );
+});

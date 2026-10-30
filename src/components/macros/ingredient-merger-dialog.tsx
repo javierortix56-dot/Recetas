@@ -13,8 +13,10 @@ import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
 import { analyzeDuplicates } from "@/ai/flows/analyze-duplicates-flow"
 import { useAppStore } from "@/store/app-store"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 
-export function IngredientMergerDialog() {
+/** Unifica ingredientes duplicados de la despensa (vive en el menú de Despensa) */
+export function IngredientMergerDialog({ asMenuItem }: { asMenuItem?: boolean } = {}) {
   const [open, setOpen] = React.useState(false)
   const [isAnalyzing, setIsAutoAnalyzing] = React.useState(false)
   const [isMerging, setIsMerging] = React.useState(false)
@@ -22,7 +24,8 @@ export function IngredientMergerDialog() {
   const [selectedGroups, setSelectedGroups] = React.useState<Set<number>>(new Set())
   
   const db = useFirestore()
-  const { ingredientes, recetas } = useAppStore()
+  const ingredientes = useAppStore(s => s.ingredientes)
+  const recetas = useAppStore(s => s.recetas)
 
   const handleAnalyze = async () => {
     if (ingredientes.length === 0) return
@@ -126,14 +129,19 @@ export function IngredientMergerDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full h-14 rounded-2xl gap-3 border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5">
-          <Sparkles className="h-5 w-5" />
-          <span className="font-black uppercase text-[10px] tracking-widest">Limpieza de Despensa</span>
-        </Button>
+        {asMenuItem ? (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }}>
+            <Sparkles /> Unificar duplicados con IA
+          </DropdownMenuItem>
+        ) : (
+          <Button variant="outline" className="w-full">
+            <Sparkles className="h-4 w-4" /> Unificar duplicados con IA
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="max-w-md rounded-[2.5rem] p-6 max-h-[90vh] flex flex-col">
+      <DialogContent className="flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-primary flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-6 w-6" /> Unificar Ingredientes
           </DialogTitle>
           <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest pt-2 leading-relaxed">
@@ -155,7 +163,7 @@ export function IngredientMergerDialog() {
               </div>
               <Button 
                 onClick={handleAnalyze} 
-                className="rounded-2xl h-14 px-8 font-black uppercase text-xs shadow-lg bg-primary"
+                className="rounded-2xl h-14 px-8 font-bold uppercase text-xs shadow-lg bg-primary"
               >
                 Comenzar Análisis
               </Button>
@@ -165,7 +173,7 @@ export function IngredientMergerDialog() {
           {isAnalyzing && (
             <div className="py-20 text-center space-y-4">
               <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
-              <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] animate-pulse">Pensando inteligentemente...</p>
+              <p className="text-[10px] font-bold uppercase text-primary tracking-[0.2em] animate-pulse">Pensando inteligentemente...</p>
             </div>
           )}
 
@@ -181,21 +189,21 @@ export function IngredientMergerDialog() {
               {suggestions.map((s, i) => (
                 <Card 
                   key={i} 
-                  className={`border-2 transition-all rounded-3xl overflow-hidden cursor-pointer ${selectedGroups.has(i) ? 'border-primary bg-primary/5' : 'border-border opacity-60'}`}
+                  className={` transition-all rounded-3xl overflow-hidden cursor-pointer ${selectedGroups.has(i) ? 'border-primary bg-primary/5' : 'border-border opacity-60'}`}
                   onClick={() => toggleGroup(i)}
                 >
                   <CardContent className="p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
-                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">Nombre Principal</p>
-                        <h4 className="text-lg font-black text-primary leading-tight">{s.mainName}</h4>
+                        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Nombre Principal</p>
+                        <h4 className="text-lg font-bold text-primary leading-tight">{s.mainName}</h4>
                       </div>
-                      <Checkbox checked={selectedGroups.has(i)} className="h-6 w-6 rounded-lg border-2" />
+                      <Checkbox checked={selectedGroups.has(i)} className="h-6 w-6 rounded-lg" />
                     </div>
                     
                     <div className="flex flex-wrap gap-1.5">
                       {s.duplicates.map((d: string, j: number) => (
-                        <Badge key={j} variant="secondary" className="bg-white border text-[9px] font-bold uppercase py-1 px-2">
+                        <Badge key={j} variant="secondary" className="bg-card border text-[9px] font-bold uppercase py-1 px-2">
                           {d}
                         </Badge>
                       ))}
@@ -216,7 +224,7 @@ export function IngredientMergerDialog() {
         {suggestions.length > 0 && (
           <div className="pt-4 space-y-3">
             <Button 
-              className="w-full h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50"
+              className="w-full h-14 rounded-2xl bg-primary text-white font-bold uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50"
               onClick={handleMerge}
               disabled={isMerging || selectedGroups.size === 0}
             >
@@ -226,7 +234,7 @@ export function IngredientMergerDialog() {
                 `Unificar ${selectedGroups.size} grupos`
               )}
             </Button>
-            <Button variant="ghost" className="w-full text-[10px] font-black uppercase text-muted-foreground" onClick={() => setSuggestions([])}>
+            <Button variant="ghost" className="w-full text-[10px] font-bold uppercase text-muted-foreground" onClick={() => setSuggestions([])}>
               Cancelar y Volver
             </Button>
           </div>
