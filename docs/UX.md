@@ -82,8 +82,8 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 ## 5. Recetas con IA
 
 - `src/ai/flows/generate-recipe-flow.ts`: dos server actions con Genkit.
-  - `generateRecipe`: `gemini-2.5-flash` con salida estructurada (esquema Zod con las unidades y categorías de la app) y las reglas de cocina de `lib/recipe-prompt.ts`.
-  - `generateRecipeImage`: `gemini-2.5-flash-image`; el cliente la comprime a JPEG de 700 px antes de guardarla.
+  - `generateRecipe`: modelo de texto (`GEMINI_TEXT_MODEL`, por defecto `gemini-2.5-flash-lite`, con capa gratuita) con salida estructurada (esquema Zod con las unidades y categorías de la app) y las reglas de cocina de `lib/recipe-prompt.ts`.
+  - `generateRecipeImage`: modelo de imagen (`GEMINI_IMAGE_MODEL`, por defecto `gemini-2.5-flash-image`, solo con facturación activa, ≈ US$0,039 por imagen); el cliente la comprime a JPEG de 700 px antes de guardarla.
 - Requiere `GEMINI_API_KEY` en Vercel (Production y Preview). La generación de imágenes puede requerir facturación activa en Google AI Studio (el nivel gratuito de la API no siempre la incluye). Si falla, la receta se guarda igual sin foto.
 - `maxDuration = 60` en el layout para que las llamadas no corten por tiempo.
 

@@ -6,7 +6,7 @@
  * función y para poder regenerar solo la foto.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, IMAGE_MODEL } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 import { RECIPE_RULES } from '@/lib/recipe-prompt';
@@ -88,7 +88,7 @@ const generateRecipeImageFlow = ai.defineFlow(
   { name: 'generateRecipeImageFlow', inputSchema: GenerateImageInputSchema, outputSchema: z.string() },
   async ({ nombre, descripcion }) => {
     const response = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash-image'),
+      model: googleAI.model(IMAGE_MODEL),
       prompt:
         `Fotografía gastronómica realista de "${nombre}"${descripcion ? ` (${descripcion})` : ''}, ` +
         'servido en un plato, vista a 45 grados, luz natural suave, fondo de cocina desenfocado, ' +
