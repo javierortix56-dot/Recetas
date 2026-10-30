@@ -96,9 +96,28 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 - Requiere `BLOB_READ_WRITE_TOKEN` (la agrega Vercel al conectar la tienda al proyecto). Las URLs son públicas pero con sufijo aleatorio imposible de adivinar.
 - Sin conexión: la app ya no tiene las fotos dentro de los datos cacheados; el navegador las cachea por su cuenta (cabecera de caché de 1 año).
 
-## 7. Propuestas (no implementadas)
+## 7. Precios de supermercados
+
+Fuentes verificadas el 30/10/2026 (todas públicas y sin clave; no son APIs con contrato, pueden cambiar sin aviso):
+
+| Fuente | Endpoint | Búsqueda | Por código de barras |
+|---|---|---|---|
+| Carrefour, Día, Jumbo, Vea, ChangoMás | VTEX `/api/catalog_system/pub/products/search` | `ft=` | `fq=alternateIds_Ean:` |
+| Coto | `coto.com.ar/sitios/cdigi/categoria?Ntt=…&format=json` | `Ntt=` | por nombre + filtro por código (también trae el precio por kg/l) |
+| Precios Claros (SEPA) | endpoint web | — | — |
+
+Precios Claros **no se usa**: su endpoint web no acepta pedidos de terceros y no corresponde simular su sitio. La vía oficial son los datos abiertos SEPA (archivos diarios en datos.produccion.gob.ar, CC BY 4.0), que requieren un proceso de importación aparte.
+
+- `src/app/actions/prices.ts`: `searchPrices(texto)` consulta las 6 fuentes en paralelo (8 s de tiempo máximo por fuente; si una falla, siguen las demás). `refreshPrices(refs)` vuelve a consultar productos vinculados por código de barras.
+- `src/lib/prices/types.ts`: interpreta el tamaño del envase ("500 Gr.", "1,5 L", "x kg", "x 12") y convierte a la unidad de la despensa ($/kg, $/l, $/unidad, $/docena).
+- Despensa › producto › **Buscar precio en supermercados**: se eligen uno o varios productos (los que tienen el mismo código en otros súper se marcan juntos) y se guarda el **promedio** por unidad base. Los elegidos quedan vinculados en `fuentesPrecio`.
+- Despensa › ⋯ › **Actualizar N precios**: recalcula el promedio de todos los productos vinculados (de a 3 en paralelo). Si ninguna fuente responde, se conserva el precio anterior. Después se recalcula la lista de compras.
+- Editar el precio a mano desvincula el producto (el precio manual no se pisa).
+
+## 8. Propuestas (no implementadas)
 
 1. ~~Fotos fuera de las recetas~~ → hecho, ver sección 6.
+2. **Precios Claros vía datos abiertos SEPA**: importar semanalmente los precios de sucursales de CABA desde los archivos oficiales como fuente adicional.
 2. **Reglas de Firestore**: hoy no hay autenticación (usuario fijo `usuario-local`); conviene Auth + reglas por familia.
 3. **Migrar a Neon (Postgres)**: pendiente por decisión. Implica perder la sincronización en vivo y el modo sin conexión de Firestore, y mover las fotos a un almacenamiento de archivos (p. ej. Vercel Blob).
 4. **Deshacer** al borrar (como en Finanzas) en vez de diálogos de confirmación.
