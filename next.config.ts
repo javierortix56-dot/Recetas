@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'placehold.co',
       },
       {
@@ -27,6 +31,10 @@ const nextConfig: NextConfig = {
         hostname: 'picsum.photos',
       },
     ],
+  },
+  experimental: {
+    // Las fotos (JPEG de 700 px) viajan como data URL hacia la server action
+    serverActions: { bodySizeLimit: '3mb' },
   },
   typescript: {
     ignoreBuildErrors: true,

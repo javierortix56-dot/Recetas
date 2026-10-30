@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Calculator, Tag } from "lucide-react"
+import { Plus, Calculator, Tag, Store } from "lucide-react"
+import { PriceSearchDialog } from "@/components/stock/price-search-dialog"
+import { SOURCE_LABEL, type PriceRef } from "@/lib/prices/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +52,9 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
   const [calcPrecio, setCalcPrecio] = React.useState<number>(0)
   const [calcCantidad, setCalcCantidad] = React.useState<number>(1)
   const [calcUnidad, setCalcUnidad] = React.useState<string>("kg")
+  // Productos de supermercado vinculados (para "Actualizar precios" en Despensa)
+  const [priceRefs, setPriceRefs] = React.useState<PriceRef[]>([])
+  const [isPriceSearchOpen, setIsPriceSearchOpen] = React.useState(false)
 
   const [formData, setFormData] = React.useState({
     nombre: "",
@@ -66,8 +71,10 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
     if (!ingredientToEdit) {
       setFormData({ nombre: "", categoria: "Almacén" as IngredientCategory, unidad: "unidad", stockActual: 0, stockMinimo: 0, precioUnitario: 0, macrosPer100g: { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 } })
       setCalcPrecio(0); setCalcCantidad(1); setCalcUnidad("kg")
+      setPriceRefs([])
       return
     }
+    setPriceRefs(Array.isArray(ingredientToEdit.fuentesPrecio) ? ingredientToEdit.fuentesPrecio : [])
     {
       setFormData({
         nombre: ingredientToEdit.nombre || "",
@@ -78,11 +85,11 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
         precioUnitario: Number(ingredientToEdit.precioUnitario || 0),
         macrosPer100g: ingredientToEdit.macrosPer100g || { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 }
       })
-      if (ingredientToEdit.precioUnitario > 0) {
-        setCalcPrecio(ingredientToEdit.precioUnitario)
-        setCalcCantidad(1)
-        setCalcUnidad(ingredientToEdit.unidad || "unidad")
-      }
+      // Siempre se reinicia la calculadora: antes, un producto sin precio heredaba
+      // el cálculo del último producto editado
+      setCalcPrecio(Number(ingredientToEdit.precioUnitario) || 0)
+      setCalcCantidad(1)
+      setCalcUnidad(ingredientToEdit.unidad || "unidad")
     }
   }, [ingredientToEdit, open])
 
@@ -100,7 +107,8 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
     const finalData = {
       ...formData,
       nombre: normalizedName,
-      categoria: formData.categoria
+      categoria: formData.categoria,
+      fuentesPrecio: priceRefs,
     };
 
     try {
@@ -209,6 +217,23 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
               <label className="text-xs font-bold uppercase text-primary tracking-widest">Calculadora de Precio</label>
             </div>
             
+            <button
+              type="button"
+              onClick={() => setIsPriceSearchOpen(true)}
+              disabled={!formData.nombre.trim()}
+              className="w-full glass rounded-2xl p-3 flex items-center gap-3 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
+            >
+              <span className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Store className="h-4 w-4 text-primary" /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold">Buscar precio en supermercados</span>
+                <span className="block text-[11px] text-muted-foreground truncate">
+                  {priceRefs.length > 0
+                    ? `Vinculado: promedio de ${priceRefs.length} (${[...new Set(priceRefs.map(r => SOURCE_LABEL[r.source]))].join(", ")})`
+                    : "Coto, Carrefour, Día, Jumbo, Vea y ChangoMás"}
+                </span>
+              </span>
+            </button>
+
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1.5">
                 <span className="text-[9px] font-bold text-muted-foreground uppercase px-1">Pagué ($)</span>
@@ -218,7 +243,7 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
                     type="number" 
                     className="h-12 rounded-xl pl-8 font-bold"
                     value={calcPrecio}
-                    onChange={(e) => setCalcPrecio(Number(e.target.value))}
+                    onChange={(e) => { setCalcPrecio(Number(e.target.value)); setPriceRefs([]) }}
                   />
                 </div>
               </div>
@@ -284,6 +309,18 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
           </Button>
         </div>
       </DialogContent>
+      <PriceSearchDialog
+        open={isPriceSearchOpen}
+        onOpenChange={setIsPriceSearchOpen}
+        initialQuery={formData.nombre}
+        baseUnit={formData.unidad}
+        onApply={(pricePerBase, refs) => {
+          setCalcPrecio(Math.round(pricePerBase * 100) / 100)
+          setCalcCantidad(1)
+          setCalcUnidad(formData.unidad)
+          setPriceRefs(refs)
+        }}
+      />
     </Dialog>
   )
 }

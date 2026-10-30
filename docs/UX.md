@@ -87,9 +87,37 @@ Se mantiene el verde como color de marca; el resto del lenguaje visual es el de 
 - Requiere `GEMINI_API_KEY` en Vercel (Production y Preview). La generación de imágenes puede requerir facturación activa en Google AI Studio (el nivel gratuito de la API no siempre la incluye). Si falla, la receta se guarda igual sin foto.
 - `maxDuration = 60` en el layout para que las llamadas no corten por tiempo.
 
-## 6. Propuestas (no implementadas)
+## 6. Fotos en Vercel Blob
 
-1. **Fotos en Firebase Storage** en vez de base64 dentro del documento: es la mejora de velocidad más grande que queda (cada receta pesa hoy decenas de KB por la foto).
+- Las fotos ya no se guardan como base64 dentro del documento de la receta: se suben a Vercel Blob (tienda `recetas-fotos`, pública, región iad1) y en `fotoURL` queda solo la URL. El listener de recetas deja de descargar todas las fotos en cada arranque.
+- `src/app/actions/recipe-images.ts`: server actions `uploadRecipeImage` (valida tipo JPEG/PNG/WebP y máx. 1,5 MB) y `deleteRecipeImage` (ignora URLs que no son de la tienda).
+- Se sube desde: formulario de receta, "Crear con IA" y "Generar foto con IA". Al reemplazar una foto o borrar una receta (individual o en lote) se borra la anterior.
+- Recetas existentes: **Recetas › ⋯ › Mover N fotos a la nube** sube las que siguen en base64 y quita las copias que los planes viejos guardaban de esas fotos. Es idempotente y no toca nada si una subida falla.
+- Requiere `BLOB_READ_WRITE_TOKEN` (la agrega Vercel al conectar la tienda al proyecto). Las URLs son públicas pero con sufijo aleatorio imposible de adivinar.
+- Sin conexión: la app ya no tiene las fotos dentro de los datos cacheados; el navegador las cachea por su cuenta (cabecera de caché de 1 año).
+
+## 7. Precios de supermercados
+
+Fuentes verificadas el 30/10/2026 (todas públicas y sin clave; no son APIs con contrato, pueden cambiar sin aviso):
+
+| Fuente | Endpoint | Búsqueda | Por código de barras |
+|---|---|---|---|
+| Carrefour, Día, Jumbo, Vea, ChangoMás | VTEX `/api/catalog_system/pub/products/search` | `ft=` | `fq=alternateIds_Ean:` |
+| Coto | `coto.com.ar/sitios/cdigi/categoria?Ntt=…&format=json` | `Ntt=` | por nombre + filtro por código (también trae el precio por kg/l) |
+| Precios Claros (SEPA) | endpoint web | — | — |
+
+Precios Claros **no se usa**: su endpoint web no acepta pedidos de terceros y no corresponde simular su sitio. La vía oficial son los datos abiertos SEPA (archivos diarios en datos.produccion.gob.ar, CC BY 4.0), que requieren un proceso de importación aparte.
+
+- `src/app/actions/prices.ts`: `searchPrices(texto)` consulta las 6 fuentes en paralelo (8 s de tiempo máximo por fuente; si una falla, siguen las demás). `refreshPrices(refs)` vuelve a consultar productos vinculados por código de barras.
+- `src/lib/prices/types.ts`: interpreta el tamaño del envase ("500 Gr.", "1,5 L", "x kg", "x 12") y convierte a la unidad de la despensa ($/kg, $/l, $/unidad, $/docena).
+- Despensa › producto › **Buscar precio en supermercados**: se eligen uno o varios productos (los que tienen el mismo código en otros súper se marcan juntos) y se guarda el **promedio** por unidad base. Los elegidos quedan vinculados en `fuentesPrecio`.
+- Despensa › ⋯ › **Actualizar N precios**: recalcula el promedio de todos los productos vinculados (de a 3 en paralelo). Si ninguna fuente responde, se conserva el precio anterior. Después se recalcula la lista de compras.
+- Editar el precio a mano desvincula el producto (el precio manual no se pisa).
+
+## 8. Propuestas (no implementadas)
+
+1. ~~Fotos fuera de las recetas~~ → hecho, ver sección 6.
+2. **Precios Claros vía datos abiertos SEPA**: importar semanalmente los precios de sucursales de CABA desde los archivos oficiales como fuente adicional.
 2. **Reglas de Firestore**: hoy no hay autenticación (usuario fijo `usuario-local`); conviene Auth + reglas por familia.
 3. **Migrar a Neon (Postgres)**: pendiente por decisión. Implica perder la sincronización en vivo y el modo sin conexión de Firestore, y mover las fotos a un almacenamiento de archivos (p. ej. Vercel Blob).
 4. **Deshacer** al borrar (como en Finanzas) en vez de diálogos de confirmación.

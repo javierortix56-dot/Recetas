@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Plus, Minus, Package, AlertCircle, RotateCcw, X, ChevronDown, MoreHorizontal, CalendarDays } from "lucide-react";
+import { Search, Plus, Minus, Package, AlertCircle, RotateCcw, X, ChevronDown, MoreHorizontal, CalendarDays, Store, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, serverTimestamp, collection, writeBatch } from "firebase/firestore";
 import { useShallow } from 'zustand/react/shallow';
@@ -22,6 +22,7 @@ import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { cn, formatPrecio } from '@/lib/utils';
 import { syncShoppingList } from '@/lib/sync-logic';
+import { linkedIngredients, refreshLinkedPrices } from '@/lib/prices/refresh';
 
 const isLow = (i: any) => Number(i.stockMinimo) > 0 && Number(i.stockActual) <= Number(i.stockMinimo);
 
@@ -40,6 +41,26 @@ export function StockTab() {
   const [editing, setEditing] = React.useState<any | null>(null);
   const [isCreating, setIsCreating] = React.useState(false);
   const [confirmReset, setConfirmReset] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState<null | { done: number; total: number }>(null);
+  const linkedCount = React.useMemo(() => linkedIngredients(ingredientes).length, [ingredientes]);
+
+  const handleRefreshPrices = async () => {
+    if (!db || refreshing) return;
+    setRefreshing({ done: 0, total: linkedCount });
+    toast({ title: `Actualizando ${linkedCount} precios…`, description: "Consultando los supermercados." });
+    try {
+      const { updated, unchanged, notFound } = await refreshLinkedPrices(db, ingredientes, (done, total) => setRefreshing({ done, total }));
+      syncShoppingList(db).catch(() => {});
+      toast({
+        title: "Precios actualizados ✓",
+        description: [`${updated} cambiaron`, unchanged && `${unchanged} iguales`, notFound && `${notFound} sin datos (quedó el precio anterior)`].filter(Boolean).join(" · "),
+      });
+    } catch {
+      toast({ variant: "destructive", title: "No se pudieron actualizar los precios" });
+    } finally {
+      setRefreshing(null);
+    }
+  };
 
   const plannedNames = React.useMemo(() => {
     const names = new Set<string>();
@@ -142,6 +163,10 @@ export function StockTab() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setExpanded(allOpen ? new Set() : new Set(categories))}>
                   <ChevronDown className={cn("transition-transform", allOpen && "rotate-180")} /> {allOpen ? "Contraer todo" : "Expandir todo"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleRefreshPrices} disabled={!!refreshing || linkedCount === 0}>
+                  {refreshing ? <Loader2 className="animate-spin" /> : <Store />}
+                  {refreshing ? `Actualizando ${refreshing.done}/${refreshing.total}…` : linkedCount > 0 ? `Actualizar ${linkedCount} precios` : "Actualizar precios (vinculá productos)"}
                 </DropdownMenuItem>
                 <StockHistorialDialog asMenuItem />
                 <DropdownMenuSeparator />

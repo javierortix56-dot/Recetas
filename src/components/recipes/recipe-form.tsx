@@ -12,7 +12,9 @@ import { Segmented } from "@/components/ui/segmented"
 import { useFirestore } from "@/firebase"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
-import { compressImageToBase64, cn, getSafeImageSource } from "@/lib/utils"
+import { cn, getSafeImageSource } from "@/lib/utils"
+import { uploadImageSrc } from "@/lib/recipe-image"
+import { deleteRecipeImage } from "@/app/actions/recipe-images"
 import { normalizeIngredientName, categorizeIngredient } from "@/lib/categorizeIngredient"
 
 const CATEGORIES = ["Desayuno", "Almuerzo", "Merienda", "Cena", "Postre", "Snack"]
@@ -142,8 +144,13 @@ export function RecipeForm({ recipe }: { recipe?: any }) {
     }
     setIsSaving(true)
     try {
-      let fotoURL = recipe?.fotoURL || recipe?.imageUrl || null
-      if (imageFile) fotoURL = await compressImageToBase64(imageFile)
+      const previousUrl = recipe?.fotoURL || recipe?.imageUrl || null
+      let fotoURL = previousUrl
+      if (imageFile) {
+        // Foto nueva: va a Blob (no dentro del documento) y se borra la anterior
+        fotoURL = await uploadImageSrc(URL.createObjectURL(imageFile))
+        if (previousUrl) deleteRecipeImage(previousUrl)
+      }
 
       const data = {
         ...form,

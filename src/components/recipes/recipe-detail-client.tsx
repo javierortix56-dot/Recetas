@@ -25,7 +25,9 @@ import { useFirestore } from "@/firebase"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
 import { isSubPreparation } from "@/lib/categorizeIngredient"
-import { calcularCostoIngrediente, cn, compressImageSrc, convertirCantidad, formatPrecio, getSafeImageSource } from "@/lib/utils"
+import { calcularCostoIngrediente, cn, convertirCantidad, formatPrecio, getSafeImageSource } from "@/lib/utils"
+import { uploadImageSrc } from "@/lib/recipe-image"
+import { deleteRecipeImage } from "@/app/actions/recipe-images"
 import { useAppStore } from "@/store/app-store"
 
 type StockState = 'ok' | 'poco' | 'falta' | 'sin-datos'
@@ -94,8 +96,10 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
     toast({ title: "Generando foto…", description: "Tarda unos segundos" })
     try {
       const raw = await generateRecipeImage({ nombre: receta.nombre, descripcion: receta.descripcion })
-      const fotoURL = await compressImageSrc(raw)
+      const previousUrl = receta.fotoURL || receta.imageUrl || null
+      const fotoURL = await uploadImageSrc(raw)
       await updateDoc(doc(db, "users", USER_ID, "recipes", recipeId), { fotoURL, imageUrl: null, updatedAt: serverTimestamp() })
+      if (previousUrl) deleteRecipeImage(previousUrl)
       toast({ title: "Foto lista ✓" })
     } catch (e) {
       console.error(e)
@@ -109,6 +113,7 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
     if (!db) return
     try {
       await deleteDoc(doc(db, "users", USER_ID, "recipes", recipeId))
+      deleteRecipeImage(receta?.fotoURL || receta?.imageUrl)
       toast({ title: "Receta eliminada" })
       router.replace("/recetas")
     } catch {
