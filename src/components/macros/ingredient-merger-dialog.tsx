@@ -96,7 +96,7 @@ export function IngredientMergerDialog({ asMenuItem }: { asMenuItem?: boolean } 
       const recipeIngs = new Map<string, any[]>()
       const planIngs = new Map<string, any[]>()
       const plansSnap = await getDocs(collection(db, "users", USER_ID, "meal_plans"))
-      const plans = plansSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))
+      const plans = plansSnap.docs.map(d => ({ ...(d.data() as any), id: d.id }))
       let skippedStock = 0
 
       for (const g of toMerge) {

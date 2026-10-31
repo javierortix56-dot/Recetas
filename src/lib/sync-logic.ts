@@ -66,9 +66,9 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
       getDocs(collection(db, "users", USER_ID, "shopping_list_items"))
     ]);
 
-    const allPlans       = plansSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-    const allIngredients = ingsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-    const allShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+    const allPlans       = plansSnap.docs.map(d => ({ ...d.data() as any, id: d.id }));
+    const allIngredients = ingsSnap.docs.map(d => ({ ...d.data() as any, id: d.id }));
+    const allShoppingItems = shoppingSnap.docs.map(d => ({ ...d.data() as any, id: d.id }));
 
     const stockMap = new Map<string, any>(
       allIngredients.map(ing => [nameKey(ing.nombre), ing])
