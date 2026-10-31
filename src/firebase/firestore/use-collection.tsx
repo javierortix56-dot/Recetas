@@ -30,8 +30,8 @@ export function useCollection<T = DocumentData>(
       query,
       (snapshot) => {
         const docs = snapshot.docs.map((doc) => ({
-          id: doc.id,
           ...doc.data(),
+          id: doc.id,
         })) as T[]
         setData(docs)
         setLoading(false)

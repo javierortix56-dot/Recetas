@@ -19,6 +19,7 @@ import { IngredientMergerDialog } from "@/components/macros/ingredient-merger-di
 import { useFirestore } from "@/firebase";
 import { toast } from "@/hooks/use-toast";
 import { useAppStore } from '@/store/app-store';
+import { nameKey } from "@/lib/ingredient-groups";
 import { USER_ID } from '@/lib/constants';
 import { cn, formatPrecio } from '@/lib/utils';
 import { syncShoppingList } from '@/lib/sync-logic';
@@ -65,7 +66,7 @@ export function StockTab() {
   const plannedNames = React.useMemo(() => {
     const names = new Set<string>();
     planificacion.forEach(plan => (plan.ingredientes || []).forEach((ing: any) => {
-      if (ing.nombre) names.add(ing.nombre.toLowerCase().trim());
+      if (ing.nombre) names.add(nameKey(ing.nombre));
     }));
     return names;
   }, [planificacion]);
@@ -78,7 +79,7 @@ export function StockTab() {
     ingredientes.forEach(item => {
       if (q && !(item.nombre || "").toLowerCase().includes(q)) return;
       if (filter === 'bajo' && !isLow(item)) return;
-      if (filter === 'plan' && !plannedNames.has((item.nombre || "").toLowerCase().trim())) return;
+      if (filter === 'plan' && !plannedNames.has(nameKey(item.nombre))) return;
       (groups[normalizeCategoria(item.categoria || "Otros")] ||= []).push(item);
     });
     // Con stock primero, después sin stock; alfabético dentro de cada grupo

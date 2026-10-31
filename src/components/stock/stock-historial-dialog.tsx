@@ -29,7 +29,7 @@ export function StockHistorialDialog({ asMenuItem }: { asMenuItem?: boolean } = 
         limit(50)
       );
       const snap = await getDocs(q);
-      setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setEntries(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) {
       console.error(e);
     } finally {

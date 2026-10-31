@@ -29,6 +29,7 @@ import { calcularCostoIngrediente, cn, convertirCantidad, formatPrecio, getSafeI
 import { uploadImageSrc } from "@/lib/recipe-image"
 import { deleteRecipeImage } from "@/app/actions/recipe-images"
 import { useAppStore } from "@/store/app-store"
+import { nameKey } from "@/lib/ingredient-groups"
 
 type StockState = 'ok' | 'poco' | 'falta' | 'sin-datos'
 
@@ -66,22 +67,22 @@ export function RecipeDetailClient({ recipeId }: { recipeId: string }) {
 
   // Despensa indexada por nombre: antes se hacía una consulta a Firestore por ingrediente
   const stockByName = React.useMemo(
-    () => new Map(ingredientes.map(i => [(i.nombre || "").toLowerCase().trim(), i])),
+    () => new Map(ingredientes.map(i => [nameKey(i.nombre), i])),
     [ingredientes]
   )
 
   const scale = receta ? portions / (receta.porciones || 1) : 1
 
   const rows = React.useMemo(() => (receta?.ingredientes || []).map((ing: any) => {
-    const stock = stockByName.get((ing.nombre || "").toLowerCase().trim())
+    const stock = stockByName.get(nameKey(ing.nombre))
     const needed = (Number(ing.cantidad) || 0) * scale
     let state: StockState = 'sin-datos'
     let cost = 0
     if (stock) {
-      const neededInStockUnit = convertirCantidad(needed, ing.unidad, stock.unidad)
+      const neededInStockUnit = convertirCantidad(needed, ing.unidad, stock.unidad, ing.nombre)
       const available = Number(stock.stockActual) || 0
       state = available <= 0 ? 'falta' : available >= neededInStockUnit ? 'ok' : 'poco'
-      cost = calcularCostoIngrediente(needed, ing.unidad, Number(stock.precioUnitario) || 0, stock.unidad)
+      cost = calcularCostoIngrediente(needed, ing.unidad, Number(stock.precioUnitario) || 0, stock.unidad, ing.nombre)
     }
     return { ing, needed, state, cost, hasPrice: !!stock?.precioUnitario }
   }), [receta?.ingredientes, stockByName, scale])

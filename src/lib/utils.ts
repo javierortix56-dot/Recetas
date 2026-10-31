@@ -68,6 +68,9 @@ export const formatPrecio = (valor: number) =>
     maximumFractionDigits: 0,
   }).format(valor)
 
+/** Unidades oficiales (las mismas que pide el prompt de recetas) */
+export const UNIDADES = ["g", "kg", "ml", "l", "unidad", "cucharada", "cucharadita", "taza", "docena"] as const
+
 /**
  * Normaliza nombres de unidades a estándares internos
  */
@@ -78,9 +81,66 @@ export function normalizarUnidad(unidad: string): string {
     'ml': 'ml', 'mililitro': 'ml', 'mililitros': 'ml', 'cc': 'ml',
     'l': 'l', 'lt': 'l', 'litro': 'l', 'litros': 'l',
     'unid': 'unidad', 'unidad': 'unidad', 'unidades': 'unidad', 'u': 'unidad',
-    'docena': 'docena', 'doz': 'docena'
+    // Piezas sueltas: un diente de ajo, un tallo de verdeo, una hoja de laurel
+    'diente': 'unidad', 'dientes': 'unidad', 'tallo': 'unidad', 'tallos': 'unidad', 'hoja': 'unidad', 'hojas': 'unidad',
+    'cucharada': 'cucharada', 'cucharadas': 'cucharada', 'cda': 'cucharada', 'cdas': 'cucharada',
+    'cucharadita': 'cucharadita', 'cucharaditas': 'cucharadita', 'cdta': 'cucharadita', 'cdtas': 'cucharadita',
+    'taza': 'taza', 'tazas': 'taza',
+    'docena': 'docena', 'docenas': 'docena', 'doz': 'docena'
   };
   return map[(unidad || "").toLowerCase().trim()] || (unidad || "unid").toLowerCase().trim();
+}
+
+const sinTildes = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
+
+// Peso aproximado de una unidad (g). El orden importa: lo más específico primero.
+const PESO_UNIDAD: [RegExp, number][] = [
+  [/\bajo\b(?! en polvo)/, 5], [/cebolla larga|verdeo|cebolla de verdeo/, 40], [/\bcebolla\b(?! en polvo)/, 150],
+  [/\bbatata/, 250], [/\bpapa/, 200], [/tomate cherry/, 15], [/tomate perita/, 80], [/\btomate\b(?!.*(pure|salsa|triturado))/, 150],
+  [/zanahoria/, 100], [/\bhuevo/, 55], [/morron|pimiento/, 180], [/\blimon/, 100], [/\blima\b/, 60],
+  [/manzana/, 180], [/banana/, 120], [/\bpera\b/, 180], [/palta|aguacate/, 200], [/platano/, 250],
+  [/choclo/, 250], [/chorizo(?! .*bife)/, 100], [/jalapeno|\bchile\b/, 15], [/laurel/, 0.2], [/clavo de olor/, 0.1],
+  [/anis estrellado/, 0.3], [/canela en rama/, 3], [/caldo .*cubo|cubo de caldo/, 10], [/tortilla/, 40], [/arepa/, 120],
+  [/zapallito/, 200], [/berenjena/, 250], [/pepino/, 200], [/naranja/, 200], [/durazno/, 150], [/salchicha/, 50],
+]
+// Densidad aproximada (g por ml) para pasar cucharadas y tazas a peso
+const DENSIDAD: [RegExp, number][] = [
+  [/harina/, 0.55], [/avena/, 0.4], [/arroz/, 0.8], [/azucar/, 0.85], [/\bsal\b/, 1.2], [/aceite/, 0.92],
+  [/en polvo|molid|pimienta|pimenton|comino|canela|oregano|aji|curry|paprika/, 0.5],
+]
+const buscar = (tabla: [RegExp, number][], nombre: string) => tabla.find(([re]) => re.test(sinTildes(nombre)))?.[1]
+
+const BASE: Record<string, { tipo: 'peso' | 'volumen' | 'unidad'; factor: number }> = {
+  g: { tipo: 'peso', factor: 1 }, kg: { tipo: 'peso', factor: 1000 },
+  ml: { tipo: 'volumen', factor: 1 }, l: { tipo: 'volumen', factor: 1000 },
+  cucharadita: { tipo: 'volumen', factor: 5 }, cucharada: { tipo: 'volumen', factor: 15 }, taza: { tipo: 'volumen', factor: 250 },
+  unidad: { tipo: 'unidad', factor: 1 }, docena: { tipo: 'unidad', factor: 12 },
+}
+
+/**
+ * Convierte una cantidad de una unidad a otra. Con el nombre del ingrediente también
+ * convierte entre familias: 2 dientes de ajo → 10 g, 1 taza de arroz → 200 g.
+ * Si no hay forma de convertir, devuelve la cantidad sin cambios.
+ */
+export function convertirCantidad(cantidad: number, desde: string, hacia: string, nombre = ""): number {
+  const d = BASE[normalizarUnidad(desde)];
+  const h = BASE[normalizarUnidad(hacia)];
+  if (!d || !h || normalizarUnidad(desde) === normalizarUnidad(hacia)) return cantidad;
+
+  const base = cantidad * d.factor; // en g, ml o unidades
+  if (d.tipo === h.tipo) return base / h.factor;
+
+  const densidad = buscar(DENSIDAD, nombre) ?? 1;
+  const pesoUnidad = buscar(PESO_UNIDAD, nombre);
+  let gramos: number | undefined;
+  if (d.tipo === 'peso') gramos = base;
+  else if (d.tipo === 'volumen') gramos = base * densidad;
+  else if (pesoUnidad) gramos = base * pesoUnidad;
+  if (gramos === undefined) return cantidad;
+
+  if (h.tipo === 'peso') return gramos / h.factor;
+  if (h.tipo === 'volumen') return gramos / densidad / h.factor;
+  return pesoUnidad ? gramos / pesoUnidad / h.factor : cantidad;
 }
 
 /**
@@ -106,47 +166,19 @@ export function sugerirUnidadLogica(nombre: string, cantidad: number, unidadActu
 }
 
 /**
- * Convierte una cantidad de una unidad a otra (para cálculos de peso y volumen)
- */
-export function convertirCantidad(cantidad: number, desde: string, hacia: string): number {
-  const d = normalizarUnidad(desde);
-  const h = normalizarUnidad(hacia);
-  
-  if (!d || !h || d === h) return cantidad;
-
-  // Peso: g <-> kg
-  if (d === 'g' && h === 'kg') return cantidad / 1000;
-  if (d === 'kg' && h === 'g') return cantidad * 1000;
-
-  // Volumen: ml <-> l
-  if (d === 'ml' && h === 'l') return cantidad / 1000;
-  if (d === 'l' && h === 'ml') return cantidad * 1000;
-
-  // Unidades / Docena
-  if (d === 'docena' && h === 'unidad') return cantidad * 12;
-  if (d === 'unidad' && h === 'docena') return cantidad / 12;
-
-  // Cocina (aproximados estándar)
-  if (d === 'taza' && h === 'g') return cantidad * 200;
-  if (d === 'cucharada' && h === 'g') return cantidad * 15;
-  if (d === 'taza' && h === 'ml') return cantidad * 250;
-
-  return cantidad; 
-}
-
-/**
  * Lógica de conversión de unidades para el cálculo de costos
  */
 export function calcularCostoIngrediente(
   cantidad: number,
   unidadReceta: string,
   precioUnitario: number,
-  unidadPrecio: string
+  unidadPrecio: string,
+  nombre = ""
 ): number {
   if (!precioUnitario) return 0;
   
   // Convertimos la cantidad de la receta a la unidad en la que está expresado el precio
-  const cantidadEnUnidadPrecio = convertirCantidad(cantidad, unidadReceta, unidadPrecio);
+  const cantidadEnUnidadPrecio = convertirCantidad(cantidad, unidadReceta, unidadPrecio, nombre);
   return cantidadEnUnidadPrecio * precioUnitario;
 }
 

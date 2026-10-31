@@ -35,19 +35,19 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   // Listeners de datos COMPARTIDOS (Globales para la familia)
   unsubs.push(
     onSnapshot(collection(db, "users", USER_ID, "recipes"), (snap) => {
-      store.setRecetas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      store.setRecetas(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     }, onError('recetas')),
     
     onSnapshot(collection(db, "users", USER_ID, "ingredients"), (snap) => {
-      store.setIngredientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      store.setIngredientes(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     }, onError('ingredientes')),
     
     onSnapshot(collection(db, "users", USER_ID, "shopping_list_items"), (snap) => {
-      store.setListaCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      store.setListaCompras(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     }, onError('compras')),
 
     onSnapshot(query(collection(db, "users", USER_ID, "historial_compras"), orderBy("creadoEn", "desc"), limit(10)), (snap) => {
-      store.setHistorialCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      store.setHistorialCompras(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     }, onError('historial'))
   );
 
@@ -71,7 +71,7 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
         where("perfil", "==", activeProfile)
       ), 
       (snap) => {
-        store.setPlanificacion(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        store.setPlanificacion(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       },
       onError('plan')
     )
@@ -85,7 +85,7 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
         where("perfil", "==", activeProfile)
       ), 
       (snap) => {
-        store.setMacrosSemana(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        store.setMacrosSemana(snap.docs.map(d => ({ ...d.data(), id: d.id })));
       },
       onError('macros')
     )
