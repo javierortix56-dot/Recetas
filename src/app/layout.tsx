@@ -8,6 +8,7 @@ import { AuthGuard } from '@/components/auth-guard';
 import { AppShell } from '@/components/app-shell';
 import { AmbientBackground } from '@/components/ui/ambient-background';
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from '@/lib/theme';
+import { APPLE_TOUCH_ICON_DATA_URI } from '@/lib/icon-data';
 
 // Las acciones de IA (receta + foto con Gemini) pueden tardar más que el límite por defecto
 export const maxDuration = 60;
@@ -29,7 +30,8 @@ export const metadata: Metadata = {
   // distintos del apple-touch-icon, la pantalla de inicio mostraba una "C" gris.
   icons: {
     icon: [{ url: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    // Incrustado: la ventana "Agregar a Inicio" de iOS 26 puede fallar al descargarlo
+    apple: [{ url: APPLE_TOUCH_ICON_DATA_URI, sizes: '180x180', type: 'image/png' }],
   },
   // Next 15 solo emite "mobile-web-app-capable"; iOS anteriores a 16.4 necesitan esta
   other: { 'apple-mobile-web-app-capable': 'yes' },
