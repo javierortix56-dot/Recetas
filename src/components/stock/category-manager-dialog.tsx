@@ -22,7 +22,7 @@ export function normalizeCategoria(cat: string): string {
 export function CategoryManagerDialog({ asMenuItem }: { asMenuItem?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const db = useFirestore();
-  const { ingredientes } = useAppStore();
+  const ingredientes = useAppStore(s => s.ingredientes);
 
   const [expandedCats, setExpandedCats] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());

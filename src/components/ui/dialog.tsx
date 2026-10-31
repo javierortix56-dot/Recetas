@@ -32,11 +32,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onCloseAutoFocus, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      // No devolver el foco al disparador: si quedó en una pestaña oculta o en un
+      // menú cerrado, la app podía quedar sin responder a toques ("pestaña congelada")
+      onCloseAutoFocus={onCloseAutoFocus ?? ((e) => e.preventDefault())}
       className={cn(
         // Bottom sheet en mobile (mismo patrón que Finanzas): pegado abajo, con asa y safe-area
         "fixed inset-x-0 bottom-0 z-50 mx-auto grid grid-cols-[minmax(0,1fr)] w-full max-w-lg gap-4 sheet-surface rounded-t-[28px] px-5 pt-7 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[92dvh] overflow-y-auto overscroll-contain outline-none duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",

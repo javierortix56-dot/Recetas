@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { format } from "date-fns"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -48,6 +49,13 @@ export async function compressImageToBase64(file: File): Promise<string> {
   });
   return compressImageSrc(dataUrl);
 }
+
+/**
+ * Identificador de semana ISO (lunes a domingo), p. ej. "2026-W44".
+ * Antes se usaba "yyyy-'W'ww": del 27 al 31/12/2026 daba "2026-W01" y esas
+ * compras se sumaban a la primera semana de enero de 2026.
+ */
+export const weekId = (date: Date) => format(date, "RRRR-'W'II")
 
 /**
  * Formatea un número como moneda ARS ($ 1.500)

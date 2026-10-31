@@ -24,7 +24,7 @@ import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
 import { cn, getSafeImageSource } from '@/lib/utils';
 import { syncShoppingList } from '@/lib/sync-logic';
-import { addMealPlan, addToSummary, clearPlansForDates, removeMealPlan, sumMacros, MOMENTOS, EMPTY_MACROS } from '@/lib/meal-plan';
+import { addMealPlan, addToSummary, clearPlansForDates, removeMealPlan, sumMacros, pickRecipesLocally, MOMENTOS, EMPTY_MACROS } from '@/lib/meal-plan';
 import { autoPlanWeek } from '@/ai/flows/auto-plan-week-flow';
 import { autoPlanDay } from '@/ai/flows/auto-plan-day-flow';
 
@@ -101,13 +101,28 @@ export function PlanificacionTab() {
     await commitAndSync(batch);
   };
 
+  /** IA primero; si falla o devuelve recetas que no existen, planificador local (gratis, sin red) */
+  const planWithFallback = async (
+    ai: () => Promise<{ plans: { date: string; mealType: string; recipeId: string }[] }>,
+    dates: string[]
+  ) => {
+    try {
+      const result = await ai();
+      const valid = (result?.plans || []).filter(p => recipesById.has(p.recipeId) && dates.includes(p.date));
+      if (valid.length > 0) return { plans: valid, local: false };
+    } catch (e) {
+      console.warn("Planificación con IA no disponible, se usa la local", e);
+    }
+    return { plans: pickRecipesLocally(recetas, dates), local: true };
+  };
+
   const handleAutoPlanWeek = async () => {
     if (!db || recetas.length === 0) return;
     setBusy('week');
     try {
-      const result = await autoPlanWeek({ recipes: recipesForAI(recetas), startDate: weekStrs[0] });
-      await writeAIPlans(result.plans, weekStrs);
-      toast({ title: "Semana planificada ✨" });
+      const { plans, local } = await planWithFallback(() => autoPlanWeek({ recipes: recipesForAI(recetas), startDate: weekStrs[0] }), weekStrs);
+      await writeAIPlans(plans, weekStrs);
+      toast({ title: "Semana planificada ✨", description: local ? "La IA no respondió: se usó el planificador local." : undefined });
     } catch (e) {
       console.error(e);
       toast({ variant: "destructive", title: "Error al generar el plan semanal" });
@@ -120,9 +135,12 @@ export function PlanificacionTab() {
     if (!db || recetas.length === 0) return;
     setBusy(dateStr);
     try {
-      const result = await autoPlanDay({ recipes: recipesForAI(recetas), date: dateStr });
-      await writeAIPlans(result.plans.map(p => ({ ...p, date: dateStr })), [dateStr]);
-      toast({ title: "Día planificado ✓" });
+      const { plans, local } = await planWithFallback(
+        async () => ({ plans: (await autoPlanDay({ recipes: recipesForAI(recetas), date: dateStr })).plans.map(p => ({ ...p, date: dateStr })) }),
+        [dateStr]
+      );
+      await writeAIPlans(plans, [dateStr]);
+      toast({ title: "Día planificado ✓", description: local ? "La IA no respondió: se usó el planificador local." : undefined });
     } catch (e) {
       console.error(e);
       toast({ variant: "destructive", title: "Error al planificar el día" });

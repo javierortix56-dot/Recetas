@@ -114,7 +114,30 @@ Precios Claros **no se usa**: su endpoint web no acepta pedidos de terceros y no
 - Despensa › ⋯ › **Actualizar N precios**: recalcula el promedio de todos los productos vinculados (de a 3 en paralelo). Si ninguna fuente responde, se conserva el precio anterior. Después se recalcula la lista de compras.
 - Editar el precio a mano desvincula el producto (el precio manual no se pisa).
 
-## 8. Propuestas (no implementadas)
+## 8. Auditoría final (31/10/2026)
+
+**Hallazgo de proceso:** producción corría la rama `claude/setup-recipe-project-L8HuG` (no `main`) desde abril, con 11 commits que nunca se mergearon. Al mergear el rediseño a `main` se perdieron. Se revisó cada uno: el cálculo de macros por día y el uso del store en el diálogo de planificar ya estaban resueltos; el cambio de modelo de IA quedó reemplazado; se portaron el **planificador local** (ahora respaldo si la IA falla) y el **arreglo de la pestaña congelada**. El ícono SVG de esa rama nunca podía verse en iPhone (iOS no acepta SVG como `apple-touch-icon`).
+
+| # | Problema | Corrección |
+|---|----------|------------|
+| 1 | Sin ícono en iPhone: el rediseño borró el `apple-touch-icon` y antes apuntaba a picsum.photos (foto al azar) o a un SVG que iOS ignora | `src/app/apple-icon.png` 180×180 opaco, `icon.png`, íconos 192/512/maskable en el manifest; fuente en `docs/icon-burger.svg` |
+| 2 | Identificador de semana `yyyy-'W'ww`: del 27 al 31/12/2026 daba `2026-W01` y esas compras se sumaban a enero de 2026 | Semana ISO `RRRR-'W'II` (`weekId`). La semana actual conserva el mismo id (W44) |
+| 3 | Terminar una compra leía y reescribía el total de la semana: dos compras simultáneas se pisaban | `increment` + `arrayUnion` |
+| 4 | Inicio calculaba "hoy" una sola vez: la app instalada en iPhone se reanuda sin recargar y mostraba el día anterior | Se recalcula al volver a la app y cada minuto; el resumen de hoy se busca por fecha |
+| 5 | Diálogo de planificar: cualquier actualización de datos con el diálogo abierto reiniciaba momento, fecha y búsqueda | Depende de la fecha como texto, no del objeto `Date` |
+| 6 | Unificar duplicados: con dos duplicados en la misma receta solo quedaba el último cambio; si el nombre principal no existía, se perdía el stock de los demás duplicados | Cambios acumulados por receta y stock sumado de todos; recalcula la lista de compras |
+| 7 | Pestaña congelada al cerrar diálogos abiertos desde menús (problema conocido de Radix) | Menús no modales y sin devolver el foco al cerrar |
+| 8 | La autoplanificación dependía solo de Gemini | IA primero; si falla o devuelve recetas inexistentes, planificador local gratis |
+| 9 | iOS < 16.4 no abría a pantalla completa (Next 15 solo emite `mobile-web-app-capable`) | Se agrega `apple-mobile-web-app-capable` |
+
+**Riesgos que quedan (requieren decisión):**
+- Firestore con reglas abiertas (`allow read, write: if true`) y sin autenticación.
+- Las server actions son endpoints públicos: cualquiera con la URL de la app puede generar recetas/fotos con IA (consume tu cuota y facturación de Gemini), subir fotos a Blob o borrar fotos si conoce su URL. Se resuelve con el mismo paso: Firebase Auth + verificar el token en cada acción.
+- No hay service worker: sin conexión la app instalada no abre (la caché de Firestore solo sirve una vez cargada).
+- Los listeners de planes y resúmenes diarios traen todo el historial del perfil; crece con el tiempo.
+- Vercel guarda logs de errores solo 1 hora en el plan Hobby.
+
+## 9. Propuestas (no implementadas)
 
 1. ~~Fotos fuera de las recetas~~ → hecho, ver sección 6.
 2. **Precios Claros vía datos abiertos SEPA**: importar semanalmente los precios de sucursales de CABA desde los archivos oficiales como fuente adicional.

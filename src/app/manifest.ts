@@ -1,4 +1,3 @@
-
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -6,21 +5,16 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Cocina Familiar',
     short_name: 'CocinaFam',
     description: 'Gestión de recetas familiares y nutrición',
-    start_url: '/',
+    start_url: '/inicio/',
     display: 'standalone',
     background_color: '#f2f4ee',
     theme_color: '#f2f4ee',
+    // Íconos propios (fuente editable en docs/icon-burger.svg). Antes apuntaban a
+    // picsum.photos, un servicio de fotos al azar.
     icons: [
-      {
-        src: 'https://picsum.photos/seed/hamburger/192/192',
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        src: 'https://picsum.photos/seed/hamburger/512/512',
-        sizes: '512x512',
-        type: 'image/png',
-      },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   }
 }

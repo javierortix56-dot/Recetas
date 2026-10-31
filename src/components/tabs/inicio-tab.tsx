@@ -15,7 +15,7 @@ import { WeekBars } from '@/components/ui/week-bars';
 import { ProfileSwitcher } from '@/components/profile-switcher';
 import { easeOut, stagger } from '@/components/ui/motion';
 import { useAppStore } from '@/store/app-store';
-import { cn, formatPrecio, getSafeImageSource } from '@/lib/utils';
+import { cn, formatPrecio, getSafeImageSource, weekId } from '@/lib/utils';
 import { MOMENTOS, sumMacros, summaryDate } from '@/lib/meal-plan';
 
 const DEFAULT_GOALS = { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 };
@@ -23,9 +23,8 @@ const DEFAULT_GOALS = { calorias: 2000, proteinas: 150, carbohidratos: 250, gras
 export function InicioTab() {
   const router = useRouter();
   const [now, setNow] = React.useState<Date | null>(null);
-  const { userProfile, macrosHoy, planificacion, macrosSemana, recetas, historialCompras, ingredientes, listaCompras, planificacionCargada } = useAppStore(useShallow(s => ({
+  const { userProfile, planificacion, macrosSemana, recetas, historialCompras, ingredientes, listaCompras, planificacionCargada } = useAppStore(useShallow(s => ({
     userProfile: s.userProfile,
-    macrosHoy: s.macrosHoy,
     planificacion: s.planificacion,
     macrosSemana: s.macrosSemana,
     recetas: s.recetas,
@@ -35,7 +34,16 @@ export function InicioTab() {
     planificacionCargada: s.planificacionCargada,
   })));
 
-  React.useEffect(() => { setNow(new Date()); }, []);
+  // "Hoy" se recalcula al volver a la app y cada minuto: en iPhone la app
+  // instalada se reanuda sin recargar y, si no, mostraba el día anterior
+  React.useEffect(() => {
+    const tick = () => setNow(prev => (prev && prev.toDateString() === new Date().toDateString() ? prev : new Date()));
+    tick();
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    const id = window.setInterval(tick, 60_000);
+    return () => { document.removeEventListener('visibilitychange', onVisible); window.clearInterval(id); };
+  }, []);
 
   const todayStr = now ? format(now, "yyyy-MM-dd") : "";
   const goals = userProfile?.objetivosMacros || DEFAULT_GOALS;
@@ -46,12 +54,14 @@ export function InicioTab() {
     .sort((a, b) => MOMENTOS.indexOf(a.mealType) - MOMENTOS.indexOf(b.mealType)),
   [planificacion, todayStr]);
 
+  // El resumen de hoy se busca por fecha (macrosHoy del store se fija al llegar el snapshot)
+  const todaySummary = React.useMemo(() => macrosSemana.find(m => summaryDate(m) === todayStr) || null, [macrosSemana, todayStr]);
   const currentMacros = React.useMemo(() => {
-    if (macrosHoy?.totalesDia && Number(macrosHoy.totalesDia.calorias) > 0) {
-      return sumMacros([{ macros: macrosHoy.totalesDia }]);
+    if (todaySummary?.totalesDia && Number(todaySummary.totalesDia.calorias) > 0) {
+      return sumMacros([{ macros: todaySummary.totalesDia }]);
     }
     return sumMacros(todayPlans);
-  }, [macrosHoy, todayPlans]);
+  }, [todaySummary, todayPlans]);
 
   const weeklyData = React.useMemo(() => {
     if (!now) return [];
@@ -70,8 +80,8 @@ export function InicioTab() {
 
   const spending = React.useMemo(() => {
     if (!now) return null;
-    const current = historialCompras.find(h => h.semana === format(now, "yyyy-'W'ww"))?.totalGastado || 0;
-    const previous = historialCompras.find(h => h.semana === format(subWeeks(now, 1), "yyyy-'W'ww"))?.totalGastado || 0;
+    const current = historialCompras.find(h => h.semana === weekId(now))?.totalGastado || 0;
+    const previous = historialCompras.find(h => h.semana === weekId(subWeeks(now, 1)))?.totalGastado || 0;
     const diffPercent = previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0;
     return { current, previous, diffPercent };
   }, [historialCompras, now]);
