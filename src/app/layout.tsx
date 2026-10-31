@@ -24,7 +24,13 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Cocina Familiar',
   },
-  // El ícono de iPhone (apple-touch-icon) lo genera Next desde src/app/apple-icon.png
+  // Una sola fuente de íconos, con las mismas direcciones en el HTML y en el manifest
+  // (public/). iOS instala la app con el manifest; si sus íconos eran otros archivos
+  // distintos del apple-touch-icon, la pantalla de inicio mostraba una "C" gris.
+  icons: {
+    icon: [{ url: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   // Next 15 solo emite "mobile-web-app-capable"; iOS anteriores a 16.4 necesitan esta
   other: { 'apple-mobile-web-app-capable': 'yes' },
 };
