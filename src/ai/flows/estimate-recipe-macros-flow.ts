@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview A Genkit flow for estimating nutritional macros of a recipe based on its ingredients.
  *
@@ -33,6 +34,7 @@ const EstimateRecipeMacrosOutputSchema = z.object({
 export type EstimateRecipeMacrosOutput = z.infer<typeof EstimateRecipeMacrosOutputSchema>;
 
 export async function estimateRecipeMacros(input: EstimateRecipeMacrosInput): Promise<EstimateRecipeMacrosOutput> {
+  await requireUser();
   return estimateRecipeMacrosFlow(input);
 }
 

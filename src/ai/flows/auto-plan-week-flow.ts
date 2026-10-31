@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview Flow de Genkit para planificar automáticamente la semana.
  */
@@ -29,6 +30,7 @@ const AutoPlanWeekOutputSchema = z.object({
 });
 
 export async function autoPlanWeek(input: z.infer<typeof AutoPlanWeekInputSchema>) {
+  await requireUser();
   return autoPlanWeekFlow(input);
 }
 

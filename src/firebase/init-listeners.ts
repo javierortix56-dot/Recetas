@@ -3,6 +3,7 @@
 import { collection, onSnapshot, doc, query, Firestore, orderBy, limit, where } from 'firebase/firestore';
 import { useAppStore, UserProfileName } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
+import { format, subDays } from 'date-fns';
 
 let initialized = false;
 let currentProfile: UserProfileName | null = null;
@@ -52,6 +53,9 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   );
 
   // Listeners de datos INDIVIDUALES (Por Perfil)
+  // Planes y macros crecen cada día: se cargan los últimos 120 días. El perfil se filtra en el
+  // cliente para no exigir un índice compuesto (perfil + fecha) en Firestore.
+  const desde = format(subDays(new Date(), 120), "yyyy-MM-dd");
   
   // Perfil y Metas
   unsubs.push(
@@ -66,12 +70,9 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   // Planificación individual (Si Javi desplanifica, Mary no se ve afectada)
   unsubs.push(
     onSnapshot(
-      query(
-        collection(db, "users", USER_ID, "meal_plans"), 
-        where("perfil", "==", activeProfile)
-      ), 
+      query(collection(db, "users", USER_ID, "meal_plans"), where("date", ">=", desde)),
       (snap) => {
-        store.setPlanificacion(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+        store.setPlanificacion(snap.docs.map(d => ({ ...d.data(), id: d.id })).filter((p: any) => p.perfil === activeProfile));
       },
       onError('plan')
     )
@@ -80,12 +81,9 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   // Resúmenes de macros por perfil
   unsubs.push(
     onSnapshot(
-      query(
-        collection(db, "users", USER_ID, "daily_macro_summaries"), 
-        where("perfil", "==", activeProfile)
-      ), 
+      query(collection(db, "users", USER_ID, "daily_macro_summaries"), where("date", ">=", desde)),
       (snap) => {
-        store.setMacrosSemana(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+        store.setMacrosSemana(snap.docs.map(d => ({ ...d.data(), id: d.id })).filter((m: any) => m.perfil === activeProfile));
       },
       onError('macros')
     )

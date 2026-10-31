@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview Precios de supermercados para la despensa.
  *
@@ -113,6 +114,7 @@ const settle = async (tasks: Promise<PriceOffer[]>[]): Promise<PriceOffer[]> =>
 
 /** Busca un producto por texto en todos los supermercados a la vez */
 export async function searchPrices(query: string): Promise<PriceOffer[]> {
+  await requireUser();
   const q = (query || '').trim().slice(0, 80);
   if (q.length < 2) return [];
   const perSource = 6;
@@ -128,6 +130,7 @@ export async function searchPrices(query: string): Promise<PriceOffer[]> {
  * busca por nombre y se filtra por código.
  */
 export async function refreshPrices(refs: PriceRef[]): Promise<PriceOffer[]> {
+  await requireUser();
   const tasks = (refs || []).slice(0, 12).map(async (ref): Promise<PriceOffer[]> => {
     if (ref.source === 'coto') {
       const found = await cotoSearch(ref.name, 12);

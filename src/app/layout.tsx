@@ -7,6 +7,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { AuthGuard } from '@/components/auth-guard';
 import { AppShell } from '@/components/app-shell';
 import { AmbientBackground } from '@/components/ui/ambient-background';
+import { ServiceWorkerRegister } from '@/components/sw-register';
 import { THEME_BOOT_SCRIPT, THEME_COLORS } from '@/lib/theme';
 import { APPLE_TOUCH_ICON_DATA_URI } from '@/lib/icon-data';
 
@@ -63,6 +64,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased overflow-x-hidden min-h-[100dvh]">
         <AmbientBackground />
+        <ServiceWorkerRegister />
         <FirebaseClientProvider>
           <AuthGuard>
             <main className="min-h-[100dvh] flex flex-col max-w-lg mx-auto relative">

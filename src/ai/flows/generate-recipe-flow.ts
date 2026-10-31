@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview Genera una receta completa a partir de un pedido en lenguaje
  * natural ("risotto de hongos para 4") y, por separado, una foto del plato.
@@ -87,6 +88,7 @@ const generateRecipeFlow = ai.defineFlow(
 );
 
 export async function generateRecipe(input: GenerateRecipeInput): Promise<GeneratedRecipe> {
+  await requireUser();
   return generateRecipeFlow(input);
 }
 
@@ -114,5 +116,6 @@ const generateRecipeImageFlow = ai.defineFlow(
 
 /** Devuelve la foto como data URL (PNG). El cliente la comprime a JPEG antes de guardarla. */
 export async function generateRecipeImage(input: { nombre: string; descripcion?: string }): Promise<string> {
+  await requireUser();
   return generateRecipeImageFlow(input);
 }

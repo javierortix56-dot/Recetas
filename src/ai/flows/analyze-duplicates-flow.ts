@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview Detecta ingredientes repetidos entre la despensa y las recetas.
  * Primero agrupa sin IA los que solo cambian en escritura (tildes, plural,
@@ -127,5 +128,6 @@ const analyzeDuplicatesFlow = ai.defineFlow(
 );
 
 export async function analyzeDuplicates(input: z.infer<typeof AnalyzeDuplicatesInputSchema>) {
+  await requireUser();
   return analyzeDuplicatesFlow(input);
 }
