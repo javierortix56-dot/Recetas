@@ -57,6 +57,8 @@ interface AppState {
 
   // UI
   activeTab: string;
+  /** Error de los listeners de Firestore (permiso, red, caché) para avisar en vez de cargar para siempre */
+  syncError: string | null;
 
   // Setters
   setActiveProfile: (profile: UserProfileName) => void;
@@ -70,6 +72,7 @@ interface AppState {
   setHistorialCompras: (data: any[]) => void;
   setUserProfile: (data: any | null) => void;
   setActiveTab: (tab: string) => void;
+  setSyncError: (message: string | null) => void;
   
   resetStore: () => void;
   optimisticToggleCompra: (id: string) => void;
@@ -98,6 +101,7 @@ const initialState = {
   profileCargado: false,
 
   activeTab: 'inicio',
+  syncError: null as string | null,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -153,6 +157,7 @@ export const useAppStore = create<AppState>((set) => ({
   },
   
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setSyncError: (message) => set({ syncError: message }),
 
   optimisticToggleCompra: (id) => set((state) => ({
     listaCompras: state.listaCompras.map(item => 

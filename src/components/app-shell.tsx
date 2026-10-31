@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { WifiOff } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
 import { InicioTab } from './tabs/inicio-tab';
 import { RecetasTab } from './tabs/recetas-tab';
@@ -55,6 +55,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const activeTab = useAppStore(s => s.activeTab) as TabKey;
   const setActiveTab = useAppStore(s => s.setActiveTab);
   const isOnline = useOnlineStatus();
+  const syncError = useAppStore(s => s.syncError);
+  const recetasCargadas = useAppStore(s => s.recetasCargadas);
+
+  // Si los datos no llegan en 12 s (o un listener falló), avisar con "Reintentar"
+  // en vez de dejar los marcadores de carga para siempre
+  const [slow, setSlow] = React.useState(false);
+  React.useEffect(() => {
+    if (recetasCargadas) { setSlow(false); return; }
+    const t = window.setTimeout(() => setSlow(true), 12_000);
+    return () => window.clearTimeout(t);
+  }, [recetasCargadas]);
+  const showRetry = !!syncError || (slow && !recetasCargadas);
 
   const normalizedPath = React.useMemo(() => {
     if (!pathname || pathname === '/' || pathname === '/inicio' || pathname === '/inicio/') return '/inicio';
@@ -81,6 +93,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="glass-strong text-destructive px-3.5 py-1.5 rounded-full flex items-center gap-1.5 pointer-events-auto">
             <WifiOff className="h-3.5 w-3.5" />
             <span className="text-[11px] font-semibold">Sin conexión · los cambios se sincronizan al volver</span>
+          </div>
+        </div>
+      )}
+
+      {showRetry && (
+        <div className="fixed inset-x-0 z-50 flex justify-center px-4 pointer-events-none top-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="glass-strong rounded-[20px] pl-4 pr-2 py-2 flex items-center gap-3 pointer-events-auto max-w-md w-full">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">No se pudieron cargar los datos</p>
+              <p className="text-[11px] text-muted-foreground truncate">{syncError || 'La conexión está tardando más de lo normal'}</p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="h-9 px-3 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1.5 active:scale-95"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Reintentar
+            </button>
           </div>
         </div>
       )}

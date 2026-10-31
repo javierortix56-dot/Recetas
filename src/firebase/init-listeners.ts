@@ -26,24 +26,29 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
   currentProfile = activeProfile;
 
   const store = useAppStore.getState();
+  // Sin callback de error, un fallo dejaba la app cargando para siempre
+  const onError = (what: string) => (err: Error) => {
+    console.error(`[Firestore] ${what}:`, err);
+    useAppStore.getState().setSyncError(err.message || String(err));
+  };
 
   // Listeners de datos COMPARTIDOS (Globales para la familia)
   unsubs.push(
     onSnapshot(collection(db, "users", USER_ID, "recipes"), (snap) => {
       store.setRecetas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }),
+    }, onError('recetas')),
     
     onSnapshot(collection(db, "users", USER_ID, "ingredients"), (snap) => {
       store.setIngredientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }),
+    }, onError('ingredientes')),
     
     onSnapshot(collection(db, "users", USER_ID, "shopping_list_items"), (snap) => {
       store.setListaCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }),
+    }, onError('compras')),
 
     onSnapshot(query(collection(db, "users", USER_ID, "historial_compras"), orderBy("creadoEn", "desc"), limit(10)), (snap) => {
       store.setHistorialCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    })
+    }, onError('historial'))
   );
 
   // Listeners de datos INDIVIDUALES (Por Perfil)
@@ -55,7 +60,7 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
         displayName: activeProfile.charAt(0).toUpperCase() + activeProfile.slice(1),
         objetivosMacros: { calorias: 2000, proteinas: 150, carbohidratos: 250, grasas: 65 }
       });
-    })
+    }, onError('perfil'))
   );
 
   // Planificación individual (Si Javi desplanifica, Mary no se ve afectada)
@@ -67,7 +72,8 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
       ), 
       (snap) => {
         store.setPlanificacion(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
+      },
+      onError('plan')
     )
   );
 
@@ -80,7 +86,8 @@ export function initFirestoreListeners(db: Firestore, activeProfile: UserProfile
       ), 
       (snap) => {
         store.setMacrosSemana(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
+      },
+      onError('macros')
     )
   );
 
