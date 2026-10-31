@@ -1,4 +1,5 @@
-import { convertirCantidad, normalizarUnidad } from "@/lib/utils"
+import { convertirCantidad, normalizarUnidad, UNIDADES } from "@/lib/utils"
+import { canonicalCategory, normalizeIngredientName } from "@/lib/categorizeIngredient"
 
 /**
  * Clave para comparar nombres de ingredientes: sin mayúsculas, tildes ni plural.
@@ -54,6 +55,43 @@ export function renameIngredients<T extends Ing>(list: T[] | undefined, keys: Se
       // Unidades que no se pueden sumar (ej. 1 unidad + 200 g): se dejan las dos líneas
       out.push(renamed)
     }
+  }
+  return out
+}
+
+type PantryItem = { nombre: string; [k: string]: any }
+
+/**
+ * Limpia los ingredientes de una receta antes de guardarla: reutiliza el nombre de
+ * la despensa si es el mismo producto con otra escritura, unidad oficial,
+ * cantidad numérica y una de las 8 categorías.
+ */
+export function cleanRecipeIngredients<T extends Ing>(list: T[], pantry: PantryItem[]): T[] {
+  const byKey = new Map(pantry.map(p => [nameKey(p.nombre), p.nombre]))
+  return list
+    .filter(ing => (ing.nombre || "").trim())
+    .map(ing => {
+      const nombre = byKey.get(nameKey(ing.nombre)) || normalizeIngredientName(ing.nombre)
+      const unidad = normalizarUnidad(ing.unidad || "unidad")
+      return {
+        ...ing,
+        nombre,
+        cantidad: Number(ing.cantidad) || 0,
+        unidad: (UNIDADES as readonly string[]).includes(unidad) ? unidad : ing.unidad,
+        categoria: canonicalCategory(ing.categoria, nombre),
+      }
+    })
+}
+
+/** Ingredientes de la receta que todavía no están en la despensa (para darlos de alta con stock 0) */
+export function missingPantryItems(list: Ing[], pantry: PantryItem[]) {
+  const known = new Set(pantry.map(p => nameKey(p.nombre)))
+  const out: { nombre: string; categoria: string; unidad: string }[] = []
+  for (const ing of list) {
+    const key = nameKey(ing.nombre)
+    if (!key || known.has(key)) continue
+    known.add(key)
+    out.push({ nombre: ing.nombre, categoria: ing.categoria || canonicalCategory(undefined, ing.nombre), unidad: ing.unidad || "unidad" })
   }
   return out
 }

@@ -121,7 +121,7 @@ export function ComprasTab() {
         const ing = item.ingredienteId ? ingredientsById.get(item.ingredienteId) : null;
         if (ing) {
           const current = Number(ing.stockActual) || 0;
-          const cantASumar = convertirCantidad(Number(item.cantidad), item.unidad, ing.unidad);
+          const cantASumar = convertirCantidad(Number(item.cantidad), item.unidad, ing.unidad, ing.nombre);
           const newStock = current + cantASumar;
           batch.update(doc(db, "users", USER_ID, "ingredients", ing.id), { stockActual: newStock, updatedAt: serverTimestamp() });
           batch.set(doc(collection(db, "users", USER_ID, "stock_historial")), {

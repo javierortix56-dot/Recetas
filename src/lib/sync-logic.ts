@@ -29,6 +29,7 @@ import { USER_ID } from "@/lib/constants";
 import type { UserProfileName } from "@/store/app-store";
 import { categorizeIngredient, isSubPreparation } from "@/lib/categorizeIngredient";
 import { convertirCantidad, sugerirUnidadLogica } from "@/lib/utils";
+import { nameKey } from "@/lib/ingredient-groups";
 import { format } from "date-fns";
 
 // Bloqueo de concurrencia: si hay un sync en curso, el nuevo se encola
@@ -70,7 +71,7 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
     const allShoppingItems = shoppingSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
 
     const stockMap = new Map<string, any>(
-      allIngredients.map(ing => [(ing.nombre || "").toLowerCase().trim(), ing])
+      allIngredients.map(ing => [nameKey(ing.nombre), ing])
     );
 
     // 2. Calcular necesidades del plan (MRP)
@@ -83,7 +84,7 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
       const scale = (planPortions > 0 && originalPortions > 0) ? planPortions / originalPortions : 1;
 
       (plan.ingredientes || []).forEach((ing: any) => {
-        const key = (ing.nombre || "").toLowerCase().trim();
+        const key = nameKey(ing.nombre);
         if (!key || isSubPreparation(key)) return;
 
         const recipes = recipesByIngredient.get(key) || [];
@@ -92,7 +93,7 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
 
         const stockItem = stockMap.get(key);
         const rawQty = (Number(ing.cantidad) || 0) * scale;
-        const qty = stockItem ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad) : rawQty;
+        const qty = stockItem ? convertirCantidad(rawQty, ing.unidad, stockItem.unidad, ing.nombre) : rawQty;
 
         const existing = neededMap.get(key);
         if (existing) {
@@ -113,7 +114,7 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
 
     // A. Ingredientes del maestro: comparar plan + mínimo vs stock actual
     allIngredients.forEach((ing) => {
-      const key      = (ing.nombre || "").toLowerCase().trim();
+      const key      = nameKey(ing.nombre);
       const planNeed = neededMap.get(key)?.cantidad || 0;
       const minNeed  = Number(ing.stockMinimo ?? 0);
       const enStock  = Math.max(0, Number(ing.stockActual ?? 0));
@@ -167,7 +168,7 @@ export const syncShoppingList = async (db: Firestore, _activeProfile?: UserProfi
       const isManual = item.source === "manual" || item.reason === "Manual";
       if (isManual) continue;
       const ref = doc(db, "users", USER_ID, "shopping_list_items", item.id);
-      const key = (item.nombre || "").toLowerCase().trim();
+      const key = nameKey(item.nombre);
       const desired = desiredItems.get(key);
 
       if (!desired || seen.has(key)) {

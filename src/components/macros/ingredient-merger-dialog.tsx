@@ -118,13 +118,13 @@ export function IngredientMergerDialog({ asMenuItem }: { asMenuItem?: boolean } 
             if (dup.id === keeper.id) continue
             const s = Number(dup.stockActual) || 0
             if (s > 0) {
-              if (unidadesCompatibles(dup.unidad, keeper.unidad)) stock += convertirCantidad(s, dup.unidad, keeper.unidad)
+              if (unidadesCompatibles(dup.unidad, keeper.unidad)) stock += convertirCantidad(s, dup.unidad, keeper.unidad, keeper.nombre)
               else skippedStock++
             }
             // Precio del duplicado si el que queda no tiene, en la misma unidad
             if (!keeper.precioUnitario && !extra.precioUnitario && dup.precioUnitario && unidadesCompatibles(dup.unidad, keeper.unidad)) {
-              extra.precioUnitario = dup.precioUnitario / convertirCantidad(1, dup.unidad, keeper.unidad)
-              if (dup.priceRefs) extra.priceRefs = dup.priceRefs
+              extra.precioUnitario = dup.precioUnitario / convertirCantidad(1, dup.unidad, keeper.unidad, keeper.nombre)
+              if (dup.fuentesPrecio?.length) extra.fuentesPrecio = dup.fuentesPrecio
             }
             ops.push(b => b.delete(doc(db, "users", USER_ID, "ingredients", dup.id)))
           }

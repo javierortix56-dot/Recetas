@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore } from "@/firebase"
-import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, query, where } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
 import { categorizeIngredient, normalizeIngredientName, IngredientCategory } from "@/lib/categorizeIngredient"
 import { formatPrecio, calcularPrecioUnitarioBase } from "@/lib/utils"
 import { syncShoppingList } from "@/lib/sync-logic"
 import { useAppStore } from "@/store/app-store"
+import { nameKey } from "@/lib/ingredient-groups"
 
 const CATEGORIES: IngredientCategory[] = [
   "Lácteos y Huevos",
@@ -119,11 +120,11 @@ export function StockFormDialog({ ingredientToEdit, trigger, open: openProp, onO
           updatedAt: serverTimestamp()
         })
       } else {
-        const q = query(collection(db, "users", USER_ID, "ingredients"), where("nombre", "==", normalizedName));
-        const snap = await getDocs(q);
+        // Mismo producto con otra escritura ("morron rojo" / "Morrón rojo"): se actualiza el existente
+        const existing = useAppStore.getState().ingredientes.find(i => nameKey(i.nombre) === nameKey(normalizedName));
         
-        if (!snap.empty) {
-          await updateDoc(doc(db, "users", USER_ID, "ingredients", snap.docs[0].id), {
+        if (existing) {
+          await updateDoc(doc(db, "users", USER_ID, "ingredients", existing.id), {
             ...finalData,
             updatedAt: serverTimestamp()
           });

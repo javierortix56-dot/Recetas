@@ -16,8 +16,7 @@ import { useAppStore } from "@/store/app-store"
 import { USER_ID } from "@/lib/constants"
 import { compressImageSrc } from "@/lib/utils"
 import { uploadRecipeImage } from "@/app/actions/recipe-images"
-import { categorizeIngredient, normalizeIngredientName } from "@/lib/categorizeIngredient"
-import { nameKey } from "@/lib/ingredient-groups"
+import { cleanRecipeIngredients, missingPantryItems } from "@/lib/ingredient-groups"
 import { generateRecipe, generateRecipeImage, type GeneratedRecipe } from "@/ai/flows/generate-recipe-flow"
 
 const IDEAS = ["Risotto de hongos", "Ñoquis de papa con salsa pomodoro", "Bife de chorizo con chimichurri", "Bowl alto en proteína para el post-gym"]
@@ -87,12 +86,9 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         try { fotoURL = await uploadRecipeImage(image) } catch (e) { console.error(e) }
       }
       const batch = writeBatch(db)
-      // Si ya existe en la despensa con otra escritura ("morron rojo" / "Morrón rojo"), se usa ese nombre
-      const pantryByKey = new Map(useAppStore.getState().ingredientes.map(i => [nameKey(i.nombre), i.nombre as string]))
-      const ingredientes = recipe.ingredientes.map(ing => {
-        const nombre = pantryByKey.get(nameKey(ing.nombre)) || normalizeIngredientName(ing.nombre)
-        return { ...ing, nombre, categoria: ing.categoria || categorizeIngredient(nombre) }
-      })
+      // Mismo nombre que en la despensa si es el mismo producto, unidades y categorías oficiales
+      const pantry = useAppStore.getState().ingredientes
+      const ingredientes = cleanRecipeIngredients(recipe.ingredientes, pantry)
       const recipeRef = doc(collection(db, "users", USER_ID, "recipes"))
       batch.set(recipeRef, {
         ...recipe,
@@ -108,15 +104,9 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       })
 
       // Ingredientes nuevos a la despensa (con stock 0) para que entren al MRP de compras
-      const known = new Set(pantryByKey.keys())
-      ingredientes.forEach(ing => {
-        const key = nameKey(ing.nombre)
-        if (!key || known.has(key)) return
-        known.add(key)
+      missingPantryItems(ingredientes, pantry).forEach(ing => {
         batch.set(doc(collection(db, "users", USER_ID, "ingredients")), {
-          nombre: ing.nombre,
-          categoria: ing.categoria,
-          unidad: ing.unidad,
+          ...ing,
           stockActual: 0,
           stockMinimo: 0,
           userId: USER_ID,

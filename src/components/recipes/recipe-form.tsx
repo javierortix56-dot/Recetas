@@ -4,7 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft, Plus, Trash2, Camera, Loader2, X, ChevronUp, ChevronDown } from "lucide-react"
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { addDoc, collection, doc, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,7 +15,8 @@ import { USER_ID } from "@/lib/constants"
 import { cn, getSafeImageSource } from "@/lib/utils"
 import { uploadImageSrc } from "@/lib/recipe-image"
 import { deleteRecipeImage } from "@/app/actions/recipe-images"
-import { normalizeIngredientName, categorizeIngredient } from "@/lib/categorizeIngredient"
+import { cleanRecipeIngredients, missingPantryItems } from "@/lib/ingredient-groups"
+import { useAppStore } from "@/store/app-store"
 
 const CATEGORIES = ["Desayuno", "Almuerzo", "Merienda", "Cena", "Postre", "Snack"]
 const UNITS = ["g", "kg", "ml", "l", "unidad", "cucharada", "cucharadita", "taza", "docena"]
@@ -143,6 +144,7 @@ export function RecipeForm({ recipe }: { recipe?: any }) {
       return
     }
     setIsSaving(true)
+    const pantry = useAppStore.getState().ingredientes
     try {
       const previousUrl = recipe?.fotoURL || recipe?.imageUrl || null
       let fotoURL = previousUrl
@@ -165,12 +167,7 @@ export function RecipeForm({ recipe }: { recipe?: any }) {
           carbohidratos: Number(form.macros.carbohidratos) || 0,
           grasas: Number(form.macros.grasas) || 0,
         },
-        ingredientes: form.ingredientes
-          .filter((ing: any) => (ing.nombre || "").trim())
-          .map((ing: any) => {
-            const nombre = normalizeIngredientName(ing.nombre)
-            return { ...ing, nombre, cantidad: Number(ing.cantidad) || 0, categoria: categorizeIngredient(nombre) }
-          }),
+        ingredientes: cleanRecipeIngredients(form.ingredientes, pantry),
         pasos: form.pasos
           .filter((p: any) => (p.descripcion || p.titulo || "").trim())
           .map((p: any, i: number) => ({ ...p, orden: i + 1, timerSegundos: Number(p.timerSegundos) || 0 })),
@@ -180,6 +177,16 @@ export function RecipeForm({ recipe }: { recipe?: any }) {
         updatedAt: serverTimestamp(),
       }
       delete (data as any).id
+
+      // Ingredientes nuevos a la despensa (con stock 0): sin esto no entraban a la lista de compras
+      const nuevos = missingPantryItems(data.ingredientes, pantry)
+      if (nuevos.length) {
+        const batch = writeBatch(db)
+        nuevos.forEach(ing => batch.set(doc(collection(db, "users", USER_ID, "ingredients")), {
+          ...ing, stockActual: 0, stockMinimo: 0, userId: USER_ID, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        }))
+        await batch.commit()
+      }
 
       if (isEdit) {
         await updateDoc(doc(db, "users", USER_ID, "recipes", recipe.id), data)
