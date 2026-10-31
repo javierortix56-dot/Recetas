@@ -17,6 +17,7 @@ import { USER_ID } from "@/lib/constants"
 import { compressImageSrc } from "@/lib/utils"
 import { uploadRecipeImage } from "@/app/actions/recipe-images"
 import { categorizeIngredient, normalizeIngredientName } from "@/lib/categorizeIngredient"
+import { nameKey } from "@/lib/ingredient-groups"
 import { generateRecipe, generateRecipeImage, type GeneratedRecipe } from "@/ai/flows/generate-recipe-flow"
 
 const IDEAS = ["Risotto de hongos", "Ñoquis de papa con salsa pomodoro", "Bife de chorizo con chimichurri", "Bowl alto en proteína para el post-gym"]
@@ -65,7 +66,8 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     setStage("recipe")
     setImage(null)
     try {
-      const r = await generateRecipe({ pedido: pedido.trim(), porciones })
+      const despensa = useAppStore.getState().ingredientes.map(i => i.nombre).filter(Boolean)
+      const r = await generateRecipe({ pedido: pedido.trim(), porciones, despensa })
       setRecipe(r)
       await makeImage(r)
     } catch (e) {
@@ -85,8 +87,10 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         try { fotoURL = await uploadRecipeImage(image) } catch (e) { console.error(e) }
       }
       const batch = writeBatch(db)
+      // Si ya existe en la despensa con otra escritura ("morron rojo" / "Morrón rojo"), se usa ese nombre
+      const pantryByKey = new Map(useAppStore.getState().ingredientes.map(i => [nameKey(i.nombre), i.nombre as string]))
       const ingredientes = recipe.ingredientes.map(ing => {
-        const nombre = normalizeIngredientName(ing.nombre)
+        const nombre = pantryByKey.get(nameKey(ing.nombre)) || normalizeIngredientName(ing.nombre)
         return { ...ing, nombre, categoria: ing.categoria || categorizeIngredient(nombre) }
       })
       const recipeRef = doc(collection(db, "users", USER_ID, "recipes"))
@@ -104,9 +108,9 @@ export function RecipeAIDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       })
 
       // Ingredientes nuevos a la despensa (con stock 0) para que entren al MRP de compras
-      const known = new Set(useAppStore.getState().ingredientes.map(i => (i.nombre || "").toLowerCase().trim()))
+      const known = new Set(pantryByKey.keys())
       ingredientes.forEach(ing => {
-        const key = ing.nombre.toLowerCase().trim()
+        const key = nameKey(ing.nombre)
         if (!key || known.has(key)) return
         known.add(key)
         batch.set(doc(collection(db, "users", USER_ID, "ingredients")), {

@@ -21,6 +21,7 @@ const CATEGORIAS_DESPENSA = [
 const GenerateRecipeInputSchema = z.object({
   pedido: z.string().min(2).max(500).describe('Qué receta quiere el usuario, con los detalles que quiera agregar'),
   porciones: z.number().int().min(1).max(20).optional(),
+  despensa: z.array(z.string()).max(1000).optional().describe('Nombres de la despensa, para reutilizarlos'),
 });
 export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
 
@@ -64,14 +65,20 @@ export type GeneratedRecipe = z.infer<typeof RecipeSchema>;
 
 const generateRecipeFlow = ai.defineFlow(
   { name: 'generateRecipeFlow', inputSchema: GenerateRecipeInputSchema, outputSchema: RecipeSchema },
-  async ({ pedido, porciones }) => {
+  async ({ pedido, porciones, despensa }) => {
     // Se usa el prompt maestro completo (el mismo de las recetas ya cargadas) y se le
     // agrega el pedido. La salida se valida contra el esquema, que refleja su formato JSON.
     const { output } = await ai.generate({
       prompt:
         `${PROMPT_TEMPLATE}\n\n━━━ PEDIDO ━━━\n` +
         `Generá UNA sola receta (un objeto, no un array) para este pedido: ${pedido}` +
-        (porciones ? `\nPorciones: ${porciones}` : ''),
+        (porciones ? `\nPorciones: ${porciones}` : '') +
+        // Mismo producto, mismo nombre: así no se crean duplicados en la despensa
+        (despensa?.length
+          ? `\n\n━━━ DESPENSA ACTUAL ━━━\nSi un ingrediente es el mismo producto que uno de esta lista, usá ese nombre exacto ` +
+            `(ej: si está "Morrón rojo", no pongas "pimiento rojo"). No lo reutilices si cambia la forma o variedad ` +
+            `("cebolla" no es "Cebolla en polvo"). Si no está, seguí la regla de "nombre".\n${despensa.join(' | ')}`
+          : ''),
       output: { schema: RecipeSchema },
     });
     if (!output) throw new Error('La IA no devolvió una receta');
