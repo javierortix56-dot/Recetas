@@ -1,4 +1,5 @@
 'use server';
+import { requireUser } from '@/lib/server-auth';
 /**
  * @fileOverview Flow de Genkit para planificar automáticamente un día específico.
  */
@@ -28,6 +29,7 @@ const AutoPlanDayOutputSchema = z.object({
 });
 
 export async function autoPlanDay(input: z.infer<typeof AutoPlanDayInputSchema>) {
+  await requireUser();
   return autoPlanDayFlow(input);
 }
 
