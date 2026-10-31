@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { searchPrices } from "@/app/actions/prices"
-import { SOURCE_LABEL, pricePerBaseUnit, type PriceOffer, type PriceRef } from "@/lib/prices/types"
+import { SOURCE_LABEL, normalizeUnit, pricePerBaseUnit, type PriceOffer, type PriceRef } from "@/lib/prices/types"
 import { cn, formatPrecio } from "@/lib/utils"
 
 const offerKey = (o: PriceOffer) => `${o.source}:${o.ean || o.name}`
@@ -63,6 +63,8 @@ export function PriceSearchDialog({ open, onOpenChange, initialQuery, baseUnit, 
     .sort((a, b) => b.rel - a.rel || Number(a.ppb === null) - Number(b.ppb === null) || (a.ppb ?? 0) - (b.ppb ?? 0)),
   [offers, baseUnit, query])
 
+  // "mililitros" → "ml" para la etiqueta de precio por unidad
+  const unitLabel = baseUnit === "docena" ? "docena" : normalizeUnit(baseUnit) ?? baseUnit
   const chosen = rows.filter(r => selected.has(r.key) && r.ppb !== null)
   const average = chosen.length ? chosen.reduce((s, r) => s + (r.ppb as number), 0) / chosen.length : 0
 
@@ -85,10 +87,10 @@ export function PriceSearchDialog({ open, onOpenChange, initialQuery, baseUnit, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="flex flex-col overflow-hidden h-[88dvh] pb-0" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Store className="h-5 w-5 text-primary" /> Precios en supermercados</DialogTitle>
-          <DialogDescription>Coto, Carrefour, Día, Jumbo, Vea y ChangoMás. Elegí uno o varios: se guarda el promedio por {baseUnit}.</DialogDescription>
+          <DialogDescription>Coto, Carrefour, Día, Jumbo, Vea y ChangoMás. Elegí uno o varios: se guarda el promedio por {unitLabel}.</DialogDescription>
         </DialogHeader>
 
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); run(query) }}>
@@ -99,7 +101,9 @@ export function PriceSearchDialog({ open, onOpenChange, initialQuery, baseUnit, 
           <Button type="submit" variant="secondary" className="h-11" disabled={loading}>Buscar</Button>
         </form>
 
-        <div className="space-y-1.5 min-h-[240px]">
+        {/* Solo la lista scrollea: un pie "sticky" con vidrio dentro de una zona con scroll
+            se dibujaba a mitad de la lista en Safari de iPhone */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-5 px-5 space-y-1.5">
           {loading && (
             <div className="py-16 flex flex-col items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin text-primary" /> Consultando 6 supermercados…
@@ -134,9 +138,9 @@ export function PriceSearchDialog({ open, onOpenChange, initialQuery, baseUnit, 
                 </span>
                 <span className="shrink-0 text-right">
                   {disabled ? (
-                    <span className="text-[10px] text-muted-foreground">no comparable<br />con {baseUnit}</span>
+                    <span className="text-[10px] text-muted-foreground">no comparable<br />con {unitLabel}</span>
                   ) : (
-                    <span className="text-sm font-bold tabular-nums">{formatPrecio(row.ppb as number)}<span className="text-[10px] font-medium text-muted-foreground">/{baseUnit}</span></span>
+                    <span className="text-sm font-bold tabular-nums">{formatPrecio(row.ppb as number)}<span className="text-[10px] font-medium text-muted-foreground">/{unitLabel}</span></span>
                   )}
                 </span>
               </button>
@@ -144,12 +148,12 @@ export function PriceSearchDialog({ open, onOpenChange, initialQuery, baseUnit, 
           })}
         </div>
 
-        <div className="sticky bottom-0 -mx-5 px-5 pt-3 pb-1 sheet-surface border-t border-hairline flex items-center gap-3">
+        <div className="shrink-0 -mx-5 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-hairline flex items-center gap-3">
           <div className="flex-1 min-w-0">
             {chosen.length > 0 ? (
               <>
                 <p className="text-[11px] text-muted-foreground">Promedio de {chosen.length}</p>
-                <p className="text-lg font-bold tabular-nums leading-tight">{formatPrecio(average)}<span className="text-xs font-medium text-muted-foreground">/{baseUnit}</span></p>
+                <p className="text-lg font-bold tabular-nums leading-tight">{formatPrecio(average)}<span className="text-xs font-medium text-muted-foreground">/{unitLabel}</span></p>
               </>
             ) : (
               <p className="text-xs text-muted-foreground">Elegí los productos que comprarías</p>
