@@ -5,7 +5,12 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Cocina Familiar',
     short_name: 'CocinaFam',
     description: 'Gestión de recetas familiares y nutrición',
+    // id y scope explícitos. Sin scope, iOS tomaba el directorio de start_url (/inicio/)
+    // como único alcance de la app y al ir a Plan, Recetas o Compras mostraba la barra
+    // de navegador (X, dirección y botones), como si fuera Safari.
+    id: '/',
     start_url: '/inicio/',
+    scope: '/',
     display: 'standalone',
     background_color: '#f2f4ee',
     theme_color: '#f2f4ee',
