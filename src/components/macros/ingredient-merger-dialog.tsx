@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast"
 import { USER_ID } from "@/lib/constants"
 import { analyzeDuplicates } from "@/ai/flows/analyze-duplicates-flow"
 import { useAppStore } from "@/store/app-store"
+import { syncShoppingList } from "@/lib/sync-logic"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 
 /** Unifica ingredientes duplicados de la despensa (vive en el menú de Despensa) */
@@ -49,65 +50,44 @@ export function IngredientMergerDialog({ asMenuItem }: { asMenuItem?: boolean } 
     try {
       const batch = writeBatch(db)
       const groupsToProcess = suggestions.filter((_, i) => selectedGroups.has(i))
+      // Ingredientes de cada receta con todos los renombres acumulados: antes cada
+      // duplicado escribía la receta original y solo quedaba el último cambio
+      const recipeIngs = new Map<string, any[]>()
 
       for (const group of groupsToProcess) {
-        const mainName = group.mainName
-        const duplicateNames = group.duplicates
+        const mainName: string = group.mainName
+        const duplicateNames: string[] = group.duplicates
+        const mainIng = ingredientes.find(i => i.nombre.toLowerCase() === mainName.toLowerCase())
+        const dups = ingredientes.filter(i => duplicateNames.includes(i.nombre) && i.id !== mainIng?.id)
+        if (dups.length === 0) continue
 
-        // 1. Encontrar o crear el ingrediente principal
-        let mainIng = ingredientes.find(i => i.nombre.toLowerCase() === mainName.toLowerCase())
-        let mainRef: any
+        // Stock total: el del principal (si existe) más el de todos los duplicados
+        const totalStock = (Number(mainIng?.stockActual) || 0) + dups.reduce((sum, d) => sum + (Number(d.stockActual) || 0), 0)
 
-        if (!mainIng) {
-          // Si no existe el principal, usamos el primero de los duplicados como base
-          const firstDup = ingredientes.find(i => duplicateNames.includes(i.nombre))
-          if (!firstDup) continue
-          mainRef = doc(collection(db, "users", USER_ID, "ingredients"))
-          batch.set(mainRef, {
-            ...firstDup,
-            nombre: mainName,
-            updatedAt: serverTimestamp()
-          })
-        } else {
-          mainRef = doc(db, "users", USER_ID, "ingredients", mainIng.id)
-        }
-
-        // 2. Procesar duplicados
-        let totalExtraStock = 0
-        for (const dupName of duplicateNames) {
-          const dupIng = ingredientes.find(i => i.nombre === dupName)
-          if (!dupIng || dupIng.id === mainIng?.id) continue
-
-          totalExtraStock += (Number(dupIng.stockActual) || 0)
-          
-          // Eliminar ingrediente duplicado
-          batch.delete(doc(db, "users", USER_ID, "ingredients", dupIng.id))
-
-          // 3. Actualizar recetas que usen este ingrediente
-          recetas.forEach(recipe => {
-            const hasIng = recipe.ingredientes?.some((ing: any) => ing.nombre === dupName)
-            if (hasIng) {
-              const updatedIngs = recipe.ingredientes.map((ing: any) => 
-                ing.nombre === dupName ? { ...ing, nombre: mainName } : ing
-              )
-              batch.update(doc(db, "users", USER_ID, "recipes", recipe.id), {
-                ingredientes: updatedIngs,
-                updatedAt: serverTimestamp()
-              })
-            }
-          })
-        }
-
-        // 4. Sumar stock al principal
         if (mainIng) {
-          batch.update(mainRef, {
-            stockActual: (Number(mainIng.stockActual) || 0) + totalExtraStock,
-            updatedAt: serverTimestamp()
+          batch.update(doc(db, "users", USER_ID, "ingredients", mainIng.id), { stockActual: totalStock, updatedAt: serverTimestamp() })
+        } else {
+          // No existe el principal: se crea a partir del primer duplicado, con el stock de todos
+          const { id: _id, ...base } = dups[0]
+          batch.set(doc(collection(db, "users", USER_ID, "ingredients")), { ...base, nombre: mainName, stockActual: totalStock, updatedAt: serverTimestamp() })
+        }
+
+        for (const dup of dups) {
+          batch.delete(doc(db, "users", USER_ID, "ingredients", dup.id))
+          recetas.forEach(recipe => {
+            const current = recipeIngs.get(recipe.id) ?? recipe.ingredientes
+            if (!current?.some((ing: any) => ing.nombre === dup.nombre)) return
+            recipeIngs.set(recipe.id, current.map((ing: any) => (ing.nombre === dup.nombre ? { ...ing, nombre: mainName } : ing)))
           })
         }
       }
 
+      recipeIngs.forEach((ingredientes, recipeId) => {
+        batch.update(doc(db, "users", USER_ID, "recipes", recipeId), { ingredientes, updatedAt: serverTimestamp() })
+      })
+
       await batch.commit()
+      syncShoppingList(db).catch(() => {})
       toast({ title: "Despensa unificada ✓", description: "Se actualizaron stock y recetas." })
       setOpen(false)
       setSuggestions([])

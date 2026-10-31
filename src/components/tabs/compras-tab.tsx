@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AlertTriangle, RefreshCcw, ChevronDown, Plus, ShoppingCart, MoreHorizontal, Trash2, CheckSquare, X, PackageCheck, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, writeBatch, serverTimestamp, getDoc, collection, deleteDoc, increment, arrayUnion } from "firebase/firestore";
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,8 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
 import { useAppStore } from '@/store/app-store';
 import { USER_ID } from '@/lib/constants';
-import { format } from 'date-fns';
-import { cn, formatPrecio, convertirCantidad } from '@/lib/utils';
+import { cn, formatPrecio, convertirCantidad, weekId } from '@/lib/utils';
 import { syncShoppingList } from '@/lib/sync-logic';
 
 const isManualItem = (i: any) => i.source === "manual" || i.reason === "Manual";
@@ -149,25 +148,18 @@ export function ComprasTab() {
         batch.delete(doc(db, "users", USER_ID, "shopping_list_items", item.id));
       }
 
-      const weekId = format(new Date(), "yyyy-'W'ww");
-      const historyRef = doc(db, "users", USER_ID, "historial_compras", weekId);
+      // increment/arrayUnion: dos compras terminadas a la vez (Javi y Mary) ya no se pisan
+      const semana = weekId(new Date());
+      const historyRef = doc(db, "users", USER_ID, "historial_compras", semana);
       const historySnap = await getDoc(historyRef);
-      if (historySnap.exists()) {
-        const existing = historySnap.data();
-        batch.update(historyRef, {
-          totalGastado: (existing.totalGastado || 0) + realTotalSpent,
-          itemsComprados: [...(existing.itemsComprados || []), ...itemsCompradosDetalle],
-          updatedAt: serverTimestamp()
-        });
-      } else {
-        batch.set(historyRef, {
-          semana: weekId,
-          totalGastado: realTotalSpent,
-          itemsComprados: itemsCompradosDetalle,
-          creadoEn: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      }
+      const compradoEn = Date.now();
+      batch.set(historyRef, {
+        semana,
+        totalGastado: increment(realTotalSpent),
+        itemsComprados: arrayUnion(...itemsCompradosDetalle.map(i => ({ ...i, compradoEn }))),
+        ...(historySnap.exists() ? {} : { creadoEn: serverTimestamp() }),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
       await batch.commit();
       syncShoppingList(db, activeProfile).catch(() => {});

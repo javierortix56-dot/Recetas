@@ -24,6 +24,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Cocina Familiar',
   },
+  // El ícono de iPhone (apple-touch-icon) lo genera Next desde src/app/apple-icon.png
+  // Next 15 solo emite "mobile-web-app-capable"; iOS anteriores a 16.4 necesitan esta
+  other: { 'apple-mobile-web-app-capable': 'yes' },
 };
 
 export const viewport: Viewport = {

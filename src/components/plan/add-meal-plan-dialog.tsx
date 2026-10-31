@@ -41,13 +41,16 @@ export function AddMealPlanDialog({ date, momento: defaultMomento, recipeToLog, 
   const [portions, setPortions] = React.useState(recipeToLog?.porciones || 3)
   const [savingId, setSavingId] = React.useState<string | null>(null)
 
+  // Depende de la fecha como texto: quien llama crea un Date nuevo en cada render
+  // y, con el objeto, cualquier actualización de datos reiniciaba lo elegido
+  const dateKey = format(date, "yyyy-MM-dd")
   React.useEffect(() => {
     if (open) {
       setMomento(defaultMomento)
-      setDateStr(format(date, "yyyy-MM-dd"))
+      setDateStr(dateKey)
       setSearch("")
     }
-  }, [open, defaultMomento, date])
+  }, [open, defaultMomento, dateKey])
 
   const filteredRecipes = React.useMemo(() => {
     if (!open || recipeToLog) return []

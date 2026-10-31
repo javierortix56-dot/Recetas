@@ -152,3 +152,39 @@ export async function removeMealPlan(batch: WriteBatch, db: Firestore, plan: any
 export function summaryDate(summary: any): string {
   return summary?.date || String(summary?.id || "").split("_")[0];
 }
+
+const LIGHT_MEALS = ["Desayuno", "Merienda"];
+const HEAVY_MEALS = ["Almuerzo", "Cena"];
+
+/**
+ * Planificador local, sin IA ni costo (traído de la rama que estaba en
+ * producción). Prioriza la categoría del momento, evita repetir recetas y no
+ * cruza comidas livianas con fuertes salvo que no quede otra opción.
+ * Se usa si la planificación con IA falla (sin clave, sin cuota o sin red).
+ */
+export function pickRecipesLocally(recetas: any[], dates: string[], momentos: readonly string[] = MOMENTOS) {
+  const used = new Set<string>();
+  const cats = (r: any): string[] => (Array.isArray(r.categorias) ? r.categorias : r.categoria ? [r.categoria] : []);
+  const plans: { date: string; mealType: string; recipeId: string; recipeName: string }[] = [];
+
+  for (const date of dates) {
+    for (const momento of momentos) {
+      const unused = recetas.filter(r => !used.has(r.id));
+      const incompatible = LIGHT_MEALS.includes(momento) ? HEAVY_MEALS : HEAVY_MEALS.includes(momento) ? LIGHT_MEALS : [];
+      const pools = [
+        unused.filter(r => cats(r).includes(momento)),                        // 1. categoría exacta
+        unused.filter(r => cats(r).length === 0),                             // 2. sin categoría
+        unused.filter(r => !cats(r).some(c => incompatible.includes(c))),    // 3. sin cruzar liviano/fuerte
+        unused,                                                               // 4. cualquiera sin usar
+        recetas,                                                              // 5. repetir
+      ];
+      const pool = pools.find(p => p.length > 0) || [];
+      const recipe = pool[Math.floor(Math.random() * pool.length)];
+      if (recipe) {
+        used.add(recipe.id);
+        plans.push({ date, mealType: momento, recipeId: recipe.id, recipeName: recipe.nombre });
+      }
+    }
+  }
+  return plans;
+}
